@@ -52,8 +52,15 @@
       >
         <Icon icon="lucide:plus" class="w-4 h-4" />
       </Button>
-      <div class="flex-1"></div>
 
+      <div class="flex-1"></div>
+      <Button
+        variant="ghost"
+        class="flex-shrink-0 text-xs ml-1 font-medium px-2 h-6 bg-transparent rounded-md flex items-center justify-center hover:bg-zinc-500/20"
+        @click="openMcpTab"
+      >
+        <Icon icon="lucide:fingerprint" class="w-4 h-4" />
+      </Button>
       <Button
         variant="ghost"
         class="text-xs font-medium px-2 h-7 bg-transparent rounded-md flex items-center justify-center hover:bg-zinc-500/20"
@@ -271,6 +278,23 @@ const openNewTab = () => {
       }
     })
   }, 300)
+}
+
+const openMcpTab = () => {
+  // 检查是否已经存在设置标签页
+  const existingSettingsTab = tabStore.tabs.find((tab) => tab.url.includes('#/mcp'))
+
+  if (existingSettingsTab) {
+    // 如果已经存在设置标签页，切换到该标签页
+    tabStore.setCurrentTabId(existingSettingsTab.id)
+  } else {
+    // 如果不存在设置标签页，创建新的
+    tabStore.addTab({
+      name: 'Mcp Tab',
+      icon: 'lucide:fingerprint',
+      viewType: 'mcp'
+    })
+  }
 }
 
 const scrollTabContainer = (direction: 'left' | 'right') => {
