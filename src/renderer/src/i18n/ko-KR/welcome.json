@@ -1,0 +1,37 @@
+{
+  "steps": {
+    "welcome": {
+      "title": "환영합니다",
+      "description": "McpChat 설정을 시작합시다"
+    },
+    "provider": {
+      "title": "모델 제공자",
+      "description": "선호하는 모델 제공자를 선택하세요"
+    },
+    "configuration": {
+      "title": "모델 구성",
+      "description": "사용할 모델을 구성하세요"
+    },
+    "complete": {
+      "title": "완료",
+      "description": "모든 설정이 완료되었습니다!"
+    }
+  },
+  "title": "McpChat에 오신 것을 환영합니다",
+  "description": "설정 과정을 완료합시다",
+  "provider": {
+    "select": "제공자 선택",
+    "apiUrl": "API URL",
+    "apiKey": "API 키",
+    "verifyLink": "링크 확인"
+  },
+  "complete": {
+    "title": "모두 완료!",
+    "description": "설정 과정을 완료했습니다. 시작해볼까요!"
+  },
+  "buttons": {
+    "getStarted": "시작하기",
+    "next": "다음",
+    "back": "뒤로"
+  }
+}

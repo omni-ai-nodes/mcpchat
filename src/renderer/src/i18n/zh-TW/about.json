@@ -1,0 +1,16 @@
+{
+  "title": "McpChat",
+  "description": "McpChat 是一款跨平台 AI 應用程式，致力於讓更多人輕鬆使用 AI。",
+  "website": "造訪我們的網站",
+  "disclaimerButton": "免責聲明",
+  "disclaimerTitle": "使用條款聲明",
+  "checkUpdateButton": "檢查更新",
+  "deviceInfo": {
+    "title": "裝置資訊",
+    "platform": "平台",
+    "arch": "架構",
+    "cpuModel": "CPU 型號",
+    "totalMemory": "總記憶體",
+    "osVersion": "系統版本"
+  }
+}

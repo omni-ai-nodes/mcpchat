@@ -1,0 +1,116 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      workflow_id:
+        description: 'Build workflow run ID to use for artifacts'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a prerelease?'
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts from workflow
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow_conclusion: success
+          run_id: ${{ github.event.inputs.workflow_id }}
+          path: artifacts
+
+      - name: List downloaded artifacts
+        run: find artifacts -type f | sort
+
+      - name: Get version number
+        id: get_version
+        run: |
+          VERSION_FILE=$(find artifacts/mcpchat-linux-x64 -name "McpChat-*.tar.gz" | head -n 1)
+          if [ -n "$VERSION_FILE" ]; then
+            VERSION=$(echo $VERSION_FILE | grep -o 'McpChat-[0-9]\+\.[0-9]\+\.[0-9]\+' | sed 's/McpChat-//')
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "Found version: $VERSION"
+          else
+            echo "Error: McpChat tar.gz file not found"
+            exit 1
+          fi
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release_assets
+
+          # Process Windows x64 artifacts
+          if [ -d "artifacts/mcpchat-win-x64" ]; then
+            cp artifacts/mcpchat-win-x64/*.exe release_assets/ 2>/dev/null || true
+            cp artifacts/mcpchat-win-x64/*.msi release_assets/ 2>/dev/null || true
+            cp artifacts/mcpchat-win-x64/*.zip release_assets/ 2>/dev/null || true
+          fi
+
+          # Process Windows arm64 artifacts
+          if [ -d "artifacts/mcpchat-win-arm64" ]; then
+            cp artifacts/mcpchat-win-arm64/*.exe release_assets/ 2>/dev/null || true
+            cp artifacts/mcpchat-win-arm64/*.msi release_assets/ 2>/dev/null || true
+            cp artifacts/mcpchat-win-arm64/*.zip release_assets/ 2>/dev/null || true
+          fi
+
+          # Process Linux x64 artifacts
+          if [ -d "artifacts/mcpchat-linux-x64" ]; then
+            cp artifacts/mcpchat-linux-x64/*.AppImage release_assets/ 2>/dev/null || true
+            cp artifacts/mcpchat-linux-x64/*.deb release_assets/ 2>/dev/null || true
+            cp artifacts/mcpchat-linux-x64/*.rpm release_assets/ 2>/dev/null || true
+            cp artifacts/mcpchat-linux-x64/*.tar.gz release_assets/ 2>/dev/null || true
+          fi
+
+          # Process Mac x64 artifacts
+          if [ -d "artifacts/mcpchat-mac-x64" ]; then
+            cp artifacts/mcpchat-mac-x64/*.dmg release_assets/ 2>/dev/null || true
+            cp artifacts/mcpchat-mac-x64/*.zip release_assets/ 2>/dev/null || true
+          fi
+
+          # Process Mac arm64 artifacts
+          if [ -d "artifacts/mcpchat-mac-arm64" ]; then
+            cp artifacts/mcpchat-mac-arm64/*.dmg release_assets/ 2>/dev/null || true
+            cp artifacts/mcpchat-mac-arm64/*.zip release_assets/ 2>/dev/null || true
+          fi
+
+          ls -la release_assets/
+
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: workflow-${{ github.event.inputs.workflow_id }}
+          name: McpChat V${{ steps.get_version.outputs.version }}
+          draft: true
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: |
+            release_assets/*
+          body: |
+            # 🚀 McpChat ${{ steps.get_version.outputs.version }} 正式发布 | 重新定义你的 AI 对话体验！
+            —— 不再是简单的 ChatBot，而是你的自然语言 Agent  工具🌟
+
+            📦 **构建信息**
+            - Workflow ID: `${{ github.event.inputs.workflow_id }}`
+            - 版本: `${{ steps.get_version.outputs.version }}`
+            - 预发布: `${{ github.event.inputs.prerelease }}`
+            - 构建时间: `${{ github.run_id }}`
+
+            🔥 为什么选择 McpChat？
+
+            ✅ **商业友好**：基于原版 [Apache License 2.0](https://github.com/omni-ai-nodes/mcpchat/blob/main/LICENSE) 开源，无任何协议外的额外约束，面向开源。
+            ✅ **开箱即用**：极简配置，即刻开启你的智能对话之旅。
+            ✅ **极致灵活**：自由切换模型，自定义模型源，满足你多样化的对话和探索需求。
+            ✅ **体验绝佳**：LaTeX 公式渲染、代码高亮、Markdown 支持，模型对话从未如此顺畅。
+            ✅ **持续进化**：我们倾听用户反馈，不断迭代更新，为你带来更卓越的 AI 对话体验。
+
+            📥 立即体验未来
+
+            💬 反馈有礼：欢迎提交你的宝贵建议，加入 VIP 用户社群，与我们一同塑造 McpChat 的未来！
+            <img width="400px" src="https://github.com/user-attachments/assets/2ebc21e8-3eef-4a11-b3ab-de28e8f9d9c0"/>
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

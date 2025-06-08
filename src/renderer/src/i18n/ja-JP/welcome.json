@@ -1,0 +1,37 @@
+{
+  "steps": {
+    "welcome": {
+      "title": "ようこそ",
+      "description": "McpChatの設定を始めましょう"
+    },
+    "provider": {
+      "title": "モデルプロバイダー",
+      "description": "お好みのモデルプロバイダーを選択してください"
+    },
+    "configuration": {
+      "title": "モデル設定",
+      "description": "使用したいモデルを設定してください"
+    },
+    "complete": {
+      "title": "完了",
+      "description": "すべての準備が整いました！"
+    }
+  },
+  "title": "McpChatへようこそ",
+  "description": "セットアップを完了しましょう",
+  "provider": {
+    "select": "プロバイダーを選択",
+    "apiUrl": "API URL",
+    "apiKey": "API キー",
+    "verifyLink": "リンクを検証"
+  },
+  "complete": {
+    "title": "すべて完了！",
+    "description": "セットアップが完了しました。始めましょう！"
+  },
+  "buttons": {
+    "getStarted": "始める",
+    "next": "次へ",
+    "back": "戻る"
+  }
+}

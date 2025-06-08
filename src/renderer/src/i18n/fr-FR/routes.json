@@ -1,0 +1,14 @@
+{
+  "chat": "Discussion",
+  "welcome": "Bienvenue",
+  "settings": "Paramètres",
+  "settings-common": "Paramètres généraux",
+  "settings-provider": "Paramètres du fournisseur",
+  "settings-mcp": "Paramètres MCP",
+  "settings-database": "Paramètres des données",
+  "settings-about": "À propos",
+  "settings-shortcut": "Raccourcis",
+  "settings-display": "Paramètres d'affichage",
+  "settings-knowledge-base": "Base de connaissances",
+  "settings-prompt": "Gestion des Prompts"
+}

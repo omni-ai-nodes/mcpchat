@@ -1,0 +1,30 @@
+{
+  "search": {
+    "placeholder": "搜索模型..."
+  },
+  "error": {
+    "loadFailed": "加載模型失敗"
+  },
+  "type": {
+    "custom": "自定義模型",
+    "official": "官方模型"
+  },
+  "add": {
+    "namePlaceholder": "模型名稱",
+    "idPlaceholder": "模型ID",
+    "contextLengthPlaceholder": "上下文長度",
+    "maxTokensPlaceholder": "最大token"
+  },
+  "actions": {
+    "add": "添加模型",
+    "enableAll": "啟用全部",
+    "disableAll": "禁用全部"
+  },
+  "tags": {
+    "reasoning": "推理",
+    "chat": "對話",
+    "code": "代碼",
+    "writing": "寫作",
+    "analysis": "分析"
+  }
+}

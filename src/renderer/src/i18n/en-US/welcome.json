@@ -1,0 +1,37 @@
+{
+  "steps": {
+    "welcome": {
+      "title": "Welcome",
+      "description": "Let's start setting up McpChat"
+    },
+    "provider": {
+      "title": "Model Provider",
+      "description": "Choose your preferred model provider"
+    },
+    "configuration": {
+      "title": "Model Configuration",
+      "description": "Configure the models you want to use"
+    },
+    "complete": {
+      "title": "Complete",
+      "description": "All set and ready to go!"
+    }
+  },
+  "title": "Welcome to McpChat",
+  "description": "Let's complete the setup process",
+  "provider": {
+    "select": "Select Provider",
+    "apiUrl": "API URL",
+    "apiKey": "API Key",
+    "verifyLink": "Verify Link"
+  },
+  "complete": {
+    "title": "All Done!",
+    "description": "You've completed the setup process, let's get started!"
+  },
+  "buttons": {
+    "getStarted": "Get Started",
+    "next": "Next",
+    "back": "Back"
+  }
+}

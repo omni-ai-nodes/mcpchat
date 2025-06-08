@@ -1,0 +1,30 @@
+{
+  "search": {
+    "placeholder": "Search models..."
+  },
+  "error": {
+    "loadFailed": "Failed to load model"
+  },
+  "type": {
+    "custom": "Custom Model",
+    "official": "Official Model"
+  },
+  "add": {
+    "namePlaceholder": "Model Name",
+    "idPlaceholder": "Model ID",
+    "contextLengthPlaceholder": "Context Length",
+    "maxTokensPlaceholder": "Max Tokens"
+  },
+  "actions": {
+    "add": "Add Model",
+    "enableAll": "Enable All",
+    "disableAll": "Disable All"
+  },
+  "tags": {
+    "reasoning": "Reasoning",
+    "chat": "Chat",
+    "code": "Code",
+    "writing": "Writing",
+    "analysis": "Analysis"
+  }
+}

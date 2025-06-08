@@ -1,0 +1,37 @@
+{
+  "steps": {
+    "welcome": {
+      "title": "Добро пожаловать",
+      "description": "Начнем настройку McpChat"
+    },
+    "provider": {
+      "title": "Провайдер моделей",
+      "description": "Выберите предпочитаемого провайдера моделей"
+    },
+    "configuration": {
+      "title": "Конфигурация модели",
+      "description": "Настройте модели, которые хотите использовать"
+    },
+    "complete": {
+      "title": "Завершено",
+      "description": "Всё готово к работе!"
+    }
+  },
+  "title": "Добро пожаловать в McpChat",
+  "description": "Давайте завершим процесс настройки",
+  "provider": {
+    "select": "Выбрать провайдера",
+    "apiUrl": "API URL",
+    "apiKey": "API ключ",
+    "verifyLink": "Проверить ссылку"
+  },
+  "complete": {
+    "title": "Всё готово!",
+    "description": "Вы завершили процесс настройки, давайте начнем!"
+  },
+  "buttons": {
+    "getStarted": "Начать",
+    "next": "Далее",
+    "back": "Назад"
+  }
+}

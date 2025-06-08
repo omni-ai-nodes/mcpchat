@@ -1,0 +1,38 @@
+{
+  "input": {
+    "placeholder": "問點什麼？可以通過{'@'}來引用工具、文件、資源...",
+    "fileArea": "文件區域",
+    "inputArea": "輸入區域",
+    "functionSwitch": "功能開關",
+    "fileSelect": "選擇文件",
+    "pasteFiles": "支持複製粘貼文件",
+    "dropFiles": "拖拽文件到此處",
+    "promptFilesAdded": "Prompt 文件已添加",
+    "promptFilesAddedDesc": "已成功添加 {count} 個文件",
+    "promptFilesError": "文件處理錯誤",
+    "promptFilesErrorDesc": "{count} 個文件處理失敗"
+  },
+  "features": {
+    "deepThinking": "深度思考",
+    "webSearch": "網絡搜索",
+    "deepThinkingProgress": "深度思考中...",
+    "thinkingDuration": "（用時 {0} 秒）",
+    "artifactThinking": "artifact 思考"
+  },
+  "search": {
+    "results": "已搜索到{0}個網頁",
+    "searching": "搜索中...",
+    "title": "搜索結果",
+    "description": "共找到 {0} 條相關結果",
+    "optimizing": "正在提取搜索意...",
+    "reading": "正在搜索并阅读网页...",
+    "error": "搜索失败"
+  },
+  "messages": {
+    "thinking": "正在思考..."
+  },
+  "notify": {
+    "generationComplete": "生成完畢",
+    "generationError": "生成失敗"
+  }
+}

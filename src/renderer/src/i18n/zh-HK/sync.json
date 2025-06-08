@@ -1,0 +1,17 @@
+{
+  "success": {
+    "importComplete": "數據導入成功，點擊確定後將重新啟動應用"
+  },
+  "error": {
+    "notEnabled": "同步功能未啟用",
+    "folderNotExists": "同步資料夾不存在",
+    "noValidBackup": "同步資料夾中沒有有效的備份文件",
+    "dbNotExists": "數據庫文件不存在",
+    "configNotExists": "配置文件不存在",
+    "tempDbFailed": "臨時數據庫備份文件創建失敗",
+    "tempConfigFailed": "臨時配置備份文件創建失敗",
+    "importFailed": "導入失敗，已恢復原始數據",
+    "importProcess": "導入過程出錯",
+    "unknown": "未知錯誤"
+  }
+}

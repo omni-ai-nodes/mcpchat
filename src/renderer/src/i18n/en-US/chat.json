@@ -1,0 +1,38 @@
+{
+  "input": {
+    "placeholder": "Ask something? You can quote tools, files, resources via {'@'}...",
+    "fileArea": "File Area",
+    "inputArea": "Input Area",
+    "functionSwitch": "Function Switch",
+    "fileSelect": "File Select",
+    "pasteFiles": "Support copy and paste files",
+    "dropFiles": "Drop files here",
+    "promptFilesAdded": "Prompt Files Added",
+    "promptFilesAddedDesc": "Successfully added {count} files",
+    "promptFilesError": "File Processing Error",
+    "promptFilesErrorDesc": "{count} files failed to process"
+  },
+  "features": {
+    "deepThinking": "Deep Thinking",
+    "webSearch": "Web Search",
+    "deepThinkingProgress": "Deep Thinking in progress...",
+    "thinkingDuration": "(Took {0} seconds)",
+    "artifactThinking": "Artifact Thinking"
+  },
+  "search": {
+    "results": "Found {0} web pages",
+    "searching": "Searching...",
+    "title": "Search Results",
+    "description": "Found {0} related results",
+    "optimizing": "Optimizing search query...",
+    "reading": "Searching and reading web pages...",
+    "error": "Search failed"
+  },
+  "messages": {
+    "thinking": "Thinking..."
+  },
+  "notify": {
+    "generationComplete": "Generation is complete",
+    "generationError": "Generation failed"
+  }
+}

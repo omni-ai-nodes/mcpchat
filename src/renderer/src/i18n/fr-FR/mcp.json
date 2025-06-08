@@ -1,0 +1,238 @@
+{
+  "tools": {
+    "searchPlaceholder": "Rechercher des outils...",
+    "noToolsAvailable": "Aucun outil disponible",
+    "toolList": "Liste des outils",
+    "functionDescription": "Description de la fonction",
+    "path": "Chemin",
+    "pathPlaceholder": "Entrez le chemin du fichier",
+    "searchPattern": "Modèle de recherche",
+    "searchPatternPlaceholder": "Entrez une expression régulière",
+    "filePattern": "Modèle de fichier",
+    "filePatternPlaceholder": "Entrez le modèle de fichier, par exemple : *.md",
+    "executeButton": "Exécuter",
+    "resultTitle": "Résultat de l'exécution",
+    "runningTool": "Exécution...",
+    "loading": "Chargement...",
+    "error": "Échec du chargement",
+    "available": "{count} outils disponibles",
+    "none": "Aucun outil disponible",
+    "title": "Outils MCP",
+    "description": "Outils fournis par le serveur MCP",
+    "loadError": "Échec du chargement des outils",
+    "parameters": "Paramètres",
+    "refresh": "Rafraîchir",
+    "disabled": "MCP est désactivé",
+    "enableToUse": "Veuillez activer MCP pour utiliser les outils",
+    "enabled": "Activer MCP",
+    "enabledDescription": "Activer la fonctionnalité MCP pour utiliser les appels d'outils",
+    "empty": "Vide",
+    "invalidJsonFormat": "Format JSON invalide",
+    "jsonInputPlaceholder": "Entrez les paramètres au format JSON",
+    "input": "Paramètres d'entrée",
+    "type": "Type",
+    "annotations": "Annotations",
+    "selectToolToDebug": "Sélectionnez un outil à déboguer",
+    "dialogDescription": "Déboguer et tester les outils fournis par les serveurs MCP",
+    "toolsCount": "outils",
+    "availableTools": "Outils disponibles",
+    "invalidJson": "Format JSON invalide",
+    "inputHint": "Veuillez entrer les paramètres au format JSON",
+    "required": "Requis",
+    "noDescription": "Pas de description"
+  },
+  "addServer": "Ajouter un serveur",
+  "addServerDialog": {
+    "description": "Configurer un nouveau serveur MCP",
+    "title": "Ajouter un serveur"
+  },
+  "confirmDelete": {
+    "cancel": "Annuler",
+    "confirm": "supprimer",
+    "description": "Êtes-vous sûr de vouloir supprimer le serveur {name} ? \nCette opération ne peut pas être annulée.",
+    "title": "Confirmer la suppression"
+  },
+  "confirmRemoveServer": "Êtes-vous sûr de vouloir supprimer le serveur {name} ? \nCette opération ne peut pas être annulée.",
+  "default": "par défaut",
+  "deleteServer": "Supprimer le serveur",
+  "description": "Gérer et configurer les serveurs et outils MCP (Modèle de Contrôle de Protocole)",
+  "editServer": "Modifier le serveur",
+  "editServerDialog": {
+    "description": "Modifier la configuration du serveur MCP",
+    "title": "Modifier le serveur"
+  },
+  "enableToAccess": "Veuillez d'abord activer MCP pour accéder aux options de configuration",
+  "enabledDescription": "Activer ou désactiver les fonctionnalités et outils MCP",
+  "enabledTitle": "Activer MCP",
+  "isDefault": "Serveur par défaut",
+  "noServersFound": "Serveur non trouvé",
+  "removeDefault": "Supprimer par défaut",
+  "removeServer": "Supprimer le serveur",
+  "removeServerDialog": {
+    "title": "Supprimer le serveur"
+  },
+  "resetConfirm": "récupérer",
+  "resetConfirmDescription": "Cette action restaure tous les serveurs par défaut tout en conservant vos serveurs personnalisés. \nToute modification du serveur par défaut sera perdue.",
+  "resetConfirmTitle": "Restaurer le service par défaut",
+  "resetToDefault": "Restaurer le service par défaut",
+  "running": "En cours d'exécution",
+  "serverForm": {
+    "add": "Ajouter à",
+    "args": "paramètre",
+    "argsPlaceholder": "Entrez les paramètres, séparés par des espaces",
+    "argsRequired": "Les paramètres ne peuvent pas être vides",
+    "autoApprove": "Autorisation automatique",
+    "autoApproveAll": "tout",
+    "autoApproveHelp": "Sélectionnez le type d'opération nécessitant une autorisation automatique et exécutez sans confirmation de l'utilisateur",
+    "autoApproveRead": "Lire",
+    "autoApproveWrite": "Écrire",
+    "baseUrl": "URL de base",
+    "baseUrlPlaceholder": "Entrez l'URL de base du serveur (par exemple : http://localhost:3000)",
+    "cancel": "Annuler",
+    "command": "Commande",
+    "commandPlaceholder": "Entrez une commande",
+    "commandRequired": "La commande ne peut pas être vide",
+    "configImported": "Importation de la configuration réussie",
+    "description": "décrire",
+    "descriptionPlaceholder": "Entrez la description du serveur",
+    "descriptions": "décrire",
+    "descriptionsPlaceholder": "Entrez la description du serveur",
+    "env": "Variables d'environnement",
+    "envInvalid": "Les variables d'environnement doivent être au format JSON valide",
+    "envPlaceholder": "Entrez les variables d'environnement au format JSON",
+    "icon": "icône",
+    "iconPlaceholder": "Entrez l'icône",
+    "icons": "icône",
+    "iconsPlaceholder": "Entrez l'icône",
+    "jsonConfig": "Configuration JSON",
+    "jsonConfigExample": "Exemple de configuration JSON",
+    "jsonConfigIntro": "Vous pouvez coller directement la configuration JSON ou choisir de configurer le serveur manuellement.",
+    "jsonConfigPlaceholder": "Veuillez coller la configuration au format JSON du serveur MCP",
+    "name": "Nom du serveur",
+    "namePlaceholder": "Entrez le nom du serveur",
+    "nameRequired": "Le nom du serveur ne peut pas être vide",
+    "parseAndContinue": "Analyser et continuer",
+    "parseError": "Erreur d'analyse",
+    "parseSuccess": "Analyse de la configuration réussie",
+    "skipToManual": "Passer à la configuration manuelle",
+    "submit": "soumettre",
+    "type": "Type de serveur",
+    "typeInMemory": "Mémoire",
+    "typePlaceholder": "Sélectionnez un type de serveur",
+    "typeSse": "Le serveur envoie des événements",
+    "typeStdio": "Entrée et sortie standard",
+    "update": "renouveler",
+    "addFolder": "Ajouter un dossier",
+    "folders": "Liste de dossiers",
+    "noFoldersSelected": "Aucun dossier n'a été sélectionné",
+    "selectFolder": "Sélectionnez un dossier",
+    "selectFolderError": "Échec de la sélection d'un dossier"
+  },
+  "serverList": "Liste des serveurs",
+  "setAsDefault": "Définir comme serveur par défaut",
+  "setDefault": "Définir par défaut",
+  "startServer": "Démarrer le serveur",
+  "stopServer": "Arrêter le serveur",
+  "stopped": "Arrêté",
+  "tabs": {
+    "servers": "serveur",
+    "tools": "outil"
+  },
+  "title": "Paramètres MCP",
+  "inmemory": {
+    "Artifacts": {
+      "desc": "Rendez votre sortie McpChat diversifiée avec du contenu d'Artifacts",
+      "name": "Artifacts"
+    },
+    "bochaSearch": {
+      "desc": "API de Bocha Search https://open.bochaai.com/",
+      "name": "Recherche Bocha"
+    },
+    "buildInFileSystem": {
+      "desc": "Permettre à McpChat de manipuler des fichiers locaux",
+      "name": "Système de fichiers"
+    },
+    "imageServer": {
+      "desc": "Après ouverture, tout modèle dans McpChat peut comprendre des images et générer des images.",
+      "name": "Service d'images"
+    },
+    "braveSearch": {
+      "desc": "Brave Search API https://brave.com/search/API/",
+      "name": "Recherche courageuse"
+    },
+    "powerpack": {
+      "desc": "Fournissez des capacités améliorées telles que la requête temporelle, l'acquisition d'informations Web et l'exécution de code sécurisé pour tout grand modèle, afin que le modèle ait des capacités d'acquisition d'informations plus puissantes et précises.",
+      "name": "Boîte à outils d'amélioration"
+    },
+    "difyKnowledge": {
+      "name": "Recherche dans la base de connaissances Dify",
+      "desc": "Service de recherche de la base de connaissances Dify, permet de rechercher le contenu de la base de connaissances Dify"
+    },
+    "ragflowKnowledge": {
+      "name": "Recherche dans la base de connaissances RAGFlow",
+      "desc": "Service de recherche dans la base de connaissances RAGFlow, peut rechercher le contenu de la base de connaissances RAGFlow"
+    },
+    "fastGptKnowledge": {
+      "name": "Recherche dans la base de connaissances FastGPT",
+      "desc": "Service de recherche dans la base de connaissances FastGPT, peut rechercher le contenu de la base de connaissances FastGPT"
+    },
+    "mcpchat-inmemory/custom-prompts-server": {
+      "desc": "Service de mot invite personnalisé intégré Deepchat intégré",
+      "name": "Mots rapides personnalisés"
+    },
+    "mcpchat-inmemory/deep-research-server": {
+      "desc": "Un service de recherche approfondi de Deepchat basé sur la recherche de bocha (notez que des modèles de contexte longs doivent être utilisés, et les modèles avec un contexte insuffisant peuvent échouer)",
+      "name": "Recherche en profondeur"
+    },
+    "mcpchat-inmemory/auto-prompting-server": {
+      "name": "Génération Automatique de Prompt par Modèle",
+      "desc": "Sélectionne automatiquement le prompt personnalisé le plus adapté en fonction de l'entrée de l'utilisateur et remplit intelligemment le modèle de prompt."
+    },
+    "mcpchat-inmemory/conversation-search-server": {
+      "name": "Recherche d'Historique de Conversation",
+      "desc": "Service de recherche d'historique de conversation intégré McpChat, peut rechercher les enregistrements de conversation historiques et le contenu des messages"
+    }
+  },
+  "prompts": {
+    "noPromptsAvailable": "Aucune invite disponible",
+    "noDescription": "Aucune description encore",
+    "selectPrompt": "Montré ici",
+    "parameters": "Paramètres rapides",
+    "input": "Paramètres d'entrée",
+    "runningPrompt": "Invite obtient",
+    "executeButton": "Cliquez pour obtenir",
+    "resultTitle": "Des détails proches",
+    "invalidJson": "Format JSON non valide",
+    "parametersHint": "Veuillez saisir les paramètres au format JSON, prendre en charge la mise en forme automatique",
+    "resetToDefault": "Réinitialiser avec les paramètres par défaut",
+    "dialogDescription": "Déboguer et tester les prompts fournis par les serveurs MCP"
+  },
+  "resources": {
+    "noResourcesAvailable": "Aucune ressource",
+    "selectResource": "Afficher le contenu des ressources ici",
+    "loading": "chargement",
+    "loadContent": "Obtenez du contenu de ressources",
+    "pleaseSelect": "Cliquez pour obtenir des détails sur les ressources d'affichage",
+    "dialogDescription": "Parcourir et afficher les ressources fournies par les serveurs MCP"
+  },
+  "errors": {
+    "loadConfigFailed": "Échec du chargement de la configuration MCP",
+    "setEnabledFailed": "Échec de la modification de l'état d'activation de MCP",
+    "getServerStatusFailed": "Échec de l'obtention du statut du serveur {serverName}",
+    "addServerFailed": "Échec de l'ajout du serveur",
+    "updateServerFailed": "Échec de la mise à jour du serveur",
+    "removeServerFailed": "Échec de la suppression du serveur",
+    "maxDefaultServersReached": "Nombre maximum de serveurs par défaut (30) atteint",
+    "toggleDefaultServerFailed": "Échec du changement d'état du serveur par défaut",
+    "resetToDefaultFailed": "Échec de la réinitialisation des serveurs par défaut",
+    "toggleServerFailed": "Échec du changement d'état du serveur {serverName}",
+    "loadToolsFailed": "Échec du chargement des outils",
+    "loadPromptsFailed": "Échec du chargement des prompts",
+    "loadResourcesFailed": "Échec du chargement des ressources",
+    "callToolFailed": "Échec de l'appel de l'outil {toolName}",
+    "toolCallError": "Erreur d'appel d'outil : {error}",
+    "mcpDisabled": "MCP est désactivé",
+    "getPromptFailed": "Échec de l'obtention du prompt",
+    "readResourceFailed": "Échec de la lecture de la ressource"
+  }
+}

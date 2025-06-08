@@ -1,0 +1,38 @@
+{
+  "input": {
+    "placeholder": "Задайте вопрос? Вы можете ссылаться на инструменты, файлы, ресурсы через {'@'}...",
+    "fileArea": "Область файлов",
+    "inputArea": "Область ввода",
+    "functionSwitch": "Переключатель функций",
+    "fileSelect": "Выбрать файл",
+    "pasteFiles": "Поддержка копирования и вставки файлов",
+    "dropFiles": "Перетащите файлы сюда",
+    "promptFilesAdded": "Файлы промпта добавлены",
+    "promptFilesAddedDesc": "Успешно добавлено {count} файлов",
+    "promptFilesError": "Ошибка обработки файлов",
+    "promptFilesErrorDesc": "Не удалось обработать {count} файлов"
+  },
+  "features": {
+    "deepThinking": "Глубокое мышление",
+    "webSearch": "Поиск в интернете",
+    "deepThinkingProgress": "Глубокое мышление...",
+    "thinkingDuration": "(Заняло {0} секунд)",
+    "artifactThinking": "Артефакт мышление"
+  },
+  "search": {
+    "results": "Найдено {0} веб-страниц",
+    "searching": "Поиск...",
+    "title": "Результаты поиска",
+    "description": "Найдено {0} связанных результатов",
+    "optimizing": "Извлечение поискового запроса...",
+    "reading": "Поиск и чтение веб-страниц...",
+    "error": "Ошибка поиска"
+  },
+  "messages": {
+    "thinking": "Думаю ..."
+  },
+  "notify": {
+    "generationComplete": "Поколение завершено",
+    "generationError": "Поколение не удалось"
+  }
+}
