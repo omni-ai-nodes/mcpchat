@@ -127,6 +127,7 @@ const confirmRemoveServer = async () => {
   isRemoveConfirmDialogOpen.value = false
 }
 
+// mcp 内置服务数据
 const handleToggleDefaultServer = async (serverName: string) => {
   const isDefault = mcpStore.config.defaultServers.includes(serverName)
   if (!isDefault && mcpStore.config.defaultServers.length > 30) {
