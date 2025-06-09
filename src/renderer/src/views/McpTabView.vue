@@ -129,21 +129,47 @@ const confirmRemoveServer = async () => {
 
 // mcp 内置服务数据
 const handleToggleDefaultServer = async (serverName: string) => {
-  const isDefault = mcpStore.config.defaultServers.includes(serverName)
-  if (!isDefault && mcpStore.config.defaultServers.length > 30) {
-    toast({
-      title: t('mcp.errors.maxDefaultServersReached'),
-      description: t('settings.mcp.removeDefaultFirst'),
-      variant: 'destructive'
-    })
-    return
-  }
+  try {
+    // 获取服务器列表数据
+    const response = await fetch('http://103.150.10.87:6666/api/get_mcp_server_list')
+    const data = await response.json()
+    
+    if (data.code === 200 && data.data.Infos) {
+      const serverInfo = data.data.Infos.find(info => info.Name === serverName)
+      
+      if (serverInfo) {
+        // 更新服务器信息
+        await mcpStore.updateServer(serverName, {
+          name: serverInfo.Name,
+          descriptions: serverInfo.Introdution,
+          icons: serverInfo.Logo
+        })
+      }
+    }
+    
+    // 检查默认服务器数量限制
+    const isDefault = mcpStore.config.defaultServers.includes(serverName)
+    if (!isDefault && mcpStore.config.defaultServers.length > 30) {
+      toast({
+        title: t('mcp.errors.maxDefaultServersReached'),
+        description: t('settings.mcp.removeDefaultFirst'),
+        variant: 'destructive'
+      })
+      return
+    }
 
-  const result = await mcpStore.toggleDefaultServer(serverName)
-  if (!result.success) {
+    const result = await mcpStore.toggleDefaultServer(serverName)
+    if (!result.success) {
+      toast({
+        title: t('common.error.operationFailed'),
+        description: result.message,
+        variant: 'destructive'
+      })
+    }
+  } catch (error) {
     toast({
       title: t('common.error.operationFailed'),
-      description: result.message,
+      description: error.message,
       variant: 'destructive'
     })
   }
@@ -273,39 +299,6 @@ const handleViewResources = async (serverName: string) => {
               @toggle="handleToggleServer(server.name)"
               @toggle-default="handleToggleDefaultServer(server.name)"
               @edit="openEditServerDialog(server.name)"
-              @view-tools="handleViewTools(server.name)"
-              @view-prompts="handleViewPrompts(server.name)"
-              @view-resources="handleViewResources(server.name)"
-            />
-          </div>
-        </div>
-
-        <!-- 自定义服务 -->
-        <div v-if="regularServers.length > 0">
-          <div class="flex items-center space-x-2 mb-3">
-            <Icon icon="lucide:settings" class="h-4 w-4 text-green-600" />
-            <h3 class="text-sm font-semibold text-foreground">
-              {{ t('settings.mcp.customServers') }}
-            </h3>
-            <div class="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full">
-              {{ regularServers.length }}
-            </div>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <McpSquareCard
-              v-for="server in regularServers"
-              :key="server.name"
-              :server="server"
-              :is-built-in="false"
-              :is-loading="mcpStore.serverLoadingStates[server.name]"
-              :disabled="mcpStore.configLoading"
-              :tools-count="getServerToolsCount(server.name)"
-              :prompts-count="getServerPromptsCount(server.name)"
-              :resources-count="getServerResourcesCount(server.name)"
-              @toggle="handleToggleServer(server.name)"
-              @toggle-default="handleToggleDefaultServer(server.name)"
-              @edit="openEditServerDialog(server.name)"
-              @remove="handleRemoveServer(server.name)"
               @view-tools="handleViewTools(server.name)"
               @view-prompts="handleViewPrompts(server.name)"
               @view-resources="handleViewResources(server.name)"
