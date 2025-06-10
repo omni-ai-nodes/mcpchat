@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -42,6 +42,31 @@ const selectedServer = ref<string>('')
 const selectedServerForTools = ref<string>('')
 const selectedServerForPrompts = ref<string>('')
 const selectedServerForResources = ref<string>('')
+
+// 在组件挂载时获取数据
+onMounted(async () => {
+  try {
+    var params = {
+        "page_size":10,
+        "current_page":1
+    }
+    const response = await fetch('https://api.omni-ainode.com/api/get_mcp_server_list', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params)
+    })
+    const data = await response.json()
+    
+    if (data.code === 200 && data.data.Infos) {
+      console.log(data.data.Infos)
+    }
+  } catch (error) {
+    console.error('Failed to fetch MCP server list:', error)
+  }
+})
+
 // 监听 MCP 安装缓存
 watch(
   () => settingsStore.mcpInstallCache,
@@ -130,23 +155,6 @@ const confirmRemoveServer = async () => {
 // mcp 内置服务数据
 const handleToggleDefaultServer = async (serverName: string) => {
   try {
-    // 获取服务器列表数据
-    const response = await fetch('http://103.150.10.87:6666/api/get_mcp_server_list')
-    const data = await response.json()
-    
-    if (data.code === 200 && data.data.Infos) {
-      const serverInfo = data.data.Infos.find(info => info.Name === serverName)
-      
-      if (serverInfo) {
-        // 更新服务器信息
-        await mcpStore.updateServer(serverName, {
-          name: serverInfo.Name,
-          descriptions: serverInfo.Introdution,
-          icons: serverInfo.Logo
-        })
-      }
-    }
-    
     // 检查默认服务器数量限制
     const isDefault = mcpStore.config.defaultServers.includes(serverName)
     if (!isDefault && mcpStore.config.defaultServers.length > 30) {
