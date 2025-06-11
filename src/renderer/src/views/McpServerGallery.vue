@@ -84,7 +84,8 @@ const showAddDialog = ref(false)
 const fetchServers = async (page: number = 1, size: number = 10) => {
   loading.value = true
   try {
-    const response = await fetch('https://api.omni-ainode.com/api/get_mcp_server_list', {
+    const apiUrl = import.meta.env.VITE_MCP_SERVER_API_URL || 'https://api.omni-ainode.com'
+    const response = await fetch(`${apiUrl}/api/get_mcp_server_list`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -519,7 +520,29 @@ onMounted(() => {
           >
             <CardContent class="p-4">
               <div class="flex items-center gap-4">
-                <div class="text-2xl flex-shrink-0">{{ server.icon }}</div>
+                <!-- 修复图标显示 -->
+                <div class="flex-shrink-0">
+                  <img 
+                    v-if="getServerIcon(server.icon).startsWith('http') || getServerIcon(server.icon).startsWith('data:')"
+                    :src="getServerIcon(server.icon)"
+                    :alt="server.name"
+                    class="w-8 h-8 rounded object-cover"
+                    @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'"
+                  />
+                  <div 
+                    v-else
+                    class="w-8 h-8 rounded bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-sm"
+                  >
+                    {{ getServerIcon(server.icon) }}
+                  </div>
+                  <!-- 备用图标，当图片加载失败时显示 -->
+                  <div 
+                    class="w-8 h-8 rounded bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-sm" 
+                    style="display: none;"
+                  >
+                    🔧
+                  </div>
+                </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 mb-1">
                     <h3 class="font-medium truncate">{{ server.name }}</h3>
@@ -600,17 +623,6 @@ onMounted(() => {
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        <!-- 空状态 -->
-        <div v-else class="flex flex-col items-center justify-center h-full min-h-[500px] text-center px-8">
-          <Icon icon="lucide:server-off" class="w-20 h-20 text-muted-foreground mb-6" />
-          <h3 class="text-xl font-medium mb-3">{{ t('mcp.mcpGallery.noServers') }}</h3>
-          <p class="text-muted-foreground mb-6 max-w-lg leading-relaxed">{{ t('mcp.mcpGallery.noServersDescription') }}</p>
-          <Button @click="showAddDialog = true" class="gap-2 px-6 py-3">
-            <Icon icon="lucide:plus" class="w-4 h-4" />
-            {{ t('mcp.mcpGallery.addFirstServer') }}
-          </Button>
         </div>
       </div>
     </div>

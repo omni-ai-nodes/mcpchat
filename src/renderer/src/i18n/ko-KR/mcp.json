@@ -208,7 +208,7 @@
     "dialogDescription": "MCP 서버가 제공하는 프롬프트를 디버그하고 테스트합니다"
   },
   "resources": {
-    "noResourcesAvailable": "자원이 없습니다",
+    "noResourcesAvailable": "자원이 없음",
     "selectResource": "여기에 리소스 콘텐츠를 표시하십시오",
     "loading": "로딩",
     "loadContent": "리소스 컨텐츠를 얻으십시오",
@@ -236,7 +236,7 @@
     "readResourceFailed": "리소스 읽기 실패"
   },
   "mcpGallery": {
-    "title": "MCP 서버 갤러리",
+    "title": "MCP 플라자",
     "addServer": "서버 추가",
     "searchPlaceholder": "서버 검색...",
     "filterByStatus": "상태별 필터",

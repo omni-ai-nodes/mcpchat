@@ -236,7 +236,7 @@
     "readResourceFailed": "讀取資源失敗"
   },
   "mcpGallery": {
-    "title": "MCP 服務器庫",
+    "title": "MCP 廣場",
     "addServer": "添加服務器",
     "searchPlaceholder": "搜索服務器...",
     "filterByStatus": "按狀態篩選",

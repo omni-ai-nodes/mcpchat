@@ -236,7 +236,7 @@
     "readResourceFailed": "Failed to read resource"
   },
   "mcpGallery": {
-    "title": "MCP Server Gallery",
+    "title": "MCP Plaza",
     "addServer": "Add Server",
     "searchPlaceholder": "Search servers...",
     "filterByStatus": "Filter by status",

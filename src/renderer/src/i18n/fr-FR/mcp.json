@@ -236,7 +236,7 @@
     "readResourceFailed": "Échec de la lecture de la ressource"
   },
   "mcpGallery": {
-    "title": "Galerie de serveurs MCP",
+    "title": "Place MCP",
     "addServer": "Ajouter un serveur",
     "searchPlaceholder": "Rechercher des serveurs...",
     "filterByStatus": "Filtrer par statut",

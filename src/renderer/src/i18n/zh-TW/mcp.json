@@ -236,7 +236,7 @@
     "dialogDescription": "瀏覽和查看MCP伺服器提供的資源"
   },
   "mcpGallery": {
-    "title": "MCP 伺服器庫",
+    "title": "MCP 廣場",
     "addServer": "新增伺服器",
     "searchPlaceholder": "搜尋伺服器...",
     "filterByStatus": "依狀態篩選",

@@ -236,7 +236,7 @@
     "readResourceFailed": "Не удалось прочитать ресурс"
   },
   "mcpGallery": {
-    "title": "Галерея MCP серверов",
+    "title": "MCP Площадь",
     "addServer": "Добавить сервер",
     "searchPlaceholder": "Поиск серверов...",
     "filterByStatus": "Фильтр по статусу",

@@ -236,7 +236,7 @@
     "dialogDescription": "浏览和查看MCP服务器提供的资源"
   },
   "mcpGallery": {
-    "title": "MCP 服务器库",
+    "title": "MCP 广场",
     "addServer": "添加服务器",
     "searchPlaceholder": "搜索服务器...",
     "filterByStatus": "按状态筛选",

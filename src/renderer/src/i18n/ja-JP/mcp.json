@@ -236,7 +236,7 @@
     "readResourceFailed": "リソースの読み込みに失敗しました"
   },
   "mcpGallery": {
-    "title": "MCP サーバーギャラリー",
+    "title": "MCP プラザ",
     "addServer": "サーバーを追加",
     "searchPlaceholder": "サーバーを検索...",
     "filterByStatus": "ステータスでフィルター",
