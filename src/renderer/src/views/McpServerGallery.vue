@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 
@@ -24,19 +24,45 @@ const DropdownMenuSeparator = defineAsyncComponent(() => import('@/components/ui
 
 const { t } = useI18n()
 
+// API返回的服务器数据类型
+interface ApiServerItem {
+  Id: number
+  Name: string
+  Logo: string
+  By: string
+  Introdution: string
+  Github: string
+  DeployJson: string
+  Content: string
+  Tools: string
+  CreatedAt: string
+  UpdatedAt: string
+}
+
+// API响应类型
+interface ApiResponse {
+  code: number
+  msg: string
+  data: {
+    Infos: ApiServerItem[]
+    total_pages: number
+  }
+}
+
 // 服务器数据类型
 interface ServerItem {
   id: string
   name: string
   icon: string
   description: string
-  type: 'http' | 'local'
+  type: string // 改为显示By内容
   status: 'running' | 'stopped' | 'error' | 'loading'
   isRunning: boolean
   isDefault: boolean
   toolsCount: number
   promptsCount: number
   resourcesCount: number
+  github?: string // 添加GitHub链接
   command?: string
   args?: string[]
   baseUrl?: string
@@ -44,180 +70,142 @@ interface ServerItem {
 }
 
 // 响应式数据
-const servers = ref<ServerItem[]>([
-  {
-    id: '1',
-    name: '支付宝 MCP',
-    icon: '💰',
-    description: '支付宝支付服务器，提供支付相关功能和API接口',
-    type: 'http',
-    status: 'running',
-    isRunning: true,
-    isDefault: true,
-    toolsCount: 5,
-    promptsCount: 3,
-    resourcesCount: 2
-  },
-  {
-    id: '2',
-    name: '无影 AgentBay',
-    icon: '🔧',
-    description: '无影AgentBay服务，提供AI代理和自动化工具',
-    type: 'local',
-    status: 'running',
-    isRunning: true,
-    isDefault: false,
-    toolsCount: 8,
-    promptsCount: 12,
-    resourcesCount: 4
-  },
-  {
-    id: '3',
-    name: 'Cloudflare',
-    icon: '☁️',
-    description: 'Cloudflare MCP服务器，提供CDN和网络服务管理',
-    type: 'http',
-    status: 'stopped',
-    isRunning: false,
-    isDefault: false,
-    toolsCount: 6,
-    promptsCount: 2,
-    resourcesCount: 8
-  },
-  {
-    id: '4',
-    name: 'Firecrawl',
-    icon: '🔥',
-    description: '网页爬虫MCP服务器，提供网页内容抓取和解析功能',
-    type: 'local',
-    status: 'running',
-    isRunning: true,
-    isDefault: false,
-    toolsCount: 4,
-    promptsCount: 1,
-    resourcesCount: 3
-  },
-  {
-    id: '5',
-    name: 'Playwright',
-    icon: '🎭',
-    description: '浏览器自动化测试工具，支持多种浏览器的自动化操作',
-    type: 'local',
-    status: 'running',
-    isRunning: true,
-    isDefault: false,
-    toolsCount: 15,
-    promptsCount: 8,
-    resourcesCount: 5
-  },
-  {
-    id: '6',
-    name: 'Perplexity Ask',
-    icon: '🔍',
-    description: 'Perplexity搜索服务，提供智能问答和信息检索功能',
-    type: 'http',
-    status: 'error',
-    isRunning: false,
-    isDefault: false,
-    toolsCount: 3,
-    promptsCount: 5,
-    resourcesCount: 1,
-    errorMessage: '连接超时，请检查网络设置'
-  },
-  {
-    id: '7',
-    name: 'Blender',
-    icon: '🎨',
-    description: '3D建模和渲染工具，支持复杂的3D场景创建和动画制作',
-    type: 'local',
-    status: 'stopped',
-    isRunning: false,
-    isDefault: false,
-    toolsCount: 20,
-    promptsCount: 6,
-    resourcesCount: 12
-  },
-  {
-    id: '8',
-    name: 'Figma',
-    icon: '🎨',
-    description: '设计协作平台，提供界面设计和原型制作工具',
-    type: 'http',
-    status: 'running',
-    isRunning: true,
-    isDefault: false,
-    toolsCount: 10,
-    promptsCount: 4,
-    resourcesCount: 7
-  },
-  {
-    id: '9',
-    name: 'Baidu Map',
-    icon: '🗺️',
-    description: '百度地图服务，提供地理位置和导航相关功能',
-    type: 'http',
-    status: 'running',
-    isRunning: true,
-    isDefault: false,
-    toolsCount: 7,
-    promptsCount: 2,
-    resourcesCount: 9
-  }
-])
-
+const servers = ref<ServerItem[]>([])
+const loading = ref(false)
+const currentPage = ref(1)
+const totalPages = ref(1)
+const pageSize = ref(10)
 const searchQuery = ref('')
 const filterStatus = ref('all')
 const viewMode = ref<'grid' | 'list'>('grid')
 const showAddDialog = ref(false)
 
-// 计算属性
+// API调用函数
+const fetchServers = async (page: number = 1, size: number = 10) => {
+  loading.value = true
+  try {
+    const response = await fetch('https://api.omni-ainode.com/api/get_mcp_server_list', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        page_size: size,
+        current_page: page
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data: ApiResponse = await response.json()
+    
+    if (data.code === 200) {
+      // 将API数据映射为组件需要的格式
+      servers.value = data.data.Infos.map(item => ({
+        id: item.Id.toString(),
+        name: item.Name,
+        icon: getServerIcon(item.Logo), // 处理图标
+        description: item.Introdution,
+        type: item.By, // 显示By内容而不是http/local
+        status: 'stopped' as const, // 默认状态
+        isRunning: false,
+        isDefault: false,
+        toolsCount: 0, // 可以根据需要解析Tools字段
+        promptsCount: 0,
+        resourcesCount: 0,
+        github: item.Github
+      }))
+      
+      totalPages.value = data.data.total_pages
+      currentPage.value = page
+    } else {
+      console.error('API返回错误:', data.msg)
+    }
+  } catch (error) {
+    console.error('获取服务器列表失败:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 处理服务器图标
+const getServerIcon = (logo: string): string => {
+  // 如果logo是有效的URL，返回该URL用于显示图片
+  if (logo && (logo.startsWith('http://') || logo.startsWith('https://') || logo.startsWith('data:'))) {
+    return logo
+  }
+  // 如果logo是emoji或其他字符，直接返回
+  if (logo && logo.trim()) {
+    return logo
+  }
+  // 默认图标
+  return '🔧'
+}
+
+// 打开GitHub链接
+const openGithub = (url: string) => {
+  if (url) {
+    window.open(url, '_blank')
+  }
+}
+
+// 翻页函数
+const goToPage = (page: number) => {
+  if (page >= 1 && page <= totalPages.value && page !== currentPage.value) {
+    fetchServers(page, pageSize.value)
+  }
+}
+
+// 上一页
+const prevPage = () => {
+  if (currentPage.value > 1) {
+    goToPage(currentPage.value - 1)
+  }
+}
+
+// 下一页
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    goToPage(currentPage.value + 1)
+  }
+}
+
+// 计算属性：过滤后的服务器列表
 const filteredServers = computed(() => {
   let filtered = servers.value
-  
+
   // 搜索过滤
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(server => 
       server.name.toLowerCase().includes(query) ||
-      server.description.toLowerCase().includes(query)
+      server.description.toLowerCase().includes(query) ||
+      server.type.toLowerCase().includes(query)
     )
   }
-  
+
   // 状态过滤
   if (filterStatus.value !== 'all') {
-    filtered = filtered.filter(server => server.status === filterStatus.value)
+    filtered = filtered.filter(server => {
+      switch (filterStatus.value) {
+        case 'running':
+          return server.status === 'running'
+        case 'stopped':
+          return server.status === 'stopped'
+        case 'error':
+          return server.status === 'error'
+        default:
+          return true
+      }
+    })
   }
-  
+
   return filtered
 })
 
-// 方法
-const getStatusDotClass = (status: string) => {
-  switch (status) {
-    case 'running':
-      return 'bg-green-500'
-    case 'loading':
-      return 'bg-blue-500 animate-pulse'
-    case 'error':
-      return 'bg-red-500'
-    default:
-      return 'bg-gray-400'
-  }
-}
-
-const getStatusTextClass = (status: string) => {
-  switch (status) {
-    case 'running':
-      return 'text-green-600 dark:text-green-400'
-    case 'loading':
-      return 'text-blue-600 dark:text-blue-400'
-    case 'error':
-      return 'text-red-600 dark:text-red-400'
-    default:
-      return 'text-muted-foreground'
-  }
-}
-
+// 状态相关函数
 const getStatusText = (status: string) => {
   switch (status) {
     case 'running':
@@ -231,48 +219,79 @@ const getStatusText = (status: string) => {
   }
 }
 
-const toggleServer = (server: ServerItem) => {
-  server.isRunning = !server.isRunning
-  server.status = server.isRunning ? 'running' : 'stopped'
-  console.log(`${server.isRunning ? '启动' : '停止'}服务器:`, server.name)
+const getStatusDotClass = (status: string) => {
+  switch (status) {
+    case 'running':
+      return 'bg-green-500'
+    case 'loading':
+      return 'bg-yellow-500'
+    case 'error':
+      return 'bg-red-500'
+    default:
+      return 'bg-gray-400'
+  }
+}
+
+const getStatusTextClass = (status: string) => {
+  switch (status) {
+    case 'running':
+      return 'text-green-600'
+    case 'loading':
+      return 'text-yellow-600'
+    case 'error':
+      return 'text-red-600'
+    default:
+      return 'text-gray-500'
+  }
+}
+
+// 服务器操作函数
+const addServer = () => {
+  showAddDialog.value = true
 }
 
 const editServer = (server: ServerItem) => {
-  console.log('编辑服务器:', server.name)
+  console.log('编辑服务器:', server)
 }
 
 const deleteServer = (server: ServerItem) => {
-  const index = servers.value.findIndex(s => s.id === server.id)
-  if (index > -1) {
-    servers.value.splice(index, 1)
-  }
-  console.log('删除服务器:', server.name)
+  console.log('删除服务器:', server)
+}
+
+const toggleServer = (server: ServerItem) => {
+  server.isRunning = !server.isRunning
+  server.status = server.isRunning ? 'running' : 'stopped'
 }
 
 const viewTools = (server: ServerItem) => {
-  console.log('查看工具:', server.name)
+  console.log('查看工具:', server)
 }
 
 const viewPrompts = (server: ServerItem) => {
-  console.log('查看提示词:', server.name)
+  console.log('查看提示词:', server)
 }
 
 const viewResources = (server: ServerItem) => {
-  console.log('查看资源:', server.name)
+  console.log('查看资源:', server)
 }
+
+// 组件挂载时获取数据
+onMounted(() => {
+  fetchServers()
+})
 </script>
 
 <template>
-  <div class="w-full h-full flex flex-col bg-background">
-    <!-- 页面标题栏 -->
+  <div class="flex flex-col h-full w-full bg-background">
+    <!-- 标题栏 -->
     <div class="flex items-center justify-between p-4 border-b">
-      <div class="flex items-center gap-3">
-        <Icon icon="lucide:server" class="w-6 h-6 text-primary" />
+      <div class="flex items-center space-x-4">
         <h1 class="text-2xl font-semibold">{{ t('mcp.mcpGallery.title') }}</h1>
       </div>
-      <div class="flex items-center gap-2">
-        <!-- 视图切换 -->
-        <div class="flex items-center border rounded-lg p-1">
+      
+      <div class="flex items-center space-x-2">
+        <!-- 视图切换按钮 -->
+        <div class="flex items-center border rounded-md p-1">
           <Button
             variant="ghost"
             size="sm"
@@ -323,186 +342,73 @@ const viewResources = (server: ServerItem) => {
     </div>
 
     <!-- 服务器展示区域 -->
-    <div class="flex-1 overflow-auto p-4">
-      <!-- 网格视图 -->
-      <div v-if="viewMode === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-        <Card
-          v-for="server in filteredServers"
-          :key="server.id"
-          class="group cursor-pointer hover:shadow-lg transition-all duration-200 overflow-hidden border hover:border-primary"
-        >
-          <div class="px-4 py-3">
-            <!-- 头部：图标、名称、状态、菜单 -->
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center space-x-2 flex-1 min-w-0">
-                <!-- 服务器图标 -->
-                <div class="text-lg flex-shrink-0">{{ server.icon }}</div>
-                <!-- 名称 -->
-                <h3 class="text-sm font-bold truncate flex-1">
-                  {{ server.name }}
-                </h3>
-              </div>
-              <!-- 操作菜单 -->
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    class="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                  >
-                    <Icon icon="lucide:more-horizontal" class="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem @click="editServer(server)">
-                    <Icon icon="lucide:edit-3" class="h-4 w-4 mr-2" />
-                    {{ t('mcp.mcpGallery.editServer') }}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem @click="toggleServer(server)">
-                    <Icon
-                      :icon="server.isRunning ? 'lucide:power-off' : 'lucide:power'"
-                      class="h-4 w-4 mr-2"
-                    />
-                    {{ server.isRunning ? t('mcp.mcpGallery.stopServer') : t('mcp.mcpGallery.startServer') }}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    class="text-destructive focus:text-destructive"
-                    @click="deleteServer(server)"
-                  >
-                    <Icon icon="lucide:trash-2" class="h-4 w-4 mr-2" />
-                    {{ t('mcp.mcpGallery.deleteServer') }}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            <!-- 类型和标识 -->
-            <div class="flex items-center space-x-2 mb-2">
-              <!-- 服务器类型 -->
-              <Badge variant="outline" class="text-xs h-4 px-1.5">
-                {{ server.type === 'http' ? 'HTTP' : 'Local' }}
-              </Badge>
-              <!-- 默认启动标识 -->
-              <Badge v-if="server.isDefault" variant="secondary" class="text-xs h-4 px-1.5">
-                {{ t('mcp.mcpGallery.default') }}
-              </Badge>
-            </div>
-
-            <!-- 描述 -->
-            <div class="mb-3">
-              <p class="text-xs text-secondary-foreground line-clamp-2 leading-4">
-                {{ server.description }}
-              </p>
-            </div>
-
-            <!-- 底部控制 -->
-            <div class="flex items-center justify-between">
-              <!-- 状态 -->
-              <div class="flex items-center space-x-1.5">
-                <div :class="['w-2 h-2 rounded-full', getStatusDotClass(server.status)]" />
-                <span :class="['text-xs', getStatusTextClass(server.status)]">
-                  {{ getStatusText(server.status) }}
-                </span>
-              </div>
-              <!-- 开关 -->
-              <Switch
-                :checked="server.isRunning"
-                @update:checked="toggleServer(server)"
-              />
-            </div>
-          </div>
-          
-          <!-- 底部统计栏 -->
-          <div class="flex flex-row bg-muted h-9 items-center">
-            <!-- 工具按钮 -->
-            <Button
-              variant="ghost"
-              class="h-full flex-1 text-xs hover:bg-secondary rounded-none"
-              :disabled="server.toolsCount === 0"
-              @click="viewTools(server)"
-            >
-              <Icon icon="lucide:wrench" class="h-3 w-3 mr-1" />
-              {{ server.toolsCount }}
-            </Button>
-            <!-- 提示词按钮 -->
-            <Separator orientation="vertical" class="h-5" />
-            <Button
-              variant="ghost"
-              class="h-full flex-1 text-xs hover:bg-secondary rounded-none"
-              :disabled="server.promptsCount === 0"
-              @click="viewPrompts(server)"
-            >
-              <Icon icon="lucide:message-square-quote" class="h-3 w-3 mr-1" />
-              {{ server.promptsCount }}
-            </Button>
-            <Separator orientation="vertical" class="h-5" />
-            <!-- 资源按钮 -->
-            <Button
-              variant="ghost"
-              class="h-full flex-1 text-xs hover:bg-secondary rounded-none"
-              :disabled="server.resourcesCount === 0"
-              @click="viewResources(server)"
-            >
-              <Icon icon="lucide:folder" class="h-3 w-3 mr-1" />
-              {{ server.resourcesCount }}
-            </Button>
-          </div>
-        </Card>
+    <div class="flex-1 overflow-auto">
+      <!-- 加载状态 -->
+      <div v-if="loading" class="flex items-center justify-center h-full min-h-[400px]">
+        <Icon icon="lucide:loader-2" class="w-8 h-8 animate-spin text-muted-foreground" />
+        <span class="ml-2 text-muted-foreground">加载中...</span>
       </div>
-
-      <!-- 列表视图 -->
-      <div v-else class="space-y-3">
-        <Card
-          v-for="server in filteredServers"
-          :key="server.id"
-          class="group cursor-pointer hover:shadow-md transition-all duration-200"
-        >
-          <CardContent class="p-4">
-            <div class="flex items-center gap-4">
-              <div class="text-2xl flex-shrink-0">{{ server.icon }}</div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-1">
-                  <h3 class="font-medium truncate">{{ server.name }}</h3>
-                  <Badge variant="outline" class="text-xs">
-                    {{ server.type === 'http' ? 'HTTP' : 'Local' }}
-                  </Badge>
-                  <Badge v-if="server.isDefault" variant="secondary" class="text-xs">
-                    {{ t('mcp.mcpGallery.default') }}
-                  </Badge>
+      
+      <!-- 有服务器时的内容区域 -->
+      <div v-else-if="filteredServers.length > 0" class="p-4">
+        <!-- 网格视图 -->
+        <div v-if="viewMode === 'grid'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+          <Card
+            v-for="server in filteredServers"
+            :key="server.id"
+            class="group cursor-pointer hover:shadow-lg transition-all duration-200 overflow-hidden border hover:border-primary"
+          >
+            <div class="px-4 py-3">
+              <!-- 头部：图标、名称、状态、菜单 -->
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2 flex-1 min-w-0">
+                  <!-- 服务器图标 -->
+                  <div class="text-lg flex-shrink-0">
+                      <img 
+                          v-if="getServerIcon(server.icon).startsWith('http') || getServerIcon(server.icon).startsWith('data:')"
+                          :src="getServerIcon(server.icon)"
+                          :alt="server.name"
+                          class="w-10 h-10 rounded-lg object-cover"
+                          @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'"
+                      />
+                      <div 
+                          v-else
+                          class="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-lg"
+                      >
+                          {{ getServerIcon(server.icon) }}
+                      </div>
+                      <!-- 备用图标，当图片加载失败时显示 -->
+                      <div 
+                          class="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-lg" 
+                          style="display: none;"
+                      >
+                          🔧
+                      </div>
+                  </div>
+                  <!-- 名称 -->
+                  <h3 class="text-sm font-bold truncate flex-1">
+                    {{ server.name }}
+                  </h3>
                 </div>
-                <p class="text-sm text-muted-foreground line-clamp-1 mb-2">{{ server.description }}</p>
-                <div class="flex items-center space-x-4 text-xs text-muted-foreground">
-                  <span class="flex items-center gap-1">
-                    <Icon icon="lucide:wrench" class="w-3 h-3" />
-                    {{ server.toolsCount }} {{ t('mcp.mcpGallery.tools') }}
-                  </span>
-                  <span class="flex items-center gap-1">
-                    <Icon icon="lucide:message-square-quote" class="w-3 h-3" />
-                    {{ server.promptsCount }} {{ t('mcp.mcpGallery.prompts') }}
-                  </span>
-                  <span class="flex items-center gap-1">
-                    <Icon icon="lucide:folder" class="w-3 h-3" />
-                    {{ server.resourcesCount }} {{ t('mcp.mcpGallery.resources') }}
-                  </span>
-                </div>
-              </div>
-              <div class="flex items-center gap-3">
-                <div class="flex items-center space-x-1.5">
-                  <div :class="['w-2 h-2 rounded-full', getStatusDotClass(server.status)]" />
-                  <span :class="['text-xs', getStatusTextClass(server.status)]">
-                    {{ getStatusText(server.status) }}
-                  </span>
-                </div>
-                <Switch
-                  :checked="server.isRunning"
-                  @update:checked="toggleServer(server)"
-                />
+                <!-- GitHub图标 -->
+                <Button
+                  v-if="server.github"
+                  variant="ghost"
+                  size="icon"
+                  class="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mr-1"
+                  @click="openGithub(server.github)"
+                >
+                  <Icon icon="lucide:github" class="h-3 w-3" />
+                </Button>
+                <!-- 操作菜单 -->
                 <DropdownMenu>
                   <DropdownMenuTrigger as-child>
-                    <Button variant="ghost" size="icon" class="h-8 w-8">
-                      <Icon icon="lucide:more-horizontal" class="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      class="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                    >
+                      <Icon icon="lucide:more-horizontal" class="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
@@ -529,21 +435,225 @@ const viewResources = (server: ServerItem) => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      <!-- 空状态 -->
-      <div v-if="filteredServers.length === 0" class="flex flex-col items-center justify-center h-64 text-center">
-        <Icon icon="lucide:server-off" class="w-16 h-16 text-muted-foreground mb-4" />
-        <h3 class="text-lg font-medium mb-2">{{ t('mcp.mcpGallery.noServers') }}</h3>
-        <p class="text-muted-foreground mb-4">{{ t('mcp.mcpGallery.noServersDescription') }}</p>
-        <Button @click="showAddDialog = true" class="gap-2">
-          <Icon icon="lucide:plus" class="w-4 h-4" />
-          {{ t('mcp.mcpGallery.addFirstServer') }}
-        </Button>
+              <!-- 类型和标识 -->
+              <div class="flex items-center space-x-2 mb-2">
+                <!-- 作者信息 -->
+                <Badge variant="outline" class="text-xs h-4 px-1.5">
+                  {{ server.type }}
+                </Badge>
+                <!-- 默认启动标识 -->
+                <Badge v-if="server.isDefault" variant="secondary" class="text-xs h-4 px-1.5">
+                  {{ t('mcp.mcpGallery.default') }}
+                </Badge>
+              </div>
+
+              <!-- 描述 -->
+              <div class="mb-3">
+                <p class="text-xs text-secondary-foreground line-clamp-2 leading-4">
+                  {{ server.description }}
+                </p>
+              </div>
+
+              <!-- 底部控制 -->
+              <div class="flex items-center justify-between">
+                <!-- 状态 -->
+                <div class="flex items-center space-x-1.5">
+                  <div :class="['w-2 h-2 rounded-full', getStatusDotClass(server.status)]" />
+                  <span :class="['text-xs', getStatusTextClass(server.status)]">
+                    {{ getStatusText(server.status) }}
+                  </span>
+                </div>
+                <!-- 开关 -->
+                <Switch
+                  :checked="server.isRunning"
+                  @update:checked="toggleServer(server)"
+                />
+              </div>
+            </div>
+            
+            <!-- 底部统计栏 -->
+            <div class="flex flex-row bg-muted h-9 items-center">
+              <!-- 工具按钮 -->
+              <Button
+                variant="ghost"
+                class="h-full flex-1 text-xs hover:bg-secondary rounded-none"
+                :disabled="server.toolsCount === 0"
+                @click="viewTools(server)"
+              >
+                <Icon icon="lucide:wrench" class="h-3 w-3 mr-1" />
+                {{ server.toolsCount }} {{ t('mcp.mcpGallery.tools') }}
+              </Button>
+              <!-- 提示词按钮 -->
+              <Separator orientation="vertical" class="h-5" />
+              <Button
+                variant="ghost"
+                class="h-full flex-1 text-xs hover:bg-secondary rounded-none"
+                :disabled="server.promptsCount === 0"
+                @click="viewPrompts(server)"
+              >
+                <Icon icon="lucide:message-square-quote" class="h-3 w-3 mr-1" />
+                {{ server.promptsCount }} {{ t('mcp.mcpGallery.prompts') }}
+              </Button>
+              <Separator orientation="vertical" class="h-5" />
+              <!-- 资源按钮 -->
+              <Button
+                variant="ghost"
+                class="h-full flex-1 text-xs hover:bg-secondary rounded-none"
+                :disabled="server.resourcesCount === 0"
+                @click="viewResources(server)"
+              >
+                <Icon icon="lucide:folder" class="h-3 w-3 mr-1" />
+                {{ server.resourcesCount }} {{ t('mcp.mcpGallery.resources') }}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      
+        <!-- 列表视图 -->
+        <div v-else class="space-y-3">
+          <Card
+            v-for="server in filteredServers"
+            :key="server.id"
+            class="group cursor-pointer hover:shadow-md transition-all duration-200"
+          >
+            <CardContent class="p-4">
+              <div class="flex items-center gap-4">
+                <div class="text-2xl flex-shrink-0">{{ server.icon }}</div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-1">
+                    <h3 class="font-medium truncate">{{ server.name }}</h3>
+                    <Badge variant="outline" class="text-xs">
+                      {{ server.type }}
+                    </Badge>
+                    <Badge v-if="server.isDefault" variant="secondary" class="text-xs">
+                      {{ t('mcp.mcpGallery.default') }}
+                    </Badge>
+                    <!-- GitHub图标 -->
+                    <Button
+                      v-if="server.github"
+                      variant="ghost"
+                      size="icon"
+                      class="h-5 w-5"
+                      @click="openGithub(server.github)"
+                    >
+                      <Icon icon="lucide:github" class="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <p class="text-sm text-muted-foreground line-clamp-1 mb-2">{{ server.description }}</p>
+                  <div class="flex items-center space-x-4 text-xs text-muted-foreground">
+                    <span class="flex items-center gap-1">
+                      <Icon icon="lucide:wrench" class="w-3 h-3" />
+                      {{ server.toolsCount }} {{ t('mcp.mcpGallery.tools') }}
+                    </span>
+                    <span class="flex items-center gap-1">
+                      <Icon icon="lucide:message-square-quote" class="w-3 h-3" />
+                      {{ server.promptsCount }} {{ t('mcp.mcpGallery.prompts') }}
+                    </span>
+                    <span class="flex items-center gap-1">
+                      <Icon icon="lucide:folder" class="w-3 h-3" />
+                      {{ server.resourcesCount }} {{ t('mcp.mcpGallery.resources') }}
+                    </span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="flex items-center space-x-1.5">
+                    <div :class="['w-2 h-2 rounded-full', getStatusDotClass(server.status)]" />
+                    <span :class="['text-xs', getStatusTextClass(server.status)]">
+                      {{ getStatusText(server.status) }}
+                    </span>
+                  </div>
+                  <Switch
+                    :checked="server.isRunning"
+                    @update:checked="toggleServer(server)"
+                  />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button variant="ghost" size="icon" class="h-8 w-8">
+                        <Icon icon="lucide:more-horizontal" class="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem @click="editServer(server)">
+                        <Icon icon="lucide:edit-3" class="h-4 w-4 mr-2" />
+                        {{ t('mcp.mcpGallery.editServer') }}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem @click="toggleServer(server)">
+                        <Icon
+                          :icon="server.isRunning ? 'lucide:power-off' : 'lucide:power'"
+                          class="h-4 w-4 mr-2"
+                        />
+                        {{ server.isRunning ? t('mcp.mcpGallery.stopServer') : t('mcp.mcpGallery.startServer') }}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        class="text-destructive focus:text-destructive"
+                        @click="deleteServer(server)"
+                      >
+                        <Icon icon="lucide:trash-2" class="h-4 w-4 mr-2" />
+                        {{ t('mcp.mcpGallery.deleteServer') }}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-else class="flex flex-col items-center justify-center h-full min-h-[500px] text-center px-8">
+          <Icon icon="lucide:server-off" class="w-20 h-20 text-muted-foreground mb-6" />
+          <h3 class="text-xl font-medium mb-3">{{ t('mcp.mcpGallery.noServers') }}</h3>
+          <p class="text-muted-foreground mb-6 max-w-lg leading-relaxed">{{ t('mcp.mcpGallery.noServersDescription') }}</p>
+          <Button @click="showAddDialog = true" class="gap-2 px-6 py-3">
+            <Icon icon="lucide:plus" class="w-4 h-4" />
+            {{ t('mcp.mcpGallery.addFirstServer') }}
+          </Button>
+        </div>
       </div>
+    </div>
+
+    <!-- 翻页组件 -->
+    <div v-if="!loading && totalPages > 1" class="flex items-center justify-center gap-2 p-4 border-t">
+      <Button
+        variant="outline"
+        size="sm"
+        :disabled="currentPage <= 1"
+        @click="prevPage"
+      >
+        <Icon icon="lucide:chevron-left" class="w-4 h-4" />
+        上一页
+      </Button>
+      
+      <div class="flex items-center gap-1">
+        <Button
+          v-for="page in Math.min(totalPages, 5)"
+          :key="page"
+          variant="outline"
+          size="sm"
+          :class="page === currentPage ? 'bg-primary text-primary-foreground' : ''"
+          @click="goToPage(page)"
+        >
+          {{ page }}
+        </Button>
+        <span v-if="totalPages > 5" class="text-muted-foreground px-2">...</span>
+      </div>
+      
+      <Button
+        variant="outline"
+        size="sm"
+        :disabled="currentPage >= totalPages"
+        @click="nextPage"
+      >
+        下一页
+        <Icon icon="lucide:chevron-right" class="w-4 h-4" />
+      </Button>
+      
+      <span class="text-sm text-muted-foreground ml-4">
+        第 {{ currentPage }} 页，共 {{ totalPages }} 页
+      </span>
     </div>
   </div>
 </template>
