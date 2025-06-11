@@ -234,5 +234,30 @@
     "mcpDisabled": "MCP est désactivé",
     "getPromptFailed": "Échec de l'obtention du prompt",
     "readResourceFailed": "Échec de la lecture de la ressource"
+  },
+  "mcpGallery": {
+    "title": "Galerie de serveurs MCP",
+    "addServer": "Ajouter un serveur",
+    "searchPlaceholder": "Rechercher des serveurs...",
+    "filterByStatus": "Filtrer par statut",
+    "allServers": "Tous les serveurs",
+    "runningServers": "En cours d'exécution",
+    "stoppedServers": "Arrêtés",
+    "errorServers": "Erreur",
+    "editServer": "Modifier le serveur",
+    "stopServer": "Arrêter le serveur",
+    "startServer": "Démarrer le serveur",
+    "deleteServer": "Supprimer le serveur",
+    "default": "Par défaut",
+    "tools": "Outils",
+    "prompts": "Invites",
+    "resources": "Ressources",
+    "noServers": "Aucun serveur",
+    "noServersDescription": "Vous n'avez pas encore ajouté de serveurs MCP. Ajoutez un serveur pour commencer à utiliser les outils et fonctionnalités.",
+    "addFirstServer": "Ajouter votre premier serveur",
+    "running": "En cours",
+    "starting": "Démarrage",
+    "error": "Erreur",
+    "stopped": "Arrêté"
   }
 }

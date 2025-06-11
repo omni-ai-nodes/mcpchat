@@ -234,5 +234,30 @@
     "mcpDisabled": "MCP가 비활성화되어 있습니다",
     "getPromptFailed": "프롬프트 가져오기 실패",
     "readResourceFailed": "리소스 읽기 실패"
+  },
+  "mcpGallery": {
+    "title": "MCP 서버 갤러리",
+    "addServer": "서버 추가",
+    "searchPlaceholder": "서버 검색...",
+    "filterByStatus": "상태별 필터",
+    "allServers": "모든 서버",
+    "runningServers": "실행 중",
+    "stoppedServers": "중지됨",
+    "errorServers": "오류 상태",
+    "editServer": "서버 편집",
+    "stopServer": "서버 중지",
+    "startServer": "서버 시작",
+    "deleteServer": "서버 삭제",
+    "default": "기본값",
+    "tools": "도구",
+    "prompts": "프롬프트",
+    "resources": "리소스",
+    "noServers": "서버 없음",
+    "noServersDescription": "아직 MCP 서버를 추가하지 않았습니다. 서버를 추가하여 도구와 기능 사용을 시작하세요.",
+    "addFirstServer": "첫 번째 서버 추가",
+    "running": "실행 중",
+    "starting": "시작 중",
+    "error": "오류",
+    "stopped": "중지됨"
   }
 }

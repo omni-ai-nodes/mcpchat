@@ -234,5 +234,30 @@
     "loadContent": "获取 Resource 内容",
     "pleaseSelect": "点击获取展示Resources详情",
     "dialogDescription": "浏览和查看MCP服务器提供的资源"
+  },
+  "mcpGallery": {
+    "title": "MCP 服务器库",
+    "addServer": "添加服务器",
+    "searchPlaceholder": "搜索服务器...",
+    "filterByStatus": "按状态筛选",
+    "allServers": "全部服务器",
+    "runningServers": "运行中",
+    "stoppedServers": "已停止",
+    "errorServers": "错误状态",
+    "editServer": "编辑服务器",
+    "stopServer": "停止服务器",
+    "startServer": "启动服务器",
+    "deleteServer": "删除服务器",
+    "default": "默认",
+    "tools": "工具",
+    "prompts": "提示模板",
+    "resources": "资源",
+    "noServers": "暂无服务器",
+    "noServersDescription": "您还没有添加任何 MCP 服务器。添加服务器以开始使用工具和功能。",
+    "addFirstServer": "添加第一个服务器",
+    "running": "运行中",
+    "starting": "启动中",
+    "error": "错误",
+    "stopped": "已停止"
   }
 }

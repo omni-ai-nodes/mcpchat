@@ -234,5 +234,30 @@
     "mcpDisabled": "MCP отключен",
     "getPromptFailed": "Не удалось получить промпт",
     "readResourceFailed": "Не удалось прочитать ресурс"
+  },
+  "mcpGallery": {
+    "title": "Галерея MCP серверов",
+    "addServer": "Добавить сервер",
+    "searchPlaceholder": "Поиск серверов...",
+    "filterByStatus": "Фильтр по статусу",
+    "allServers": "Все серверы",
+    "runningServers": "Запущенные",
+    "stoppedServers": "Остановленные",
+    "errorServers": "Ошибка",
+    "editServer": "Редактировать сервер",
+    "stopServer": "Остановить сервер",
+    "startServer": "Запустить сервер",
+    "deleteServer": "Удалить сервер",
+    "default": "По умолчанию",
+    "tools": "Инструменты",
+    "prompts": "Промпты",
+    "resources": "Ресурсы",
+    "noServers": "Нет серверов",
+    "noServersDescription": "Вы еще не добавили ни одного MCP сервера. Добавьте сервер, чтобы начать использовать инструменты и функции.",
+    "addFirstServer": "Добавить первый сервер",
+    "running": "Запущен",
+    "starting": "Запускается",
+    "error": "Ошибка",
+    "stopped": "Остановлен"
   }
 }

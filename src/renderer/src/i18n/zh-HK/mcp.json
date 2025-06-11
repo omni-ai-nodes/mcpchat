@@ -234,5 +234,30 @@
     "mcpDisabled": "MCP功能已禁用",
     "getPromptFailed": "獲取提示模板失敗",
     "readResourceFailed": "讀取資源失敗"
+  },
+  "mcpGallery": {
+    "title": "MCP 服務器庫",
+    "addServer": "添加服務器",
+    "searchPlaceholder": "搜索服務器...",
+    "filterByStatus": "按狀態篩選",
+    "allServers": "全部服務器",
+    "runningServers": "運行中",
+    "stoppedServers": "已停止",
+    "errorServers": "錯誤狀態",
+    "editServer": "編輯服務器",
+    "stopServer": "停止服務器",
+    "startServer": "啟動服務器",
+    "deleteServer": "刪除服務器",
+    "default": "默認",
+    "tools": "工具",
+    "prompts": "提示模板",
+    "resources": "資源",
+    "noServers": "暫無服務器",
+    "noServersDescription": "您還沒有添加任何 MCP 服務器。添加服務器以開始使用工具和功能。",
+    "addFirstServer": "添加第一個服務器",
+    "running": "運行中",
+    "starting": "啟動中",
+    "error": "錯誤",
+    "stopped": "已停止"
   }
 }

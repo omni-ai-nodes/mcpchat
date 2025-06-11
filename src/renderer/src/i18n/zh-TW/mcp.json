@@ -234,5 +234,30 @@
     "loadContent": "獲取 Resource 內容",
     "pleaseSelect": "點擊獲取展示Resources詳情",
     "dialogDescription": "瀏覽和查看MCP伺服器提供的資源"
+  },
+  "mcpGallery": {
+    "title": "MCP 伺服器庫",
+    "addServer": "新增伺服器",
+    "searchPlaceholder": "搜尋伺服器...",
+    "filterByStatus": "依狀態篩選",
+    "allServers": "全部伺服器",
+    "runningServers": "執行中",
+    "stoppedServers": "已停止",
+    "errorServers": "錯誤狀態",
+    "editServer": "編輯伺服器",
+    "stopServer": "停止伺服器",
+    "startServer": "啟動伺服器",
+    "deleteServer": "刪除伺服器",
+    "default": "預設",
+    "tools": "工具",
+    "prompts": "提示範本",
+    "resources": "資源",
+    "noServers": "暫無伺服器",
+    "noServersDescription": "您尚未新增任何 MCP 伺服器。新增伺服器以開始使用工具和功能。",
+    "addFirstServer": "新增第一個伺服器",
+    "running": "執行中",
+    "starting": "啟動中",
+    "error": "錯誤",
+    "stopped": "已停止"
   }
 }

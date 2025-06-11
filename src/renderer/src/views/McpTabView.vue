@@ -1,363 +1,451 @@
-<template>
-  <div class="w-full h-full flex flex-col bg-background">
-    <!-- 页面标题栏 -->
-    <div class="flex items-center justify-between p-4 border-b">
-      <div class="flex items-center gap-3">
-        <Icon icon="lucide:image" class="w-6 h-6 text-primary" />
-        <h1 class="text-2xl font-semibold">{{ t('imageGallery.title') }}</h1>
-      </div>
-      <div class="flex items-center gap-2">
-        <!-- 视图切换 -->
-        <div class="flex items-center border rounded-lg p-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            :class="viewMode === 'grid' ? 'bg-muted' : ''"
-            @click="viewMode = 'grid'"
-          >
-            <Icon icon="lucide:grid-3x3" class="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            :class="viewMode === 'list' ? 'bg-muted' : ''"
-            @click="viewMode = 'list'"
-          >
-            <Icon icon="lucide:list" class="w-4 h-4" />
-          </Button>
-        </div>
-        
-        <!-- 上传按钮 -->
-        <Button @click="triggerFileUpload" class="gap-2">
-          <Icon icon="lucide:upload" class="w-4 h-4" />
-          {{ t('imageGallery.upload') }}
-        </Button>
-        <input
-          ref="fileInput"
-          type="file"
-          multiple
-          accept="image/*"
-          class="hidden"
-          @change="handleFileUpload"
-        />
-      </div>
-    </div>
-
-    <!-- 搜索和筛选栏 -->
-    <div class="flex items-center gap-4 p-4 border-b">
-      <div class="flex-1 relative">
-        <Icon icon="lucide:search" class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          v-model="searchQuery"
-          :placeholder="t('imageGallery.searchPlaceholder')"
-          class="pl-10"
-        />
-      </div>
-      <Select v-model="sortBy">
-        <SelectTrigger class="w-48">
-          <SelectValue :placeholder="t('imageGallery.sortBy')" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="name">{{ t('imageGallery.sortByName') }}</SelectItem>
-          <SelectItem value="date">{{ t('imageGallery.sortByDate') }}</SelectItem>
-          <SelectItem value="size">{{ t('imageGallery.sortBySize') }}</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-
-    <!-- 图片展示区域 -->
-    <div class="flex-1 overflow-auto p-4">
-      <!-- 网格视图 -->
-      <div v-if="viewMode === 'grid'" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-        <Card
-          v-for="image in filteredImages"
-          :key="image.id"
-          class="group cursor-pointer hover:shadow-lg transition-all duration-200 overflow-hidden"
-          @click="openImagePreview(image)"
-        >
-          <div class="aspect-square relative overflow-hidden">
-            <img
-              :src="image.thumbnail || image.url"
-              :alt="image.name"
-              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-              loading="lazy"
-            />
-            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
-              <Icon icon="lucide:eye" class="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-            </div>
-            <!-- 删除按钮 -->
-            <Button
-              variant="destructive"
-              size="sm"
-              class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 w-8 h-8 p-0"
-              @click.stop="deleteImage(image.id)"
-            >
-              <Icon icon="lucide:trash-2" class="w-4 h-4" />
-            </Button>
-          </div>
-          <CardContent class="p-3">
-            <p class="text-sm font-medium truncate">{{ image.name }}</p>
-            <p class="text-xs text-muted-foreground">{{ formatFileSize(image.size) }}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <!-- 列表视图 -->
-      <div v-else class="space-y-2">
-        <Card
-          v-for="image in filteredImages"
-          :key="image.id"
-          class="group cursor-pointer hover:shadow-md transition-all duration-200"
-          @click="openImagePreview(image)"
-        >
-          <CardContent class="p-4">
-            <div class="flex items-center gap-4">
-              <div class="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
-                <img
-                  :src="image.thumbnail || image.url"
-                  :alt="image.name"
-                  class="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              </div>
-              <div class="flex-1 min-w-0">
-                <h3 class="font-medium truncate">{{ image.name }}</h3>
-                <p class="text-sm text-muted-foreground">{{ formatFileSize(image.size) }}</p>
-                <p class="text-xs text-muted-foreground">{{ formatDate(image.createdAt) }}</p>
-              </div>
-              <div class="flex items-center gap-2">
-                <Button variant="ghost" size="sm" @click.stop="openImagePreview(image)">
-                  <Icon icon="lucide:eye" class="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="sm" @click.stop="deleteImage(image.id)">
-                  <Icon icon="lucide:trash-2" class="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <!-- 空状态 -->
-      <div v-if="filteredImages.length === 0" class="flex flex-col items-center justify-center h-64 text-center">
-        <Icon icon="lucide:image-off" class="w-16 h-16 text-muted-foreground mb-4" />
-        <h3 class="text-lg font-medium mb-2">{{ t('imageGallery.noImages') }}</h3>
-        <p class="text-muted-foreground mb-4">{{ t('imageGallery.noImagesDescription') }}</p>
-        <Button @click="triggerFileUpload" class="gap-2">
-          <Icon icon="lucide:upload" class="w-4 h-4" />
-          {{ t('imageGallery.uploadFirst') }}
-        </Button>
-      </div>
-    </div>
-
-    <!-- 图片预览对话框 -->
-    <Dialog v-model:open="previewDialogOpen">
-      <DialogContent class="max-w-4xl max-h-[90vh] p-0">
-        <div v-if="selectedImage" class="flex flex-col h-full">
-          <!-- 预览头部 -->
-          <DialogHeader class="p-6 pb-4">
-            <DialogTitle class="flex items-center gap-3">
-              <Icon icon="lucide:image" class="w-5 h-5" />
-              {{ selectedImage.name }}
-            </DialogTitle>
-            <DialogDescription>
-              {{ formatFileSize(selectedImage.size) }} • {{ formatDate(selectedImage.createdAt) }}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <!-- 图片预览区域 -->
-          <div class="flex-1 flex items-center justify-center p-6 pt-0 min-h-0">
-            <img
-              :src="selectedImage.url"
-              :alt="selectedImage.name"
-              class="max-w-full max-h-full object-contain rounded-lg"
-            />
-          </div>
-          
-          <!-- 预览底部操作 -->
-          <DialogFooter class="p-6 pt-4">
-            <Button variant="outline" @click="downloadImage(selectedImage)" class="gap-2">
-              <Icon icon="lucide:download" class="w-4 h-4" />
-              {{ t('imageGallery.download') }}
-            </Button>
-            <Button variant="destructive" @click="deleteImage(selectedImage.id)" class="gap-2">
-              <Icon icon="lucide:trash-2" class="w-4 h-4" />
-              {{ t('imageGallery.delete') }}
-            </Button>
-          </DialogFooter>
-        </div>
-      </DialogContent>
-    </Dialog>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogDescription
+} from '@/components/ui/dialog'
+import { useMcpStore } from '@/stores/mcp'
+import { useSettingsStore } from '@/stores/settings'
 import { useI18n } from 'vue-i18n'
+import { useToast } from '@/components/ui/toast'
+import { useRouter } from 'vue-router'
+import McpSquareCard from '@/components/mcp-config/components/McpSquareCard.vue'
+import McpServerForm from '@/components/mcp-config/mcpServerForm.vue'
+import McpToolPanel from '@/components/mcp-config/components/McpToolPanel.vue'
+import McpPromptPanel from '@/components/mcp-config/components/McpPromptPanel.vue'
+import McpResourceViewer from '@/components/mcp-config/components/McpResourceViewer.vue'
+import type { MCPServerConfig } from '@shared/presenter'
 
-// 异步加载组件
-const Button = defineAsyncComponent(() => import('@/components/ui/button').then(mod => mod.Button))
-const Card = defineAsyncComponent(() => import('@/components/ui/card').then(mod => mod.Card))
-const CardContent = defineAsyncComponent(() => import('@/components/ui/card').then(mod => mod.CardContent))
-const Input = defineAsyncComponent(() => import('@/components/ui/input').then(mod => mod.Input))
-const Select = defineAsyncComponent(() => import('@/components/ui/select').then(mod => mod.Select))
-const SelectContent = defineAsyncComponent(() => import('@/components/ui/select').then(mod => mod.SelectContent))
-const SelectItem = defineAsyncComponent(() => import('@/components/ui/select').then(mod => mod.SelectItem))
-const SelectTrigger = defineAsyncComponent(() => import('@/components/ui/select').then(mod => mod.SelectTrigger))
-const SelectValue = defineAsyncComponent(() => import('@/components/ui/select').then(mod => mod.SelectValue))
-const Dialog = defineAsyncComponent(() => import('@/components/ui/dialog').then(mod => mod.Dialog))
-const DialogContent = defineAsyncComponent(() => import('@/components/ui/dialog').then(mod => mod.DialogContent))
-const DialogHeader = defineAsyncComponent(() => import('@/components/ui/dialog').then(mod => mod.DialogHeader))
-const DialogTitle = defineAsyncComponent(() => import('@/components/ui/dialog').then(mod => mod.DialogTitle))
-const DialogDescription = defineAsyncComponent(() => import('@/components/ui/dialog').then(mod => mod.DialogDescription))
-const DialogFooter = defineAsyncComponent(() => import('@/components/ui/dialog').then(mod => mod.DialogFooter))
-
+const mcpStore = useMcpStore()
+const settingsStore = useSettingsStore()
 const { t } = useI18n()
+const { toast } = useToast()
+const router = useRouter()
 
-// 图片数据类型
-interface ImageItem {
-  id: string
-  name: string
-  url: string
-  thumbnail?: string
-  size: number
-  createdAt: Date
-  type: string
-}
+// 对话框状态
+const isAddServerDialogOpen = ref(false)
+const isEditServerDialogOpen = ref(false)
+const isResetConfirmDialogOpen = ref(false)
+const isRemoveConfirmDialogOpen = ref(false)
+const isToolPanelOpen = ref(false)
+const isPromptPanelOpen = ref(false)
+const isResourceViewerOpen = ref(false)
+const selectedServer = ref<string>('')
+const selectedServerForTools = ref<string>('')
+const selectedServerForPrompts = ref<string>('')
+const selectedServerForResources = ref<string>('')
 
-// 响应式数据
-const images = ref<ImageItem[]>([])
-const searchQuery = ref('')
-const sortBy = ref('date')
-const viewMode = ref<'grid' | 'list'>('grid')
-const previewDialogOpen = ref(false)
-const selectedImage = ref<ImageItem | null>(null)
-const fileInput = ref<HTMLInputElement>()
-
-// 计算属性
-const filteredImages = computed(() => {
-  let filtered = images.value
-  
-  // 搜索过滤
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(image => 
-      image.name.toLowerCase().includes(query)
-    )
-  }
-  
-  // 排序
-  filtered.sort((a, b) => {
-    switch (sortBy.value) {
-      case 'name':
-        return a.name.localeCompare(b.name)
-      case 'size':
-        return b.size - a.size
-      case 'date':
-      default:
-        return b.createdAt.getTime() - a.createdAt.getTime()
+// 在组件挂载时获取数据
+onMounted(async () => {
+  try {
+    var params = {
+        "page_size":10,
+        "current_page":1
     }
-  })
-  
-  return filtered
+    const response = await fetch('https://api.omni-ainode.com/api/get_mcp_server_list', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params)
+    })
+    const data = await response.json()
+    
+    if (data.code === 200 && data.data.Infos) {
+      console.log(data.data.Infos)
+      
+    }
+  } catch (error) {
+    console.error('Failed to fetch MCP server list:', error)
+  }
 })
 
-// 方法
-const triggerFileUpload = () => {
-  fileInput.value?.click()
+// 监听 MCP 安装缓存
+watch(
+  () => settingsStore.mcpInstallCache,
+  (newCache) => {
+    if (newCache) {
+      // 打开添加服务器对话框
+      isAddServerDialogOpen.value = true
+    }
+  },
+  { immediate: true }
+)
+
+watch(isAddServerDialogOpen, (newIsAddServerDialogOpen) => {
+  // 当添加服务器对话框关闭时，清理缓存
+  if (!newIsAddServerDialogOpen) {
+    // 清理缓存
+    settingsStore.clearMcpInstallCache()
+  }
+})
+// 计算属性：区分内置服务和普通服务
+const inMemoryServers = computed(() => {
+  return mcpStore.serverList.filter((server) => {
+    const config = mcpStore.config.mcpServers[server.name]
+    return config?.type === 'inmemory'
+  })
+})
+
+const regularServers = computed(() => {
+  return mcpStore.serverList.filter((server) => {
+    const config = mcpStore.config.mcpServers[server.name]
+    return config?.type !== 'inmemory'
+  })
+})
+
+// 计算属性：获取每个服务器的工具数量
+const getServerToolsCount = (serverName: string) => {
+  return mcpStore.tools.filter((tool) => tool.server.name === serverName).length
 }
 
-const handleFileUpload = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  const files = target.files
-  
-  if (files) {
-    Array.from(files).forEach(file => {
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          const url = e.target?.result as string
-          const newImage: ImageItem = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            name: file.name,
-            url,
-            size: file.size,
-            createdAt: new Date(),
-            type: file.type
-          }
-          images.value.unshift(newImage)
-        }
-        reader.readAsDataURL(file)
-      }
+// 计算属性：获取每个服务器的prompts数量
+const getServerPromptsCount = (serverName: string) => {
+  return mcpStore.prompts.filter((prompt) => prompt.client.name === serverName).length
+}
+
+// 计算属性：获取每个服务器的resources数量
+const getServerResourcesCount = (serverName: string) => {
+  return mcpStore.resources.filter((resource) => resource.client.name === serverName).length
+}
+
+// 事件处理函数
+const handleAddServer = async (serverName: string, serverConfig: MCPServerConfig) => {
+  const result = await mcpStore.addServer(serverName, serverConfig)
+  if (result.success) {
+    isAddServerDialogOpen.value = false
+  }
+}
+
+const handleEditServer = async (serverName: string, serverConfig: Partial<MCPServerConfig>) => {
+  const success = await mcpStore.updateServer(serverName, serverConfig)
+  if (success) {
+    isEditServerDialogOpen.value = false
+    selectedServer.value = ''
+  }
+}
+
+const handleRemoveServer = async (serverName: string) => {
+  const config = mcpStore.config.mcpServers[serverName]
+  if (config?.type === 'inmemory') {
+    toast({
+      title: t('settings.mcp.cannotRemoveBuiltIn'),
+      description: t('settings.mcp.builtInServerCannotBeRemoved'),
+      variant: 'destructive'
+    })
+    return
+  }
+  selectedServer.value = serverName
+  isRemoveConfirmDialogOpen.value = true
+}
+
+const confirmRemoveServer = async () => {
+  const serverName = selectedServer.value
+  await mcpStore.removeServer(serverName)
+  isRemoveConfirmDialogOpen.value = false
+}
+
+// mcp 内置服务数据
+const handleToggleDefaultServer = async (serverName: string) => {
+  try {
+    // 检查默认服务器数量限制
+    const isDefault = mcpStore.config.defaultServers.includes(serverName)
+    if (!isDefault && mcpStore.config.defaultServers.length > 30) {
+      toast({
+        title: t('mcp.errors.maxDefaultServersReached'),
+        description: t('settings.mcp.removeDefaultFirst'),
+        variant: 'destructive'
+      })
+      return
+    }
+
+    const result = await mcpStore.toggleDefaultServer(serverName)
+    if (!result.success) {
+      toast({
+        title: t('common.error.operationFailed'),
+        description: result.message,
+        variant: 'destructive'
+      })
+    }
+  } catch (error) {
+    toast({
+      title: t('common.error.operationFailed'),
+      description: error.message,
+      variant: 'destructive'
     })
   }
-  
-  // 清空input
-  if (target) {
-    target.value = ''
+}
+
+const handleToggleServer = async (serverName: string) => {
+  if (mcpStore.serverLoadingStates[serverName]) {
+    return
+  }
+  const success = await mcpStore.toggleServer(serverName)
+  if (!success) {
+    const isRunning = mcpStore.serverStatuses[serverName]
+    toast({
+      title: t('common.error.operationFailed'),
+      description: `${serverName} ${isRunning ? t('settings.mcp.stopped') : t('settings.mcp.running')}${t('common.error.requestFailed')}`,
+      variant: 'destructive'
+    })
   }
 }
 
-const openImagePreview = (image: ImageItem) => {
-  selectedImage.value = image
-  previewDialogOpen.value = true
-}
-
-const deleteImage = (imageId: string) => {
-  images.value = images.value.filter(img => img.id !== imageId)
-  if (selectedImage.value?.id === imageId) {
-    previewDialogOpen.value = false
-    selectedImage.value = null
+const handleResetToDefaultServers = async () => {
+  const success = await mcpStore.resetToDefaultServers()
+  if (success) {
+    isResetConfirmDialogOpen.value = false
+  } else {
+    toast({
+      title: t('common.error.operationFailed'),
+      description: t('common.error.requestFailed'),
+      variant: 'destructive'
+    })
   }
 }
 
-const downloadImage = (image: ImageItem) => {
-  const link = document.createElement('a')
-  link.href = image.url
-  link.download = image.name
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+const openEditServerDialog = (serverName: string) => {
+  // 特殊服务器跳转到对应设置页面
+  const specialServers = {
+    difyKnowledge: 'dify',
+    ragflowKnowledge: 'ragflow',
+    fastGptKnowledge: 'fastgpt'
+  }
+
+  if (specialServers[serverName]) {
+    router.push({
+      name: 'settings-knowledge-base',
+      query: { subtab: specialServers[serverName] }
+    })
+    return
+  }
+
+  selectedServer.value = serverName
+  isEditServerDialogOpen.value = true
 }
 
-const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+const handleViewTools = async (serverName: string) => {
+  selectedServerForTools.value = serverName
+  // 确保工具已加载
+  await mcpStore.loadTools()
+  isToolPanelOpen.value = true
 }
 
-const formatDate = (date: Date): string => {
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date)
+const handleViewPrompts = async (serverName: string) => {
+  selectedServerForPrompts.value = serverName
+  // 确保提示模板已加载
+  await mcpStore.loadPrompts()
+  isPromptPanelOpen.value = true
 }
 
-// 初始化一些示例数据（可选）
-const initSampleData = () => {
-  // 这里可以添加一些示例图片数据
-  // 在实际应用中，这些数据应该从API或本地存储加载
+const handleViewResources = async (serverName: string) => {
+  selectedServerForResources.value = serverName
+  // 确保资源已加载
+  await mcpStore.loadResources()
+  isResourceViewerOpen.value = true
 }
-
-// 组件挂载时初始化
-initSampleData()
 </script>
 
-<style scoped>
-/* 自定义样式 */
-.grid {
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-}
+<template>
+  <div class="h-full flex flex-col">
+    <!-- 服务器列表 - 占满主要空间 -->
+    <ScrollArea class="flex-1 px-3">
+      <div v-if="mcpStore.configLoading" class="flex justify-center py-8">
+        <div class="text-center">
+          <Icon
+            icon="lucide:loader"
+            class="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground"
+          />
+          <p class="text-xs text-muted-foreground">{{ t('common.loading') }}</p>
+        </div>
+      </div>
 
-@media (max-width: 768px) {
-  .grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  }
-}
-</style>
+      <div v-else-if="mcpStore.serverList.length === 0" class="text-center py-8">
+        <div
+          class="mx-auto w-16 h-16 bg-muted/30 rounded-full flex items-center justify-center mb-3"
+        >
+          <Icon icon="lucide:server-off" class="h-6 w-6 text-muted-foreground" />
+        </div>
+        <h3 class="text-base font-medium text-foreground mb-2">
+          {{ t('settings.mcp.noServersFound') }}
+        </h3>
+        <p class="text-xs text-muted-foreground mb-3 px-4">
+          {{ t('settings.mcp.noServersDescription') }}
+        </p>
+      </div>
+
+      <div v-else class="space-y-4 py-3">
+        <!-- 内置服务 -->
+        <div v-if="inMemoryServers.length > 0">
+          <div class="flex items-center space-x-2 mb-3">
+            <Icon icon="lucide:shield-check" class="h-4 w-4 text-blue-600" />
+            <h3 class="text-sm font-semibold text-foreground">
+              {{ t('settings.mcp.builtInServers') }}
+            </h3>
+            <div class="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full">
+              {{ inMemoryServers.length }}
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <McpSquareCard
+              v-for="server in inMemoryServers"
+              :key="server.name"
+              :server="server"
+              :is-built-in="true"
+              :is-loading="mcpStore.serverLoadingStates[server.name]"
+              :disabled="mcpStore.configLoading"
+              :tools-count="getServerToolsCount(server.name)"
+              :prompts-count="getServerPromptsCount(server.name)"
+              :resources-count="getServerResourcesCount(server.name)"
+              @toggle="handleToggleServer(server.name)"
+              @toggle-default="handleToggleDefaultServer(server.name)"
+              @edit="openEditServerDialog(server.name)"
+              @view-tools="handleViewTools(server.name)"
+              @view-prompts="handleViewPrompts(server.name)"
+              @view-resources="handleViewResources(server.name)"
+            />
+          </div>
+        </div>
+      </div>
+    </ScrollArea>
+
+    <!-- 底部操作栏 -->
+    <div
+      class="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+    >
+      <div class="flex items-center justify-between p-3">
+        <!-- 左侧：服务器统计信息 -->
+        <div class="flex items-center space-x-3">
+          <div class="flex items-center space-x-1">
+            <Icon icon="lucide:server" class="h-3 w-3 text-muted-foreground" />
+            <span class="text-xs text-muted-foreground">
+              {{ t('settings.mcp.totalServers') }}: {{ mcpStore.serverList.length }}
+            </span>
+          </div>
+          <div v-if="mcpStore.serverList.length > 0" class="flex items-center space-x-1">
+            <Icon icon="lucide:play" class="h-3 w-3 text-green-600" />
+            <span class="text-xs text-green-600">
+              {{ mcpStore.serverList.filter((s) => s.isRunning).length }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 右侧：操作按钮 -->
+        <div class="flex space-x-2">
+          <Dialog v-model:open="isResetConfirmDialogOpen">
+            <DialogTrigger as-child>
+              <Button variant="outline" size="sm" class="h-8 px-3 text-xs">
+                <Icon icon="lucide:refresh-cw" class="mr-1.5 h-3 w-3" />
+                {{ t('common.reset') }}
+              </Button>
+            </DialogTrigger>
+            <DialogContent class="w-[90vw] max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle class="text-base">{{
+                  t('settings.mcp.resetConfirmTitle')
+                }}</DialogTitle>
+                <DialogDescription class="text-sm">
+                  {{ t('settings.mcp.resetConfirmDescription') }}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter class="flex-row gap-2 justify-end">
+                <Button variant="outline" size="sm" @click="isResetConfirmDialogOpen = false">
+                  {{ t('common.cancel') }}
+                </Button>
+                <Button variant="default" size="sm" @click="handleResetToDefaultServers">
+                  {{ t('settings.mcp.resetConfirm') }}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog v-model:open="isAddServerDialogOpen">
+            <DialogTrigger as-child>
+              <Button size="sm" class="h-8 px-3 text-xs">
+                <Icon icon="lucide:plus" class="mr-1.5 h-3 w-3" />
+                {{ t('common.add') }}
+              </Button>
+            </DialogTrigger>
+            <DialogContent class="w-[95vw] max-w-[500px] px-0 h-[85vh] max-h-[500px] flex flex-col">
+              <DialogHeader class="px-3 flex-shrink-0 pb-2">
+                <DialogTitle class="text-base">{{
+                  t('settings.mcp.addServerDialog.title')
+                }}</DialogTitle>
+                <DialogDescription class="text-sm">
+                  {{ t('settings.mcp.addServerDialog.description') }}
+                </DialogDescription>
+              </DialogHeader>
+              <McpServerForm
+                :default-json-config="settingsStore.mcpInstallCache || undefined"
+                @submit="handleAddServer"
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+    </div>
+
+    <!-- 编辑服务器对话框 -->
+    <Dialog v-model:open="isEditServerDialogOpen">
+      <DialogContent class="w-[95vw] max-w-[500px] px-0 h-[85vh] max-h-[500px] flex flex-col">
+        <DialogHeader class="px-3 flex-shrink-0 pb-2">
+          <DialogTitle class="text-base">{{
+            t('settings.mcp.editServerDialog.title')
+          }}</DialogTitle>
+          <DialogDescription class="text-sm">
+            {{ t('settings.mcp.editServerDialog.description') }}
+          </DialogDescription>
+        </DialogHeader>
+        <McpServerForm
+          v-if="selectedServer && mcpStore.config.mcpServers[selectedServer]"
+          :server-name="selectedServer"
+          :initial-config="mcpStore.config.mcpServers[selectedServer]"
+          :edit-mode="true"
+          @submit="(name, config) => handleEditServer(name, config)"
+        />
+      </DialogContent>
+    </Dialog>
+
+    <!-- 删除服务器确认对话框 -->
+    <Dialog v-model:open="isRemoveConfirmDialogOpen">
+      <DialogContent class="w-[90vw] max-w-[380px]">
+        <DialogHeader>
+          <DialogTitle class="text-base">{{
+            t('settings.mcp.removeServerDialog.title')
+          }}</DialogTitle>
+          <DialogDescription class="text-sm">
+            {{ t('settings.mcp.confirmRemoveServer', { name: selectedServer }) }}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter class="flex-row gap-2 justify-end">
+          <Button variant="outline" size="sm" @click="isRemoveConfirmDialogOpen = false">
+            {{ t('common.cancel') }}
+          </Button>
+          <Button variant="destructive" size="sm" @click="confirmRemoveServer">
+            {{ t('common.confirm') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- 工具调试弹窗 -->
+    <McpToolPanel v-model:open="isToolPanelOpen" :server-name="selectedServerForTools" />
+
+    <!-- 提示模板调试弹窗 -->
+    <McpPromptPanel v-model:open="isPromptPanelOpen" :server-name="selectedServerForPrompts" />
+
+    <!-- 资源查看器弹窗 -->
+    <McpResourceViewer
+      v-model:open="isResourceViewerOpen"
+      :server-name="selectedServerForResources"
+    />
+  </div>
+</template>

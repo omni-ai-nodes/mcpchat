@@ -234,5 +234,30 @@
     "mcpDisabled": "MCPは無効になっています",
     "getPromptFailed": "プロンプトの取得に失敗しました",
     "readResourceFailed": "リソースの読み込みに失敗しました"
+  },
+  "mcpGallery": {
+    "title": "MCP サーバーギャラリー",
+    "addServer": "サーバーを追加",
+    "searchPlaceholder": "サーバーを検索...",
+    "filterByStatus": "ステータスでフィルター",
+    "allServers": "すべてのサーバー",
+    "runningServers": "実行中",
+    "stoppedServers": "停止中",
+    "errorServers": "エラー状態",
+    "editServer": "サーバーを編集",
+    "stopServer": "サーバーを停止",
+    "startServer": "サーバーを開始",
+    "deleteServer": "サーバーを削除",
+    "default": "デフォルト",
+    "tools": "ツール",
+    "prompts": "プロンプト",
+    "resources": "リソース",
+    "noServers": "サーバーがありません",
+    "noServersDescription": "まだMCPサーバーが追加されていません。サーバーを追加してツールと機能の使用を開始してください。",
+    "addFirstServer": "最初のサーバーを追加",
+    "running": "実行中",
+    "starting": "開始中",
+    "error": "エラー",
+    "stopped": "停止中"
   }
 }
