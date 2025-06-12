@@ -624,6 +624,13 @@ const parseKeyValueHeaders = (text: string): Record<string, string> => {
 // 定义 customHeaders 的 placeholder
 const customHeadersPlaceholder = `Authorization=Bearer your_token
 HTTP-Referer=mcpchatai.cn`
+
+// 暴露方法和变量给父组件
+defineExpose({
+  parseJsonConfig,
+  handleSubmit,
+  jsonConfig
+})
 </script>
 
 <template>
@@ -717,7 +724,25 @@ HTTP-Referer=mcpchatai.cn`
             t('settings.mcp.serverForm.icons')
           }}</Label>
           <div class="flex items-center space-x-2">
-            <EmojiPicker v-model="icons" :disabled="isFieldReadOnly" />
+            <!-- 图标显示区域 -->
+            <div class="flex items-center space-x-2">
+              <!-- 如果是图片URL，显示图片 -->
+              <div v-if="icons && (icons.startsWith('http://') || icons.startsWith('https://') || icons.startsWith('data:'))" 
+                   class="w-8 h-8 rounded border flex items-center justify-center bg-muted">
+                <img :src="icons" alt="Server Icon" class="w-8 h-8 object-contain" 
+                     @error="() => icons = '📁'" />
+              </div>
+              <!-- 如果是emoji，显示emoji -->
+              <div v-else-if="icons && !icons.startsWith('http://') && !icons.startsWith('https://') && !icons.startsWith('data:')" 
+                   class="w-8 h-8 rounded border flex items-center justify-center bg-muted text-lg">
+                 <!-- Emoji选择器 -->
+                <EmojiPicker v-model="icons" :disabled="isFieldReadOnly" class="w-8 h-8" />
+              </div>
+              <!-- 默认图标 -->
+              <div v-else class="w-8 h-8 rounded border flex items-center justify-center bg-muted text-lg">
+                📁
+              </div>
+            </div>
           </div>
         </div>
 

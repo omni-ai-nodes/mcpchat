@@ -127,6 +127,11 @@ const confirmRemoveServer = async () => {
   isRemoveConfirmDialogOpen.value = false
 }
 
+// 导出方法供外部组件使用
+defineExpose({
+  handleAddServer
+})
+
 const handleToggleDefaultServer = async (serverName: string) => {
   const isDefault = mcpStore.config.defaultServers.includes(serverName)
   if (!isDefault && mcpStore.config.defaultServers.length > 30) {

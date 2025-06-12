@@ -14,6 +14,7 @@ import {
 import { useI18n } from 'vue-i18n'
 import { computed, ref, nextTick, onMounted, watch } from 'vue'
 import { Separator } from '@/components/ui/separator'
+import EmojiPicker from '@/components/ui/emoji-picker'
 
 interface ServerInfo {
   name: string
@@ -141,8 +142,24 @@ watch(watchDescription, () => {
       <!-- 头部：图标、名称、状态、菜单 -->
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center space-x-2 flex-1 min-w-0">
-          <!-- 服务器图标 -->
-          <div class="text-lg flex-shrink-0">{{ server.icons }}</div>
+          <!-- 图标显示区域 -->
+          <div class="flex items-center space-x-2">
+            <!-- 如果是图片URL，显示图片 -->
+            <div v-if="server.icons && (server.icons.startsWith('http://') || server.icons.startsWith('https://') || server.icons.startsWith('data:'))"
+                 class="w-8 h-8 rounded border flex items-center justify-center bg-muted">
+              <img :src="server.icons" alt="Server Icon" class="w-8 h-8 object-contain"
+                   @error="() => server.icons = '📁'" />
+            </div>
+            <!-- 如果是emoji，显示emoji -->
+            <div v-else-if="server.icons && !server.icons.startsWith('http://') && !server.icons.startsWith('https://') && !server.icons.startsWith('data:')"
+                 class="w-8 h-8 rounded border flex items-center justify-center bg-muted text-lg">
+              {{ server.icons }}
+            </div>
+            <!-- 默认图标 -->
+            <div v-else class="w-8 h-8 rounded border flex items-center justify-center bg-muted text-lg">
+              📁
+            </div>
+          </div>
 
           <!-- 名称 -->
           <h3 class="text-sm font-bold truncate flex-1">

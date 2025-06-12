@@ -2,6 +2,16 @@
 import { ref, computed, defineAsyncComponent, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import { useMcpStore } from '@/stores/mcp'
+import McpServerForm from '@/components/mcp-config/mcpServerForm.vue'
+import McpServers from '@/components/mcp-config/components/McpServers.vue'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
+} from '@/components/ui/dialog'
 
 // 异步加载组件
 const Button = defineAsyncComponent(() => import('@/components/ui/button').then(mod => mod.Button))
@@ -23,6 +33,10 @@ const DropdownMenuTrigger = defineAsyncComponent(() => import('@/components/ui/d
 const DropdownMenuSeparator = defineAsyncComponent(() => import('@/components/ui/dropdown-menu').then(mod => mod.DropdownMenuSeparator))
 
 const { t } = useI18n()
+const mcpStore = useMcpStore()
+
+// McpServers 组件引用
+const mcpServersRef = ref<InstanceType<typeof McpServers> | null>(null)
 
 // API返回的服务器数据类型
 interface ApiServerItem {
@@ -110,7 +124,7 @@ const fetchServers = async (page: number = 1, size: number = 10) => {
         name: item.Name,
         icon: getServerIcon(item.Logo), // 处理图标
         description: item.Introdution,
-        type: item.By, // 显示By内容而不是http/local
+        type: 'stdio' as const, // 显示By内容而不是http/local
         status: 'stopped' as const, // 默认状态
         isRunning: false,
         isDefault: false,
@@ -278,26 +292,80 @@ const viewResources = (server: ServerItem) => {
   console.log('查看资源:', server)
 }
 
+// 弹窗状态管理
+const isInstallDialogOpen = ref(false)
+const prefilledJsonConfig = ref('')
+
 const installServer = (server: ServerItem) => {
   console.log('安装服务器:', server)
   
-  // 显示 DeployJson 信息
+  // 如果有 DeployJson 配置信息，预填充到弹窗中
   if (server.deployJson) {
     try {
-      const deployInfo = JSON.parse(server.deployJson)
-      const deployInfoStr = JSON.stringify(deployInfo, null, 2)
+      // 解析原始 JSON 配置
+      const deployConfig = JSON.parse(server.deployJson)
       
-      // 使用浏览器原生的 alert 显示部署信息
-      alert(`服务器 "${server.name}" 的部署配置信息：\n\n${deployInfoStr}`)
+      // 自动为每个服务器配置添加 icons 和 type 字段
+      if (deployConfig.mcpServers) {
+        Object.keys(deployConfig.mcpServers).forEach(serverKey => {
+          const serverConfig = deployConfig.mcpServers[serverKey]
+          
+          // 添加 icons 字段，使用 ServerItem 的 icon
+          if (!serverConfig.icons) {
+            serverConfig.icons = server.icon
+          }
+          
+          // 添加默认 type 字段
+          if (!serverConfig.type) {
+            serverConfig.type = 'stdio'
+          }
+          // 添加 简介
+          if (!serverConfig.descriptions) {
+            serverConfig.descriptions = server.description
+          }
+        })
+      }
+      
+      // 将修改后的配置转换回 JSON 字符串
+      const enhancedDeployJson = JSON.stringify(deployConfig, null, 2)
+      
+      // 设置预填充配置并打开弹窗
+      prefilledJsonConfig.value = enhancedDeployJson
+      isInstallDialogOpen.value = true
+      
+      console.log(`准备安装服务器 "${server.name}"，已预填充配置`)
     } catch (error) {
-      // 如果不是有效的JSON，直接显示原始字符串
-      alert(`服务器 "${server.name}" 的部署配置信息：\n\n${server.deployJson}`)
+      console.error('DeployJson 格式错误:', error)
+      alert(`服务器 "${server.name}" 的部署配置格式错误：\n\n${server.deployJson}`)
     }
   } else {
     alert(`服务器 "${server.name}" 没有部署配置信息`)
   }
+}
+
+// 处理表单提交
+const handleInstallSubmit = async (name: string, config: any) => {
+  console.log('安装服务器配置:', name, config)
   
-  // TODO: 实现服务器安装逻辑
+  try {
+    // 调用 McpServers 组件的 handleAddServer 方法
+    if (mcpServersRef.value) {
+      await mcpServersRef.value.handleAddServer(name, {
+        ...config,
+        type: 'inmemory' // 确保类型为 inmemory
+      })
+      console.log('服务器添加成功:', name)
+    } else {
+      console.error('McpServers 组件引用不可用')
+    }
+  } catch (error) {
+    console.error('添加服务器时发生错误:', error)
+  }
+  
+  // 关闭弹窗
+  isInstallDialogOpen.value = false
+  // 清空预填充配置
+  prefilledJsonConfig.value = ''
 }
 
 // 组件挂载时获取数据
@@ -697,9 +765,28 @@ onMounted(() => {
       </span>
     </div>
   </div>
+  
+  <!-- 安装服务器弹窗 -->
+  <Dialog v-model:open="isInstallDialogOpen">
+    <DialogContent class="w-[95vw] max-w-[500px] px-0 h-[85vh] max-h-[500px] flex flex-col">
+      <DialogHeader class="px-3 flex-shrink-0 pb-2">
+        <DialogTitle class="text-base">
+          {{ t('mcp.mcpGallery.installDialog.title') }}
+        </DialogTitle>
+        <DialogDescription class="text-sm">
+          {{ t('mcp.mcpGallery.installDialog.description') }}
+        </DialogDescription>
+      </DialogHeader>
+      <McpServerForm
+        :default-json-config="prefilledJsonConfig"
+        @submit="handleInstallSubmit"
+      />
+    </DialogContent>
+  </Dialog>
+  
+  <!-- 隐藏的 McpServers 组件，用于调用其方法 -->
+  <McpServers ref="mcpServersRef" style="display: none;" />
 </template>
-
-
 
 <style scoped>
 /* 自定义样式 */
