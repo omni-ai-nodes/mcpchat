@@ -258,6 +258,7 @@
     "running": "Running",
     "starting": "Starting",
     "error": "Error",
-    "stopped": "Stopped"
+    "stopped": "Stopped",
+    "install": "Install"
   }
 }

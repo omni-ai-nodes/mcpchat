@@ -258,6 +258,7 @@
     "running": "En cours",
     "starting": "Démarrage",
     "error": "Erreur",
-    "stopped": "Arrêté"
+    "stopped": "Arrêté",
+    "install": "Installer"
   }
 }

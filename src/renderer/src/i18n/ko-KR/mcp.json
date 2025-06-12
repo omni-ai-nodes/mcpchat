@@ -258,6 +258,7 @@
     "running": "실행 중",
     "starting": "시작 중",
     "error": "오류",
-    "stopped": "중지됨"
+    "stopped": "중지됨",
+    "install": "설치"
   }
 }

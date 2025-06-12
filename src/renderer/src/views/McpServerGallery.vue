@@ -63,6 +63,7 @@ interface ServerItem {
   promptsCount: number
   resourcesCount: number
   github?: string // 添加GitHub链接
+  deployJson?: string // 添加部署配置信息
   command?: string
   args?: string[]
   baseUrl?: string
@@ -116,7 +117,8 @@ const fetchServers = async (page: number = 1, size: number = 10) => {
         toolsCount: 0, // 可以根据需要解析Tools字段
         promptsCount: 0,
         resourcesCount: 0,
-        github: item.Github
+        github: item.Github,
+        deployJson: item.DeployJson // 保留部署配置信息
       }))
       
       totalPages.value = data.data.total_pages
@@ -274,6 +276,28 @@ const viewPrompts = (server: ServerItem) => {
 
 const viewResources = (server: ServerItem) => {
   console.log('查看资源:', server)
+}
+
+const installServer = (server: ServerItem) => {
+  console.log('安装服务器:', server)
+  
+  // 显示 DeployJson 信息
+  if (server.deployJson) {
+    try {
+      const deployInfo = JSON.parse(server.deployJson)
+      const deployInfoStr = JSON.stringify(deployInfo, null, 2)
+      
+      // 使用浏览器原生的 alert 显示部署信息
+      alert(`服务器 "${server.name}" 的部署配置信息：\n\n${deployInfoStr}`)
+    } catch (error) {
+      // 如果不是有效的JSON，直接显示原始字符串
+      alert(`服务器 "${server.name}" 的部署配置信息：\n\n${server.deployJson}`)
+    }
+  } else {
+    alert(`服务器 "${server.name}" 没有部署配置信息`)
+  }
+  
+  // TODO: 实现服务器安装逻辑
 }
 
 // 组件挂载时获取数据
@@ -451,7 +475,7 @@ onMounted(() => {
 
               <!-- 描述 -->
               <div class="mb-3">
-                <p class="text-xs text-secondary-foreground line-clamp-2 leading-4">
+                <p class="text-xs text-secondary-foreground line-clamp-2 leading-4 h-8">
                   {{ server.description }}
                 </p>
               </div>
@@ -485,17 +509,6 @@ onMounted(() => {
                 <Icon icon="lucide:wrench" class="h-3 w-3 mr-1" />
                 {{ server.toolsCount }} {{ t('mcp.mcpGallery.tools') }}
               </Button>
-              <!-- 提示词按钮 -->
-              <Separator orientation="vertical" class="h-5" />
-              <Button
-                variant="ghost"
-                class="h-full flex-1 text-xs hover:bg-secondary rounded-none"
-                :disabled="server.promptsCount === 0"
-                @click="viewPrompts(server)"
-              >
-                <Icon icon="lucide:message-square-quote" class="h-3 w-3 mr-1" />
-                {{ server.promptsCount }} {{ t('mcp.mcpGallery.prompts') }}
-              </Button>
               <Separator orientation="vertical" class="h-5" />
               <!-- 资源按钮 -->
               <Button
@@ -506,6 +519,16 @@ onMounted(() => {
               >
                 <Icon icon="lucide:folder" class="h-3 w-3 mr-1" />
                 {{ server.resourcesCount }} {{ t('mcp.mcpGallery.resources') }}
+              </Button>
+              <Separator orientation="vertical" class="h-5" />
+              <!-- 安装按钮 -->
+              <Button
+                variant="ghost"
+                class="h-full flex-1 text-xs hover:bg-secondary rounded-none"
+                @click="installServer(server)"
+              >
+                <Icon icon="lucide:download" class="h-3 w-3 mr-1" />
+                {{ t('mcp.mcpGallery.install') }}
               </Button>
             </div>
           </Card>
@@ -569,10 +592,7 @@ onMounted(() => {
                       <Icon icon="lucide:wrench" class="w-3 h-3" />
                       {{ server.toolsCount }} {{ t('mcp.mcpGallery.tools') }}
                     </span>
-                    <span class="flex items-center gap-1">
-                      <Icon icon="lucide:message-square-quote" class="w-3 h-3" />
-                      {{ server.promptsCount }} {{ t('mcp.mcpGallery.prompts') }}
-                    </span>
+
                     <span class="flex items-center gap-1">
                       <Icon icon="lucide:folder" class="w-3 h-3" />
                       {{ server.resourcesCount }} {{ t('mcp.mcpGallery.resources') }}
@@ -580,6 +600,15 @@ onMounted(() => {
                   </div>
                 </div>
                 <div class="flex items-center gap-3">
+                  <!-- 安装按钮 -->
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    @click="installServer(server)"
+                  >
+                    <Icon icon="lucide:download" class="h-4 w-4 mr-1" />
+                    {{ t('mcp.mcpGallery.install') }}
+                  </Button>
                   <div class="flex items-center space-x-1.5">
                     <div :class="['w-2 h-2 rounded-full', getStatusDotClass(server.status)]" />
                     <span :class="['text-xs', getStatusTextClass(server.status)]">

@@ -258,6 +258,7 @@
     "running": "実行中",
     "starting": "開始中",
     "error": "エラー",
-    "stopped": "停止中"
+    "stopped": "停止中",
+    "install": "インストール"
   }
 }
