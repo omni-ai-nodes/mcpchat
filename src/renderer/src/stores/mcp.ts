@@ -253,11 +253,19 @@ export const useMcpStore = defineStore('mcp', () => {
     try {
       serverLoadingStates.value[serverName] = true
       const isRunning = serverStatuses.value[serverName] || false
+      const serverConfig = config.value.mcpServers[serverName]
 
       if (isRunning) {
         await mcpPresenter.stopServer(serverName)
       } else {
-        await mcpPresenter.startServer(serverName)
+        // 检查是否为 gallery 类型的服务器
+        if (serverConfig?.type === 'gallery') {
+          // 对于 gallery 类型，直接通过 SDK 启动
+          await startGalleryServer(serverName, serverConfig)
+        } else {
+          // 对于其他类型，使用原有逻辑
+          await mcpPresenter.startServer(serverName)
+        }
       }
 
       await updateServerStatus(serverName)
@@ -268,6 +276,13 @@ export const useMcpStore = defineStore('mcp', () => {
     } finally {
       serverLoadingStates.value[serverName] = false
     }
+  }
+
+  // 启动 gallery 类型的服务器
+  const startGalleryServer = async (serverName: string, serverConfig: any) => {
+    // Gallery 类型服务器现在通过 mcpClient.ts 中的 stdio 传输方式启动
+    // 直接调用标准的 startServer 方法，mcpClient 会根据 type='gallery' 进行正确处理
+    await mcpPresenter.startServer(serverName)
   }
 
   const loadClients = async () => {

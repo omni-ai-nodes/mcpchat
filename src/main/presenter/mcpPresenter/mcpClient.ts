@@ -155,6 +155,130 @@ export class McpClient {
         const _server = getInMemoryServer(this.serverName, _args, _env)
         _server.startServer(serverTransport)
         this.transport = clientTransport
+      } else if (this.serverConfig.type === 'gallery') {
+        // Gallery 类型服务器使用 stdio 传输方式
+        const command = this.serverConfig.command as string
+        const HOME_DIR = app.getPath('home')
+
+        // 定义允许的环境变量白名单
+        const allowedEnvVars = [
+          'PATH',
+          'path',
+          'Path',
+          'npm_config_registry',
+          'npm_config_cache',
+          'npm_config_prefix',
+          'npm_config_tmp',
+          'NPM_CONFIG_REGISTRY',
+          'NPM_CONFIG_CACHE',
+          'NPM_CONFIG_PREFIX',
+          'NPM_CONFIG_TMP'
+        ]
+
+        // 修复env类型问题
+        const env: Record<string, string> = {}
+
+        // 判断是否是 Node.js 相关命令
+        const isNodeCommand = ['node', 'npm', 'npx'].some((cmd) => command.includes(cmd))
+
+        if (isNodeCommand) {
+          // Node.js 命令使用白名单处理
+          if (process.env) {
+            const existingPaths: string[] = []
+
+            // 收集所有PATH相关的值
+            Object.entries(process.env).forEach(([key, value]) => {
+              if (value !== undefined) {
+                if (['PATH', 'Path', 'path'].includes(key)) {
+                  existingPaths.push(value)
+                } else if (
+                  allowedEnvVars.includes(key) &&
+                  !['PATH', 'Path', 'path'].includes(key)
+                ) {
+                  env[key] = value
+                }
+              }
+            })
+
+            // 获取默认路径
+            const defaultPaths = this.getDefaultPaths(HOME_DIR)
+
+            // 合并所有路径
+            const allPaths = [...existingPaths, ...defaultPaths]
+            if (this.nodeRuntimePath) {
+              allPaths.unshift(
+                process.platform === 'win32' ? this.nodeRuntimePath : `${this.nodeRuntimePath}/bin`
+              )
+            }
+
+            // 规范化并设置PATH
+            const { key, value } = this.normalizePathEnv(allPaths)
+            env[key] = value
+          }
+        } else {
+          // 非 Node.js 命令，保留所有系统环境变量，只补充 PATH
+          Object.entries(process.env).forEach(([key, value]) => {
+            if (value !== undefined) {
+              env[key] = value
+            }
+          })
+
+          // 补充 PATH
+          const existingPaths: string[] = []
+          if (env.PATH) {
+            existingPaths.push(env.PATH)
+          }
+          if (env.Path) {
+            existingPaths.push(env.Path)
+          }
+
+          // 获取默认路径
+          const defaultPaths = this.getDefaultPaths(HOME_DIR)
+
+          // 合并所有路径
+          const allPaths = [...existingPaths, ...defaultPaths]
+          if (this.nodeRuntimePath) {
+            allPaths.unshift(
+              process.platform === 'win32' ? this.nodeRuntimePath : `${this.nodeRuntimePath}/bin`
+            )
+          }
+
+          // 规范化并设置PATH
+          const { key, value } = this.normalizePathEnv(allPaths)
+          env[key] = value
+        }
+
+        // 添加自定义环境变量
+        if (this.serverConfig.env) {
+          Object.entries(this.serverConfig.env as Record<string, string>).forEach(
+            ([key, value]) => {
+              if (value !== undefined) {
+                // 如果是PATH相关变量，合并到主PATH中
+                if (['PATH', 'Path', 'path'].includes(key)) {
+                  const currentPathKey = process.platform === 'win32' ? 'Path' : 'PATH'
+                  const separator = process.platform === 'win32' ? ';' : ':'
+                  env[currentPathKey] = env[currentPathKey]
+                    ? `${value}${separator}${env[currentPathKey]}`
+                    : value
+                } else {
+                  env[key] = value
+                }
+              }
+            }
+          )
+        }
+
+        if (this.npmRegistry) {
+          env.npm_config_registry = this.npmRegistry
+        }
+
+        console.log('gallery mcp env', env)
+        this.transport = new StdioClientTransport({
+          command,
+          args: this.serverConfig.args as string[],
+          env,
+          stderr: 'pipe'
+        })
       } else if (this.serverConfig.type === 'stdio') {
         // 创建合适的transport
         const command = this.serverConfig.command as string

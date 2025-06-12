@@ -124,7 +124,24 @@ onMounted(async () => {
           <div v-else-if="mcpEnabled" class="divide-y">
             <div v-for="server in mcpStore.serverList" :key="server.name" class="w-full">
               <div class="p-2 hover:bg-accent flex items-center w-full">
-                <span class="mr-2">{{ server.icons }}</span>
+                <!-- 图标显示区域 - 支持图片链接和emoji -->
+                <div class="mr-2 flex-shrink-0">
+                  <!-- 如果是图片URL，显示图片 -->
+                  <div v-if="server.icons && (server.icons.startsWith('http://') || server.icons.startsWith('https://') || server.icons.startsWith('data:'))"
+                       class="w-5 h-5 rounded flex items-center justify-center">
+                    <img :src="server.icons" alt="Server Icon" class="w-5 h-5 object-contain"
+                         @error="() => server.icons = '📁'" />
+                  </div>
+                  <!-- 如果是emoji或其他文本，直接显示 -->
+                  <div v-else-if="server.icons"
+                       class="w-5 h-5 flex items-center justify-center text-sm">
+                    {{ server.icons }}
+                  </div>
+                  <!-- 默认图标 -->
+                  <div v-else class="w-5 h-5 flex items-center justify-center text-sm">
+                    📁
+                  </div>
+                </div>
                 <span
                   v-if="server.type === 'inmemory'"
                   class="flex-grow truncate text-left text-sm"

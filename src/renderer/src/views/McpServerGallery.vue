@@ -352,7 +352,7 @@ const handleInstallSubmit = async (name: string, config: any) => {
     if (mcpServersRef.value) {
       await mcpServersRef.value.handleAddServer(name, {
         ...config,
-        type: 'inmemory' // 确保类型为 inmemory
+        type: 'gallery' // 确保类型为 gallery
       })
       console.log('服务器添加成功:', name)
     } else {

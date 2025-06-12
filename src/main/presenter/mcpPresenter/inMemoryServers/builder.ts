@@ -11,6 +11,7 @@ import { CustomPromptsServer } from './customPromptsServer'
 import { DeepResearchServer } from './deepResearchServer'
 import { AutoPromptingServer } from './autoPromptingServer'
 import { ConversationSearchServer } from './conversationSearchServer'
+// import { HowToCookServer } from './howtocookServer'
 
 export function getInMemoryServer(
   serverName: string,
@@ -76,6 +77,8 @@ export function getInMemoryServer(
       return new AutoPromptingServer()
     case 'mcpchat-inmemory/conversation-search-server':
       return new ConversationSearchServer()
+    // case 'howtocook-mcp':
+    //   return new HowToCookServer()
     default:
       throw new Error(`Unknown in-memory server: ${serverName}`)
   }

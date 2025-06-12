@@ -60,11 +60,37 @@ const descriptionRef = ref<HTMLElement>()
 const needsExpansion = ref(false)
 
 const getLocalizedServerName = (serverName: string) => {
-  return t(`mcp.inmemory.${serverName}.name`, serverName)
+  try {
+    const key = `mcp.inmemory.${serverName}.name`
+    const result = t(key)
+    // 如果翻译结果等于键值本身，说明没有找到翻译，返回原始名称
+    return result === key ? serverName : result
+  } catch {
+    return serverName
+  }
 }
 
 const getLocalizedServerDesc = (serverName: string, fallbackDesc: string) => {
-  return t(`mcp.inmemory.${serverName}.desc`, fallbackDesc)
+  try {
+    const key = `mcp.inmemory.${serverName}.desc`
+    const result = t(key)
+    // 如果翻译结果等于键值本身，说明没有找到翻译，返回备用描述
+    return result === key ? fallbackDesc : result
+  } catch {
+    return fallbackDesc
+  }
+}
+
+const getServerTypeLabel = (type?: string) => {
+  switch (type) {
+    case 'http':
+      return 'HTTP'
+    case 'gallery':
+      return 'Gallery'
+    case 'inmemory':
+    default:
+      return 'Local'
+  }
 }
 
 // 计算服务器状态
@@ -211,7 +237,7 @@ watch(watchDescription, () => {
       <div class="flex items-center space-x-2 mb-2">
         <!-- 服务器类型 -->
         <Badge variant="outline" class="text-xs h-4 px-1.5">
-          {{ server.type === 'http' ? 'HTTP' : 'Local' }}
+          {{ getServerTypeLabel(server.type) }}
         </Badge>
 
         <!-- 默认启动标识 -->
