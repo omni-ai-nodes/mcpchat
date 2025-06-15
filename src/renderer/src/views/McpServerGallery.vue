@@ -2,9 +2,11 @@
 import { ref, computed, defineAsyncComponent, onMounted, watch, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useMcpStore } from '@/stores/mcp'
 import McpServerForm from '@/components/mcp-config/mcpServerForm.vue'
 import McpServers from '@/components/mcp-config/components/McpServers.vue'
+import McpSettings from '@/components/settings/McpSettings.vue'
 import {
   Dialog,
   DialogContent,
@@ -33,6 +35,7 @@ const DropdownMenuTrigger = defineAsyncComponent(() => import('@/components/ui/d
 const DropdownMenuSeparator = defineAsyncComponent(() => import('@/components/ui/dropdown-menu').then(mod => mod.DropdownMenuSeparator))
 
 const { t } = useI18n()
+const router = useRouter()
 const mcpStore = useMcpStore()
 
 // McpServers 组件引用
@@ -410,9 +413,12 @@ const viewResources = (server: ServerItem) => {
   console.log('查看资源:', server)
 }
 
-// 弹窗状态管理
+// 安装对话框状态
 const isInstallDialogOpen = ref(false)
 const prefilledJsonConfig = ref('')
+
+// MCP设置对话框状态
+const isMcpSettingsDialogOpen = ref(false)
 
 const installServer = (server: ServerItem) => {
   console.log('安装服务器:', server)
@@ -485,6 +491,11 @@ const handleInstallSubmit = async (name: string, config: any) => {
   // 清空预填充配置
   prefilledJsonConfig.value = ''
 }
+
+// 打开MCP设置弹窗
+const goToMcpSettings = () => {
+  isMcpSettingsDialogOpen.value = true
+}
 </script>
 
 <template>
@@ -516,10 +527,10 @@ const handleInstallSubmit = async (name: string, config: any) => {
           </Button>
         </div>
         
-        <!-- 添加服务器按钮 -->
-        <Button @click="showAddDialog = true" class="gap-2">
-          <Icon icon="lucide:plus" class="w-4 h-4" />
-          {{ t('mcp.mcpGallery.addServer') }}
+        <!-- MCP设置按钮 -->
+        <Button @click="goToMcpSettings" class="gap-2">
+          <Icon icon="lucide:settings" class="w-4 h-4" />
+          MCP设置
         </Button>
       </div>
     </div>
@@ -879,6 +890,23 @@ const handleInstallSubmit = async (name: string, config: any) => {
         :default-json-config="prefilledJsonConfig"
         @submit="handleInstallSubmit"
       />
+    </DialogContent>
+  </Dialog>
+
+  <!-- MCP设置弹窗 -->
+  <Dialog v-model:open="isMcpSettingsDialogOpen">
+    <DialogContent class="w-[95vw] max-w-[800px] h-[85vh] max-h-[600px] flex flex-col">
+      <DialogHeader class="flex-shrink-0 pb-4">
+        <DialogTitle class="text-lg">
+          MCP设置
+        </DialogTitle>
+        <DialogDescription class="text-sm">
+          启用或禁用MCP功能和工具
+        </DialogDescription>
+      </DialogHeader>
+      <div class="flex-grow overflow-hidden">
+        <McpSettings />
+      </div>
     </DialogContent>
   </Dialog>
   
