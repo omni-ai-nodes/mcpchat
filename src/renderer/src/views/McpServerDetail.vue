@@ -1,36 +1,39 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- 头部 -->
-    <div class="flex items-center gap-4 p-6 border-b">
-      <Button variant="ghost" size="icon" @click="goBack">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 sm:p-6 border-b">
+      <Button variant="ghost" size="icon" @click="goBack" class="self-start">
         <Icon icon="lucide:arrow-left" class="h-4 w-4" />
       </Button>
-      <div class="flex items-center gap-3 flex-1">
-        <div class="flex-shrink-0">
-          <img 
-            v-if="serverDetail?.Logo && (serverDetail.Logo.startsWith('http') || serverDetail.Logo.startsWith('data:'))"
-            :src="serverDetail.Logo"
-            :alt="serverDetail?.Name || 'Server'"
-            class="w-12 h-12 rounded-lg object-cover"
-            @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'"
-          />
-          <div 
-            v-else
-            class="w-12 h-12 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-lg"
-          >
-            🔧
+      <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-1 w-full sm:w-auto">
+        <div class="flex items-center gap-3 flex-1 w-full sm:w-auto">
+          <div class="flex-shrink-0">
+            <img 
+              v-if="serverDetail?.Logo && (serverDetail.Logo.startsWith('http') || serverDetail.Logo.startsWith('data:'))"
+              :src="serverDetail.Logo"
+              :alt="serverDetail?.Name || 'Server'"
+              class="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover"
+              @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'"
+            />
+            <div 
+              v-else
+              class="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-base sm:text-lg"
+            >
+              🔧
+            </div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h1 class="text-xl sm:text-2xl font-semibold truncate">{{ serverDetail?.Name || 'Loading...' }}</h1>
+            <p v-if="serverDetail?.By" class="text-sm text-muted-foreground">by {{ serverDetail.By }}</p>
           </div>
         </div>
-        <div class="flex-1 min-w-0">
-          <h1 class="text-2xl font-semibold truncate">{{ serverDetail?.Name || 'Loading...' }}</h1>
-          <p v-if="serverDetail?.By" class="text-sm text-muted-foreground">by {{ serverDetail.By }}</p>
-        </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <Button
             v-if="serverDetail?.Github"
             variant="outline"
             size="sm"
             @click="openGithub(serverDetail.Github)"
+            class="w-full sm:w-auto"
           >
             <Icon icon="lucide:github" class="h-4 w-4 mr-2" />
             GitHub
@@ -40,6 +43,7 @@
             variant="default"
             size="sm"
             @click="installServer"
+            class="w-full sm:w-auto"
           >
             <Icon icon="lucide:download" class="h-4 w-4 mr-2" />
             {{ t('mcp.mcpGallery.install') }}
@@ -50,8 +54,8 @@
 
     <!-- 内容区域 -->
     <div class="flex-1 overflow-hidden">
-      <div class="h-full overflow-y-auto">
-        <div class="max-w-4xl mx-auto p-6">
+      <div class="h-full overflow-y-auto scrollbar-hide">
+        <div class="max-w-4xl mx-auto p-4 sm:p-6">
           <!-- 加载状态 -->
           <div v-if="loading" class="flex items-center justify-center py-12">
             <div class="flex items-center gap-2">
@@ -80,12 +84,12 @@
 
             <!-- 标签页 -->
             <div class="border rounded-lg">
-              <div class="flex border-b">
+              <div class="flex border-b overflow-x-auto scrollbar-hide">
                 <button
                   v-for="tab in tabs"
                   :key="tab.key"
                   :class="[
-                    'px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+                    'px-3 sm:px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0',
                     activeTab === tab.key
                       ? 'border-primary text-primary'
                       : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -96,7 +100,7 @@
                 </button>
               </div>
               
-              <div class="p-6">
+              <div class="p-4 sm:p-6">
                 <!-- 快速入门 -->
                 <div v-if="activeTab === 'quickstart' && serverDetail.Content" class="prose prose-sm max-w-none dark:prose-invert">
                   <div v-html="serverDetail.Content"></div>
@@ -109,8 +113,19 @@
                 
                 <!-- 配置信息 -->
                 <div v-else-if="activeTab === 'config' && serverDetail.DeployJson">
-                  <h3 class="text-lg font-semibold mb-3">{{ t('mcp.serverDetail.deployConfig') }}</h3>
-                  <pre class="bg-muted p-4 rounded-lg overflow-x-auto text-sm"><code>{{ formatJson(serverDetail.DeployJson) }}</code></pre>
+                  <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-semibold">{{ t('mcp.serverDetail.deployConfig') }}</h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      @click="copyDeployConfig"
+                      class="flex items-center gap-2"
+                    >
+                      <Icon icon="lucide:copy" class="h-4 w-4" />
+                      {{ t('common.copy') }}
+                    </Button>
+                  </div>
+                  <pre class="bg-muted p-4 rounded-lg overflow-x-auto scrollbar-hide text-sm"><code>{{ formatJson(serverDetail.DeployJson) }}</code></pre>
                 </div>
                 
                 <!-- 空状态 -->
@@ -122,14 +137,14 @@
             </div>
 
             <!-- 元信息 -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t">
               <div>
                 <h3 class="text-sm font-medium text-muted-foreground mb-1">{{ t('mcp.serverDetail.createdAt') }}</h3>
-                <p class="text-sm">{{ formatDate(serverDetail.CreatedAt) }}</p>
+                <p class="text-sm break-words">{{ formatDate(serverDetail.CreatedAt) }}</p>
               </div>
               <div>
                 <h3 class="text-sm font-medium text-muted-foreground mb-1">{{ t('mcp.serverDetail.updatedAt') }}</h3>
-                <p class="text-sm">{{ formatDate(serverDetail.UpdatedAt) }}</p>
+                <p class="text-sm break-words">{{ formatDate(serverDetail.UpdatedAt) }}</p>
               </div>
             </div>
           </div>
@@ -218,6 +233,32 @@ const installServer = () => {
   console.log('Install server:', serverDetail.value)
 }
 
+// 复制部署配置
+const copyDeployConfig = async () => {
+  if (!serverDetail.value?.DeployJson) return
+  
+  try {
+    const formattedJson = formatJson(serverDetail.value.DeployJson)
+    await navigator.clipboard.writeText(formattedJson)
+    // TODO: 可以添加成功提示
+    console.log('Deploy config copied to clipboard')
+  } catch (err) {
+    console.error('Failed to copy deploy config:', err)
+    // 降级方案：使用传统的复制方法
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = formatJson(serverDetail.value.DeployJson)
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      console.log('Deploy config copied to clipboard (fallback)')
+    } catch (fallbackErr) {
+      console.error('Fallback copy also failed:', fallbackErr)
+    }
+  }
+}
+
 // 格式化JSON
 const formatJson = (jsonStr: string) => {
   try {
@@ -272,5 +313,15 @@ onMounted(() => {
 .prose pre code {
   background-color: transparent;
   padding: 0;
+}
+
+/* 隐藏滚动条 */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
 }
 </style>

@@ -287,11 +287,8 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="flex flex-col h-screen bg-container">
-    <div class="flex flex-row h-0 flex-grow relative overflow-hidden px-[1px] py-[1px]">
-      <!-- 主内容区域 -->
-
-      <RouterView />
-    </div>
+    <!-- 主内容区域 -->
+    <RouterView />
     <!-- 全局更新弹窗 -->
     <UpdateDialog />
     <!-- 全局Toast提示 -->
