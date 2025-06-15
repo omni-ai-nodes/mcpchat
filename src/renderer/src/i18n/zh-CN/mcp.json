@@ -259,6 +259,7 @@
     "starting": "启动中",
     "error": "错误",
     "stopped": "已停止",
+    "notInstalled": "未安装",
     "install": "安装"
   }
 }

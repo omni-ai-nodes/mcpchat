@@ -259,6 +259,7 @@
     "starting": "Starting",
     "error": "Error",
     "stopped": "Stopped",
+    "notInstalled": "Not Installed",
     "install": "Install"
   }
 }

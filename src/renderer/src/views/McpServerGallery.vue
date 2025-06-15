@@ -95,6 +95,17 @@ const filterStatus = ref('all')
 const viewMode = ref<'grid' | 'list'>('grid')
 const showAddDialog = ref(false)
 
+// 检查服务是否已安装
+const isServerInstalled = (server: ServerItem): boolean => {
+  const localServer = mcpStore.serverList.find(local => {
+    return local.name === server.name || 
+           local.name.includes(server.name) || 
+           server.name.includes(local.name) ||
+           (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+  })
+  return !!localServer
+}
+
 // 同步服务状态的函数
 const syncServerStatuses = () => {
   servers.value.forEach(server => {
@@ -280,7 +291,12 @@ const filteredServers = computed(() => {
 })
 
 // 状态相关函数
-const getStatusText = (status: string) => {
+const getStatusText = (status: string, server?: ServerItem) => {
+  // 如果服务未安装，显示"未安装"状态
+  if (server && !isServerInstalled(server)) {
+    return t('mcp.mcpGallery.notInstalled')
+  }
+  
   switch (status) {
     case 'running':
       return t('mcp.mcpGallery.running')
@@ -293,7 +309,12 @@ const getStatusText = (status: string) => {
   }
 }
 
-const getStatusDotClass = (status: string) => {
+const getStatusDotClass = (status: string, server?: ServerItem) => {
+  // 如果服务未安装，显示蓝色状态点
+  if (server && !isServerInstalled(server)) {
+    return 'bg-blue-500'
+  }
+  
   switch (status) {
     case 'running':
       return 'bg-green-500'
@@ -306,7 +327,12 @@ const getStatusDotClass = (status: string) => {
   }
 }
 
-const getStatusTextClass = (status: string) => {
+const getStatusTextClass = (status: string, server?: ServerItem) => {
+  // 如果服务未安装，显示蓝色文本
+  if (server && !isServerInstalled(server)) {
+    return 'text-blue-600'
+  }
+  
   switch (status) {
     case 'running':
       return 'text-green-600'
@@ -633,53 +659,38 @@ const handleInstallSubmit = async (name: string, config: any) => {
               <div class="flex items-center justify-between">
                 <!-- 状态 -->
                 <div class="flex items-center space-x-1.5">
-                  <div :class="['w-2 h-2 rounded-full', getStatusDotClass(server.status)]" />
-                  <span :class="['text-xs', getStatusTextClass(server.status)]">
-                    {{ getStatusText(server.status) }}
+                  <div :class="['w-2 h-2 rounded-full', getStatusDotClass(server.status, server)]" />
+                  <span :class="['text-xs', getStatusTextClass(server.status, server)]">
+                    {{ getStatusText(server.status, server) }}
                   </span>
                 </div>
-                <!-- 开关 -->
-                <Switch
-                  :checked="server.isRunning"
-                  @update:checked="toggleServer(server)"
-                />
+                <!-- 根据安装状态显示不同控件 -->
+                <!-- 未安装时显示安装按钮 -->
+                <Button
+                  v-if="!isServerInstalled(server)"
+                  variant="default"
+                  size="sm"
+                  class="px-3 py-1 text-xs"
+                  @click="installServer(server)"
+                >
+                  <Icon icon="lucide:download" class="h-3 w-3 mr-1" />
+                  {{ t('mcp.mcpGallery.install') }}
+                </Button>
+                <!-- 已安装时显示启动按钮 -->
+                <Button
+                  v-if="isServerInstalled(server)"
+                  variant="default"
+                  size="sm"
+                  class="px-3 py-1 text-xs"
+                  @click="toggleServer(server)"
+                >
+                  <Icon :icon="server.isRunning ? 'lucide:power-off' : 'lucide:power'" class="h-3 w-3 mr-1" />
+                  {{ server.isRunning ? t('mcp.mcpGallery.stopServer') : t('mcp.mcpGallery.startServer') }}
+                </Button>
               </div>
             </div>
             
-            <!-- 底部统计栏 -->
-            <div class="flex flex-row bg-muted h-9 items-center">
-              <!-- 工具按钮 -->
-              <Button
-                variant="ghost"
-                class="h-full flex-1 text-xs hover:bg-secondary rounded-none"
-                :disabled="server.toolsCount === 0"
-                @click="viewTools(server)"
-              >
-                <Icon icon="lucide:wrench" class="h-3 w-3 mr-1" />
-                {{ server.toolsCount }} {{ t('mcp.mcpGallery.tools') }}
-              </Button>
-              <Separator orientation="vertical" class="h-5" />
-              <!-- 资源按钮 -->
-              <Button
-                variant="ghost"
-                class="h-full flex-1 text-xs hover:bg-secondary rounded-none"
-                :disabled="server.resourcesCount === 0"
-                @click="viewResources(server)"
-              >
-                <Icon icon="lucide:folder" class="h-3 w-3 mr-1" />
-                {{ server.resourcesCount }} {{ t('mcp.mcpGallery.resources') }}
-              </Button>
-              <Separator orientation="vertical" class="h-5" />
-              <!-- 安装按钮 -->
-              <Button
-                variant="ghost"
-                class="h-full flex-1 text-xs hover:bg-secondary rounded-none"
-                @click="installServer(server)"
-              >
-                <Icon icon="lucide:download" class="h-3 w-3 mr-1" />
-                {{ t('mcp.mcpGallery.install') }}
-              </Button>
-            </div>
+
           </Card>
         </div>
       
@@ -735,39 +746,38 @@ const handleInstallSubmit = async (name: string, config: any) => {
                       <Icon icon="lucide:github" class="h-3 w-3" />
                     </Button>
                   </div>
-                  <p class="text-sm text-muted-foreground line-clamp-1 mb-2">{{ server.description }}</p>
-                  <div class="flex items-center space-x-4 text-xs text-muted-foreground">
-                    <span class="flex items-center gap-1">
-                      <Icon icon="lucide:wrench" class="w-3 h-3" />
-                      {{ server.toolsCount }} {{ t('mcp.mcpGallery.tools') }}
-                    </span>
-
-                    <span class="flex items-center gap-1">
-                      <Icon icon="lucide:folder" class="w-3 h-3" />
-                      {{ server.resourcesCount }} {{ t('mcp.mcpGallery.resources') }}
-                    </span>
-                  </div>
+                  <p class="text-sm text-muted-foreground line-clamp-1">{{ server.description }}</p>
                 </div>
                 <div class="flex items-center gap-3">
-                  <!-- 安装按钮 -->
+                  <!-- 根据安装状态显示不同按钮 -->
+                  <!-- 未安装时显示安装按钮 -->
                   <Button
-                    variant="outline"
+                    v-if="!isServerInstalled(server)"
+                    variant="default"
                     size="sm"
+                    class="px-4"
                     @click="installServer(server)"
                   >
-                    <Icon icon="lucide:download" class="h-4 w-4 mr-1" />
+                    <Icon icon="lucide:download" class="h-4 w-4 mr-2" />
                     {{ t('mcp.mcpGallery.install') }}
                   </Button>
+                  <!-- 已安装时显示启动按钮 -->
+                  <Button
+                    v-if="isServerInstalled(server)"
+                    variant="default"
+                    size="sm"
+                    class="px-4"
+                    @click="toggleServer(server)"
+                  >
+                    <Icon :icon="server.isRunning ? 'lucide:power-off' : 'lucide:power'" class="h-4 w-4 mr-2" />
+                    {{ server.isRunning ? t('mcp.mcpGallery.stopServer') : t('mcp.mcpGallery.startServer') }}
+                  </Button>
                   <div class="flex items-center space-x-1.5">
-                    <div :class="['w-2 h-2 rounded-full', getStatusDotClass(server.status)]" />
-                    <span :class="['text-xs', getStatusTextClass(server.status)]">
-                      {{ getStatusText(server.status) }}
+                    <div :class="['w-2 h-2 rounded-full', getStatusDotClass(server.status, server)]" />
+                  <span :class="['text-xs', getStatusTextClass(server.status, server)]">
+                    {{ getStatusText(server.status, server) }}
                     </span>
                   </div>
-                  <Switch
-                    :checked="server.isRunning"
-                    @update:checked="toggleServer(server)"
-                  />
                   <DropdownMenu>
                     <DropdownMenuTrigger as-child>
                       <Button variant="ghost" size="icon" class="h-8 w-8">
