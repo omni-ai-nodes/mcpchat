@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, onMounted } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useMcpStore } from '@/stores/mcp'
@@ -96,19 +96,26 @@ const viewMode = ref<'grid' | 'list'>('grid')
 const showAddDialog = ref(false)
 
 // API调用函数
-const fetchServers = async (page: number = 1, size: number = 10) => {
+const fetchServers = async (page: number = 1, size: number = 10, searchName: string = '') => {
   loading.value = true
   try {
     const apiUrl = import.meta.env.VITE_MCP_SERVER_API_URL || 'https://api.omni-ainode.com'
+    const requestBody: any = {
+      page_size: size,
+      current_page: page
+    }
+    
+    // 如果有搜索内容，添加到请求体中
+    if (searchName.trim()) {
+      requestBody.name = searchName.trim()
+    }
+    
     const response = await fetch(`${apiUrl}/api/get_mcp_server_list`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        page_size: size,
-        current_page: page
-      })
+      body: JSON.stringify(requestBody)
     })
     
     if (!response.ok) {
@@ -169,41 +176,48 @@ const openGithub = (url: string) => {
 }
 
 // 翻页函数
-const goToPage = (page: number) => {
+// 组件挂载时获取数据
+onMounted(() => {
+  fetchServers()
+})
+
+// 监听搜索查询变化，实现实时搜索
+watch(searchQuery, (newQuery) => {
+  // 重置到第一页并执行搜索
+  fetchServers(1, pageSize.value, newQuery)
+}, { debounce: 500 }) // 添加防抖，避免频繁请求
+
+// 修改翻页函数以支持搜索
+const goToPageWithSearch = (page: number) => {
   if (page >= 1 && page <= totalPages.value && page !== currentPage.value) {
-    fetchServers(page, pageSize.value)
+    fetchServers(page, pageSize.value, searchQuery.value)
   }
+}
+
+// 更新翻页函数
+const goToPage = (page: number) => {
+  goToPageWithSearch(page)
 }
 
 // 上一页
 const prevPage = () => {
   if (currentPage.value > 1) {
-    goToPage(currentPage.value - 1)
+    goToPageWithSearch(currentPage.value - 1)
   }
 }
 
 // 下一页
 const nextPage = () => {
   if (currentPage.value < totalPages.value) {
-    goToPage(currentPage.value + 1)
+    goToPageWithSearch(currentPage.value + 1)
   }
 }
 
-// 计算属性：过滤后的服务器列表
+// 计算属性：过滤后的服务器列表（仅保留状态过滤，搜索已移至服务端）
 const filteredServers = computed(() => {
   let filtered = servers.value
 
-  // 搜索过滤
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(server => 
-      server.name.toLowerCase().includes(query) ||
-      server.description.toLowerCase().includes(query) ||
-      server.type.toLowerCase().includes(query)
-    )
-  }
-
-  // 状态过滤
+  // 状态过滤（保留客户端状态过滤）
   if (filterStatus.value !== 'all') {
     filtered = filtered.filter(server => {
       switch (filterStatus.value) {
@@ -367,11 +381,6 @@ const handleInstallSubmit = async (name: string, config: any) => {
   // 清空预填充配置
   prefilledJsonConfig.value = ''
 }
-
-// 组件挂载时获取数据
-onMounted(() => {
-  fetchServers()
-})
 </script>
 
 <template>
