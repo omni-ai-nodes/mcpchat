@@ -767,6 +767,13 @@ const goToMcpSettings = () => {
                   <p class="text-sm text-muted-foreground line-clamp-1">{{ server.description }}</p>
                 </div>
                 <div class="flex items-center gap-3">
+                  <!-- 状态显示 -->
+                  <div class="flex items-center space-x-1.5">
+                    <div :class="['w-2 h-2 rounded-full', getStatusDotClass(server.status, server)]" />
+                  <span :class="['text-xs', getStatusTextClass(server.status, server)]">
+                    {{ getStatusText(server.status, server) }}
+                    </span>
+                  </div>
                   <!-- 根据安装状态显示不同按钮 -->
                   <!-- 未安装时显示安装按钮 -->
                   <Button
@@ -790,12 +797,6 @@ const goToMcpSettings = () => {
                     <Icon :icon="server.isRunning ? 'lucide:power-off' : 'lucide:power'" class="h-4 w-4 mr-2" />
                     {{ server.isRunning ? t('mcp.mcpGallery.stopServer') : t('mcp.mcpGallery.startServer') }}
                   </Button>
-                  <div class="flex items-center space-x-1.5">
-                    <div :class="['w-2 h-2 rounded-full', getStatusDotClass(server.status, server)]" />
-                  <span :class="['text-xs', getStatusTextClass(server.status, server)]">
-                    {{ getStatusText(server.status, server) }}
-                    </span>
-                  </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger as-child>
                       <Button variant="ghost" size="icon" class="h-8 w-8">

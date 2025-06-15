@@ -17,11 +17,11 @@ const router = createRouter({
       }
     },
     {
-      path: '/mcp',
-      name: 'mcp',
+      path: '/mcp-gallery',
+      name: 'mcp-gallery',
       component: () => import('@/views/McpServerGallery.vue'),
       meta: {
-        titleKey: 'routes.mcp',
+        titleKey: 'routes.mcp-gallery',
         icon: 'lucide:message-square'
       }
     },

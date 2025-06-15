@@ -282,7 +282,7 @@ const openNewTab = () => {
 
 const openMcpTab = () => {
   // 检查是否已经存在设置标签页
-  const existingSettingsTab = tabStore.tabs.find((tab) => tab.url.includes('#/mcp'))
+  const existingSettingsTab = tabStore.tabs.find((tab) => tab.url.includes('#/mcp-gallery'))
 
   if (existingSettingsTab) {
     // 如果已经存在设置标签页，切换到该标签页
@@ -290,9 +290,9 @@ const openMcpTab = () => {
   } else {
     // 如果不存在设置标签页，创建新的
     tabStore.addTab({
-      name: 'Mcp Tab',
+      name: 'Mcp Gallery',
       icon: 'lucide:fingerprint',
-      viewType: 'mcp'
+      viewType: 'mcp-gallery'
     })
   }
 }
