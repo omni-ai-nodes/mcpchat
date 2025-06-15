@@ -61,7 +61,7 @@ watch(isAddServerDialogOpen, (newIsAddServerDialogOpen) => {
     settingsStore.clearMcpInstallCache()
   }
 })
-// 计算属性：区分内置服务和普通服务
+// 计算属性：区分内置服务、MCP广场服务和普通服务
 const inMemoryServers = computed(() => {
   return mcpStore.serverList.filter((server) => {
     const config = mcpStore.config.mcpServers[server.name]
@@ -69,10 +69,17 @@ const inMemoryServers = computed(() => {
   })
 })
 
+const galleryServers = computed(() => {
+  return mcpStore.serverList.filter((server) => {
+    const config = mcpStore.config.mcpServers[server.name]
+    return config?.type === 'gallery'
+  })
+})
+
 const regularServers = computed(() => {
   return mcpStore.serverList.filter((server) => {
     const config = mcpStore.config.mcpServers[server.name]
-    return config?.type !== 'inmemory'
+    return config?.type !== 'inmemory' && config?.type !== 'gallery'
   })
 })
 
@@ -252,6 +259,39 @@ const handleViewResources = async (serverName: string) => {
       </div>
 
       <div v-else class="space-y-4 py-3">
+         <!-- MCP广场 -->
+         <div v-if="galleryServers.length > 0">
+          <div class="flex items-center space-x-2 mb-3">
+            <Icon icon="lucide:store" class="h-4 w-4 text-purple-600" />
+            <h3 class="text-sm font-semibold text-foreground">
+              {{ t('settings.mcp.mcpGallery') }}
+            </h3>
+            <div class="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full">
+              {{ galleryServers.length }}
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <McpServerCard
+              v-for="server in galleryServers"
+              :key="server.name"
+              :server="server"
+              :is-built-in="false"
+              :is-loading="mcpStore.serverLoadingStates[server.name]"
+              :disabled="mcpStore.configLoading"
+              :tools-count="getServerToolsCount(server.name)"
+              :prompts-count="getServerPromptsCount(server.name)"
+              :resources-count="getServerResourcesCount(server.name)"
+              @toggle="handleToggleServer(server.name)"
+              @toggle-default="handleToggleDefaultServer(server.name)"
+              @edit="openEditServerDialog(server.name)"
+              @remove="handleRemoveServer(server.name)"
+              @view-tools="handleViewTools(server.name)"
+              @view-prompts="handleViewPrompts(server.name)"
+              @view-resources="handleViewResources(server.name)"
+            />
+          </div>
+        </div>
+
         <!-- 内置服务 -->
         <div v-if="inMemoryServers.length > 0">
           <div class="flex items-center space-x-2 mb-3">

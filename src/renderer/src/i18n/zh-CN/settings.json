@@ -349,6 +349,7 @@
     "resetConfirmDescription": "此操作将恢复所有默认服务器，同时保留您自定义的服务器。对默认服务器的任何修改将会丢失。",
     "resetConfirm": "恢复",
     "builtInServers": "内置服务",
+    "mcpGallery": "MCP广场",
     "customServers": "自定义服务",
     "builtIn": "内置",
     "cannotRemoveBuiltIn": "无法删除内置服务",
