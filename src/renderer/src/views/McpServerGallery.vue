@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, onMounted, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, watch, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useMcpStore } from '@/stores/mcp'
@@ -95,6 +95,42 @@ const filterStatus = ref('all')
 const viewMode = ref<'grid' | 'list'>('grid')
 const showAddDialog = ref(false)
 
+// 同步服务状态的函数
+const syncServerStatuses = () => {
+  servers.value.forEach(server => {
+    // 检查该服务是否已安装到本地配置中
+    // 使用与toggleServer相同的匹配逻辑
+    const localServer = mcpStore.serverList.find(local => {
+      return local.name === server.name || 
+             local.name.includes(server.name) || 
+             server.name.includes(local.name) ||
+             (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+    })
+    
+    if (localServer) {
+      // 如果找到本地服务，同步其状态
+      server.status = localServer.isRunning ? 'running' : (localServer.isLoading ? 'loading' : 'stopped')
+      server.isRunning = localServer.isRunning
+      server.isDefault = localServer.isDefault
+      // 可以从本地服务获取更多信息，如工具数量等
+      if (localServer.type === 'gallery') {
+        // 对于gallery类型的服务，确保状态正确同步
+        server.type = 'gallery'
+      }
+    }
+  })
+}
+
+// 监听mcpStore的服务状态变化
+watch(() => mcpStore.serverStatuses, () => {
+  syncServerStatuses()
+}, { deep: true })
+
+// 监听mcpStore的服务列表变化
+watch(() => mcpStore.serverList, () => {
+  syncServerStatuses()
+}, { deep: true })
+
 // API调用函数
 const fetchServers = async (page: number = 1, size: number = 10, searchName: string = '') => {
   loading.value = true
@@ -144,6 +180,9 @@ const fetchServers = async (page: number = 1, size: number = 10, searchName: str
       
       totalPages.value = data.data.total_pages
       currentPage.value = page
+      
+      // 获取数据后立即同步服务状态
+      syncServerStatuses()
     } else {
       console.error('API返回错误:', data.msg)
     }
@@ -179,6 +218,10 @@ const openGithub = (url: string) => {
 // 组件挂载时获取数据
 onMounted(() => {
   fetchServers()
+  // 确保mcpStore已初始化后同步状态
+  nextTick(() => {
+    syncServerStatuses()
+  })
 })
 
 // 监听搜索查询变化，实现实时搜索
@@ -289,9 +332,38 @@ const deleteServer = (server: ServerItem) => {
   console.log('删除服务器:', server)
 }
 
-const toggleServer = (server: ServerItem) => {
-  server.isRunning = !server.isRunning
-  server.status = server.isRunning ? 'running' : 'stopped'
+const toggleServer = async (server: ServerItem) => {
+  try {
+    // 检查该服务是否已安装到本地配置中
+    // 尝试多种匹配方式：精确匹配、包含匹配、被包含匹配
+    const localServer = mcpStore.serverList.find(local => {
+      return local.name === server.name || 
+             local.name.includes(server.name) || 
+             server.name.includes(local.name) ||
+             (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+    })
+    
+    if (localServer) {
+      // 如果已安装，使用mcpStore的toggleServer方法
+      server.status = 'loading'
+      const success = await mcpStore.toggleServer(localServer.name) // 使用本地服务的名称
+      if (success) {
+        // 状态会通过watch自动同步，这里不需要手动更新
+        console.log(`服务器 ${localServer.name} 状态切换成功`)
+      } else {
+        // 如果切换失败，恢复原状态
+        server.status = server.isRunning ? 'running' : 'stopped'
+        console.error(`服务器 ${localServer.name} 状态切换失败`)
+      }
+    } else {
+      // 如果未安装，提示用户先安装
+      console.log('当前已安装的服务列表:', mcpStore.serverList.map(s => s.name))
+      alert(`请先安装服务器 "${server.name}" 后再启动`)
+    }
+  } catch (error) {
+    console.error(`切换服务器 ${server.name} 状态时发生错误:`, error)
+    server.status = server.isRunning ? 'running' : 'stopped'
+  }
 }
 
 const viewTools = (server: ServerItem) => {
