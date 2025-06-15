@@ -243,6 +243,7 @@
     "allServers": "すべてのサーバー",
     "runningServers": "実行中",
     "stoppedServers": "停止中",
+    "notInstalledServers": "未インストール",
     "errorServers": "エラー状態",
     "editServer": "サーバーを編集",
     "stopServer": "サーバーを停止",

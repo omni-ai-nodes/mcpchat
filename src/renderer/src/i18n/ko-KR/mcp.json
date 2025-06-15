@@ -243,6 +243,7 @@
     "allServers": "모든 서버",
     "runningServers": "실행 중",
     "stoppedServers": "중지됨",
+    "notInstalledServers": "설치되지 않음",
     "errorServers": "오류 상태",
     "editServer": "서버 편집",
     "stopServer": "서버 중지",

@@ -243,6 +243,7 @@
     "allServers": "Tous les serveurs",
     "runningServers": "En cours d'exécution",
     "stoppedServers": "Arrêtés",
+    "notInstalledServers": "Non installés",
     "errorServers": "Erreur",
     "editServer": "Modifier le serveur",
     "stopServer": "Arrêter le serveur",

@@ -243,6 +243,7 @@
     "allServers": "Все серверы",
     "runningServers": "Запущенные",
     "stoppedServers": "Остановленные",
+    "notInstalledServers": "Не установлены",
     "errorServers": "Ошибка",
     "editServer": "Редактировать сервер",
     "stopServer": "Остановить сервер",

@@ -70,7 +70,7 @@ interface ServerItem {
   icon: string
   description: string
   type: string // 改为显示By内容
-  status: 'running' | 'stopped' | 'error' | 'loading'
+  status: 'running' | 'stopped' | 'error' | 'loading' | 'not_installed'
   isRunning: boolean
   isDefault: boolean
   toolsCount: number
@@ -128,6 +128,11 @@ const syncServerStatuses = () => {
         // 对于gallery类型的服务，确保状态正确同步
         server.type = 'gallery'
       }
+    } else {
+      // 如果未找到本地服务，设置为未安装状态
+      server.status = 'not_installed'
+      server.isRunning = false
+      server.isDefault = false
     }
   })
 }
@@ -179,7 +184,7 @@ const fetchServers = async (page: number = 1, size: number = 10, searchName: str
         icon: getServerIcon(item.Logo), // 处理图标
         description: item.Introdution,
         type: 'stdio' as const, // 显示By内容而不是http/local
-        status: 'stopped' as const, // 默认状态
+        status: 'not_installed' as const, // 默认状态为未安装
         isRunning: false,
         isDefault: false,
         toolsCount: 0, // 可以根据需要解析Tools字段
@@ -281,6 +286,8 @@ const filteredServers = computed(() => {
           return server.status === 'stopped'
         case 'error':
           return server.status === 'error'
+        case 'not_installed':
+          return server.status === 'not_installed'
         default:
           return true
       }
@@ -292,11 +299,6 @@ const filteredServers = computed(() => {
 
 // 状态相关函数
 const getStatusText = (status: string, server?: ServerItem) => {
-  // 如果服务未安装，显示"未安装"状态
-  if (server && !isServerInstalled(server)) {
-    return t('mcp.mcpGallery.notInstalled')
-  }
-  
   switch (status) {
     case 'running':
       return t('mcp.mcpGallery.running')
@@ -304,17 +306,15 @@ const getStatusText = (status: string, server?: ServerItem) => {
       return t('mcp.mcpGallery.starting')
     case 'error':
       return t('mcp.mcpGallery.error')
+    case 'not_installed':
+      return t('mcp.mcpGallery.notInstalled')
+    case 'stopped':
     default:
       return t('mcp.mcpGallery.stopped')
   }
 }
 
 const getStatusDotClass = (status: string, server?: ServerItem) => {
-  // 如果服务未安装，显示蓝色状态点
-  if (server && !isServerInstalled(server)) {
-    return 'bg-blue-500'
-  }
-  
   switch (status) {
     case 'running':
       return 'bg-green-500'
@@ -322,17 +322,15 @@ const getStatusDotClass = (status: string, server?: ServerItem) => {
       return 'bg-yellow-500'
     case 'error':
       return 'bg-red-500'
+    case 'not_installed':
+      return 'bg-blue-500'
+    case 'stopped':
     default:
       return 'bg-gray-400'
   }
 }
 
 const getStatusTextClass = (status: string, server?: ServerItem) => {
-  // 如果服务未安装，显示蓝色文本
-  if (server && !isServerInstalled(server)) {
-    return 'text-blue-600'
-  }
-  
   switch (status) {
     case 'running':
       return 'text-green-600'
@@ -340,6 +338,9 @@ const getStatusTextClass = (status: string, server?: ServerItem) => {
       return 'text-yellow-600'
     case 'error':
       return 'text-red-600'
+    case 'not_installed':
+      return 'text-blue-600'
+    case 'stopped':
     default:
       return 'text-gray-500'
   }
@@ -388,7 +389,12 @@ const toggleServer = async (server: ServerItem) => {
     }
   } catch (error) {
     console.error(`切换服务器 ${server.name} 状态时发生错误:`, error)
-    server.status = server.isRunning ? 'running' : 'stopped'
+    // 恢复状态时需要考虑服务是否已安装
+    if (isServerInstalled(server)) {
+      server.status = server.isRunning ? 'running' : 'stopped'
+    } else {
+      server.status = 'not_installed'
+    }
   }
 }
 
@@ -536,6 +542,7 @@ const handleInstallSubmit = async (name: string, config: any) => {
           <SelectItem value="all">{{ t('mcp.mcpGallery.allServers') }}</SelectItem>
           <SelectItem value="running">{{ t('mcp.mcpGallery.runningServers') }}</SelectItem>
           <SelectItem value="stopped">{{ t('mcp.mcpGallery.stoppedServers') }}</SelectItem>
+          <SelectItem value="not_installed">{{ t('mcp.mcpGallery.notInstalledServers') }}</SelectItem>
           <SelectItem value="error">{{ t('mcp.mcpGallery.errorServers') }}</SelectItem>
         </SelectContent>
       </Select>

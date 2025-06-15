@@ -243,6 +243,7 @@
     "allServers": "全部服务器",
     "runningServers": "运行中",
     "stoppedServers": "已停止",
+    "notInstalledServers": "未安装",
     "errorServers": "错误状态",
     "editServer": "编辑服务器",
     "stopServer": "停止服务器",
