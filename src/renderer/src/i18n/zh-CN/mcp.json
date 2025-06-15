@@ -236,7 +236,7 @@
     "dialogDescription": "浏览和查看MCP服务器提供的资源"
   },
   "mcpGallery": {
-    "title": "MCP 广场",
+    "title": "MCP广场",
     "addServer": "添加服务器",
     "searchPlaceholder": "搜索服务器...",
     "filterByStatus": "按状态筛选",
@@ -244,7 +244,7 @@
     "runningServers": "运行中",
     "stoppedServers": "已停止",
     "notInstalledServers": "未安装",
-    "errorServers": "错误状态",
+    "errorServers": "错误",
     "editServer": "编辑服务器",
     "stopServer": "停止服务器",
     "startServer": "启动服务器",
@@ -254,13 +254,26 @@
     "prompts": "提示模板",
     "resources": "资源",
     "noServers": "暂无服务器",
-    "noServersDescription": "您还没有添加任何 MCP 服务器。添加服务器以开始使用工具和功能。",
-    "addFirstServer": "添加第一个服务器",
+    "noServersDescription": "您还没有添加任何MCP服务器。添加服务器以开始使用工具和功能。",
+    "addFirstServer": "添加您的第一个服务器",
     "running": "运行中",
     "starting": "启动中",
     "error": "错误",
     "stopped": "已停止",
     "notInstalled": "未安装",
     "install": "安装"
+  },
+  "serverDetail": {
+    "introduction": "介绍",
+    "deployConfig": "部署配置",
+    "noContent": "暂无内容",
+    "createdAt": "创建时间",
+    "updatedAt": "更新时间",
+    "quickstart": "快速开始",
+    "tools": "工具",
+    "config": "配置",
+    "invalidParams": "参数无效",
+    "fetchError": "获取服务器详情失败",
+    "networkError": "网络错误"
   }
 }

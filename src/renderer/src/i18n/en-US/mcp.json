@@ -262,5 +262,18 @@
     "stopped": "Stopped",
     "notInstalled": "Not Installed",
     "install": "Install"
+  },
+  "serverDetail": {
+    "introduction": "Introduction",
+    "deployConfig": "Deploy Configuration",
+    "noContent": "No content available",
+    "createdAt": "Created At",
+    "updatedAt": "Updated At",
+    "quickstart": "Quick Start",
+    "tools": "Tools",
+    "config": "Configuration",
+    "invalidParams": "Invalid parameters",
+    "fetchError": "Failed to fetch server details",
+    "networkError": "Network error occurred"
   }
 }

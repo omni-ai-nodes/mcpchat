@@ -228,7 +228,10 @@ onMounted(() => {
   watch(
     () => activeTab.value,
     (newVal) => {
-      router.push({ name: newVal })
+      // 跳过详情页面的路由推送
+      if (newVal && !newVal.startsWith('mcp-server')) {
+        router.push({ name: newVal })
+      }
     }
   )
 

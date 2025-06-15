@@ -26,6 +26,15 @@ const router = createRouter({
       }
     },
     {
+      path: '/mcp-server/:name',
+      name: 'mcp-server-detail',
+      component: () => import('@/views/McpServerDetail.vue'),
+      meta: {
+        titleKey: 'routes.mcp-server-detail',
+        icon: 'lucide:server'
+      }
+    },
+    {
       path: '/welcome',
       name: 'welcome',
       component: () => import('@/views/WelcomeView.vue'),

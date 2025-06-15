@@ -233,6 +233,16 @@ const openGithub = (url: string) => {
   }
 }
 
+// 跳转到服务器详情页面
+const goToServerDetail = (server: ServerItem) => {
+  router.push({
+    name: 'mcp-server-detail',
+    params: {
+      name: server.name
+    }
+  })
+}
+
 // 翻页函数
 // 组件挂载时获取数据
 onMounted(() => {
@@ -575,6 +585,7 @@ const goToMcpSettings = () => {
             v-for="server in filteredServers"
             :key="server.id"
             class="group cursor-pointer hover:shadow-lg transition-all duration-200 overflow-hidden border hover:border-primary"
+            @click="goToServerDetail(server)"
           >
             <div class="px-4 py-3">
               <!-- 头部：图标、名称、状态、菜单 -->
@@ -718,6 +729,7 @@ const goToMcpSettings = () => {
             v-for="server in filteredServers"
             :key="server.id"
             class="group cursor-pointer hover:shadow-md transition-all duration-200"
+            @click="goToServerDetail(server)"
           >
             <CardContent class="p-4">
               <div class="flex items-center gap-4">
