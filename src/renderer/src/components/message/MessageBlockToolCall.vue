@@ -9,9 +9,19 @@
           <h4
             class="text-xs font-medium leading-none text-accent-foreground flex flex-row gap-2 items-center"
           >
-            <span v-if="block.tool_call?.server_icons" class="text-base leading-none">{{
-              `${block.tool_call?.server_icons}  `
-            }}</span>
+            <!-- 图标显示区域 - 支持图片链接和emoji -->
+            <div v-if="block.tool_call?.server_icons" class="flex-shrink-0">
+              <!-- 如果是图片URL，显示图片 -->
+              <div v-if="block.tool_call.server_icons.startsWith('http://') || block.tool_call.server_icons.startsWith('https://') || block.tool_call.server_icons.startsWith('data:')"
+                   class="w-4 h-4 rounded flex items-center justify-center">
+                <img :src="block.tool_call.server_icons" alt="Server Icon" class="w-4 h-4 object-contain"
+                     @error="() => block.tool_call.server_icons = '📁'" />
+              </div>
+              <!-- 如果是emoji或其他文本，直接显示 -->
+              <span v-else class="text-base leading-none">
+                {{ block.tool_call.server_icons }}
+              </span>
+            </div>
             <Icon v-else icon="lucide:hammer" class="w-4 h-4 text-muted-foreground" />
             {{ block.tool_call?.server_name ? `${block.tool_call?.server_name} · ` : ''
             }}{{ block.tool_call?.name ?? '' }}
