@@ -120,6 +120,8 @@ const autoApproveWrite = ref(
 // 简单表单状态
 const currentStep = ref(props.editMode ? 'detailed' : 'simple')
 const jsonConfig = ref('')
+// JSON编辑模式状态
+const isJsonEditMode = ref(false)
 
 // 当type变更时处理baseUrl的显示逻辑
 const showBaseUrl = computed(() => type.value === 'sse' || type.value === 'http')
@@ -221,6 +223,91 @@ const parseJsonConfig = (): void => {
 // 切换到详细表单
 const goToDetailedForm = (): void => {
   currentStep.value = 'detailed'
+}
+
+// 切换JSON编辑模式
+const toggleJsonEditMode = (): void => {
+  if (isJsonEditMode.value) {
+    // 从JSON模式切换回表单模式，尝试解析JSON
+    try {
+      parseJsonConfig()
+      isJsonEditMode.value = false
+    } catch (error) {
+      // 如果解析失败，保持在JSON模式
+      console.error('JSON解析失败，保持编辑模式:', error)
+    }
+  } else {
+    // 从表单模式切换到JSON模式，生成当前配置的JSON
+    generateJsonFromForm()
+    isJsonEditMode.value = true
+  }
+}
+
+// 从当前表单生成JSON配置
+const generateJsonFromForm = (): void => {
+  try {
+    const config: any = {
+      mcpServers: {
+        [name.value || 'server']: {
+          command: command.value,
+          args: args.value ? args.value.split(' ').filter(arg => arg.trim()) : [],
+          type: type.value || 'stdio'
+        }
+      }
+    }
+
+    const serverConfig = config.mcpServers[name.value || 'server']
+
+    // 添加环境变量
+    if (env.value.trim()) {
+      try {
+        serverConfig.env = JSON.parse(env.value)
+      } catch {
+        // 如果环境变量解析失败，跳过
+      }
+    }
+
+    // 添加描述
+    if (descriptions.value) {
+      serverConfig.descriptions = descriptions.value
+    }
+
+    // 添加图标
+    if (icons.value) {
+      serverConfig.icons = icons.value
+    }
+
+    // 添加baseUrl（如果适用）
+    if (showBaseUrl.value && baseUrl.value) {
+      serverConfig.url = baseUrl.value
+    }
+
+    // 添加自定义headers（如果适用）
+    if (showBaseUrl.value && customHeaders.value.trim()) {
+      serverConfig.customHeaders = parseKeyValueHeaders(customHeaders.value)
+    }
+
+    // 添加权限设置
+    const autoApprove = []
+    if (autoApproveAll.value) {
+      autoApprove.push('all')
+    } else {
+      if (autoApproveRead.value) autoApprove.push('read')
+      if (autoApproveWrite.value) autoApprove.push('write')
+    }
+    if (autoApprove.length > 0) {
+      serverConfig.autoApprove = autoApprove
+    }
+
+    jsonConfig.value = JSON.stringify(config, null, 2)
+  } catch (error) {
+    console.error('生成JSON配置失败:', error)
+    toast({
+      title: t('settings.mcp.serverForm.generateJsonError'),
+      description: error instanceof Error ? error.message : String(error),
+      variant: 'destructive'
+    })
+  }
 }
 
 // 验证
@@ -691,7 +778,24 @@ defineExpose({
   <!-- 详细表单 -->
   <form v-else class="space-y-2 h-full flex flex-col" @submit.prevent="handleSubmit">
     <ScrollArea class="h-0 flex-grow">
-      <div class="space-y-2 px-4 pb-4">
+      <div v-if="isJsonEditMode" class="space-y-4 px-4 pb-4">
+        <div class="text-sm text-muted-foreground">
+          {{ t('settings.mcp.serverForm.jsonEditModeDesc') }}
+        </div>
+        <div class="space-y-2">
+          <Label class="text-xs text-muted-foreground" for="json-config-edit">
+            {{ t('settings.mcp.serverForm.jsonConfig') }}
+          </Label>
+          <Textarea 
+            id="json-config-edit" 
+            v-model="jsonConfig" 
+            rows="15" 
+            :placeholder="placeholder" 
+            class="font-mono text-sm"
+          />
+        </div>
+      </div>
+      <div v-else class="space-y-2 px-4 pb-4">
         <!-- 服务器名称 -->
         <!-- 本地化名称 (针对inmemory类型) -->
         <div v-if="isInMemoryType && name" class="space-y-2">
@@ -1033,7 +1137,10 @@ defineExpose({
     </ScrollArea>
 
     <!-- 提交按钮 -->
-    <div class="flex justify-end pt-2 border-t px-4">
+    <div class="flex justify-between pt-2 border-t px-4">
+      <Button type="button" variant="outline" size="sm" @click="toggleJsonEditMode">
+        {{ isJsonEditMode ? t('settings.mcp.serverForm.backToForm') : t('settings.mcp.serverForm.editJson') }}
+      </Button>
       <Button type="submit" size="sm" :disabled="!isFormValid">
         {{ t('settings.mcp.serverForm.submit') }}
       </Button>

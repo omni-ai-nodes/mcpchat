@@ -324,7 +324,11 @@
       "selectFolderError": "Folder selection error",
       "folders": "Folders allowed to access",
       "addFolder": "Add folder",
-      "noFoldersSelected": "No folders were selected"
+      "noFoldersSelected": "No folders were selected",
+      "editJson": "Edit JSON",
+      "backToForm": "Back to Form",
+      "jsonEditModeDesc": "In this mode, you can directly edit the server's JSON configuration. When switching back to form mode, the JSON content will be automatically parsed.",
+      "generateJsonError": "Failed to generate JSON configuration"
     },
     "deleteServer": "Delete Server",
     "editServer": "Edit Server",

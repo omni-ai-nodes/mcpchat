@@ -323,7 +323,11 @@
       "selectFolderError": "文件夹选择错误",
       "folders": "允许访问的文件夹",
       "addFolder": "添加文件夹",
-      "noFoldersSelected": "未选择任何文件夹"
+      "noFoldersSelected": "未选择任何文件夹",
+      "editJson": "编辑JSON",
+      "backToForm": "返回表单",
+      "jsonEditModeDesc": "在此模式下，您可以直接编辑服务器的JSON配置。切换回表单模式时会自动解析JSON内容。",
+      "generateJsonError": "生成JSON配置失败"
     },
     "deleteServer": "删除服务器",
     "editServer": "编辑服务器",
