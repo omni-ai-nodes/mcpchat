@@ -269,6 +269,27 @@
       "description": "配置并安装新的MCP服务器到您的系统中"
     }
   },
+  "workflow": {
+    "title": "Mcp工作流",
+    "beta": "Beta",
+    "refresh": "刷新",
+    "create": "创建工作流",
+    "loading": "加载中...",
+    "empty": {
+      "title": "暂无工作流",
+      "description": "创建您的第一个工作流来自动化MCP任务"
+    },
+    "steps": "步骤",
+    "edit": "编辑",
+    "duplicate": "复制",
+    "delete": "删除",
+    "run": "运行",
+    "status": {
+      "active": "活跃",
+      "inactive": "未激活",
+      "draft": "草稿"
+    }
+  },
   "serverDetail": {
     "introduction": "介绍",
     "deployConfig": "部署配置",

@@ -10,5 +10,7 @@
   "settings-shortcut": "快捷键",
   "settings-display": "显示设置",
   "settings-knowledge-base": "知识库",
-  "settings-prompt": "Prompt管理"
+  "settings-prompt": "Prompt管理",
+  "mcp-gallery": "MCP广场",
+  "mcp-workflow": "Mcp工作流"
 }

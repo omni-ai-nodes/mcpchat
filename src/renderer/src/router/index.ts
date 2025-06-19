@@ -26,6 +26,15 @@ const router = createRouter({
       }
     },
     {
+      path: '/mcp-workflow',
+      name: 'mcp-workflow',
+      component: () => import('@/views/McpWorkflow.vue'),
+      meta: {
+        titleKey: 'routes.mcp-workflow',
+        icon: 'lucide:workflow'
+      }
+    },
+    {
       path: '/mcp-server/:name',
       name: 'mcp-server-detail',
       component: () => import('@/views/McpServerDetail.vue'),

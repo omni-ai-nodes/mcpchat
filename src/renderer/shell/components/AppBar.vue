@@ -57,6 +57,13 @@
       <Button
         variant="ghost"
         class="flex-shrink-0 text-xs ml-1 font-medium px-2 h-6 bg-transparent rounded-md flex items-center justify-center hover:bg-zinc-500/20"
+        @click="openMcpWorkflowTab"
+      >
+        <Icon icon="lucide:workflow" class="w-4 h-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        class="flex-shrink-0 text-xs ml-1 font-medium px-2 h-6 bg-transparent rounded-md flex items-center justify-center hover:bg-zinc-500/20"
         @click="openMcpTab"
       >
         <Icon icon="lucide:fingerprint" class="w-4 h-4" />
@@ -278,6 +285,23 @@ const openNewTab = () => {
       }
     })
   }, 300)
+}
+
+const openMcpWorkflowTab = () => {
+  // 检查是否已经存在工作流标签页
+  const existingWorkflowTab = tabStore.tabs.find((tab) => tab.url.includes('#/mcp-workflow'))
+
+  if (existingWorkflowTab) {
+    // 如果已经存在工作流标签页，切换到该标签页
+    tabStore.setCurrentTabId(existingWorkflowTab.id)
+  } else {
+    // 如果不存在工作流标签页，创建新的
+    tabStore.addTab({
+      name: 'Mcp工作流',
+      icon: 'lucide:workflow',
+      viewType: 'mcp-workflow'
+    })
+  }
 }
 
 const openMcpTab = () => {
