@@ -70,5 +70,9 @@
   "reset": "Réinitialiser",
   "format": "Format",
   "edit": "Modifier",
-  "delete": "Supprimer"
+  "delete": "Supprimer",
+  "appBar": {
+    "mcpWorkflow": "Flux de travail MCP",
+    "mcpGallery": "Galerie MCP"
+  }
 }

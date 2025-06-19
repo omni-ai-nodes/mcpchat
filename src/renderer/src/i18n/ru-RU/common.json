@@ -70,5 +70,9 @@
   "reset": "Сброс",
   "format": "Формат",
   "edit": "Редактировать",
-  "delete": "Удалить"
+  "delete": "Удалить",
+  "appBar": {
+    "mcpWorkflow": "MCP Рабочий процесс",
+    "mcpGallery": "MCP Галерея"
+  }
 }

@@ -59,14 +59,16 @@
         class="flex-shrink-0 text-xs ml-1 font-medium px-2 h-6 bg-transparent rounded-md flex items-center justify-center hover:bg-zinc-500/20"
         @click="openMcpWorkflowTab"
       >
-        <Icon icon="lucide:workflow" class="w-4 h-4" />
+        <Icon icon="lucide:workflow" class="w-4 h-4 mr-1" />
+        <span>{{ t('common.appBar.mcpWorkflow') }}</span>
       </Button>
       <Button
         variant="ghost"
         class="flex-shrink-0 text-xs ml-1 font-medium px-2 h-6 bg-transparent rounded-md flex items-center justify-center hover:bg-zinc-500/20"
         @click="openMcpTab"
       >
-        <Icon icon="lucide:fingerprint" class="w-4 h-4" />
+        <Icon icon="lucide:fingerprint" class="w-4 h-4 mr-1" />
+        <span>{{ t('common.appBar.mcpGallery') }}</span>
       </Button>
       <Button
         variant="ghost"
@@ -129,6 +131,9 @@ import AppBarTabItem from './app-bar/AppBarTabItem.vue'
 import { useTabStore } from '@shell/stores/tab'
 import { useThemeStore } from '@/stores/theme'
 import { useElementSize } from '@vueuse/core'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 const tabStore = useTabStore()
 const windowPresenter = usePresenter('windowPresenter')
 const devicePresenter = usePresenter('devicePresenter')

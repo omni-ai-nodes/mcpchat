@@ -70,5 +70,9 @@
   "reset": "リセット",
   "format": "フォーマット",
   "edit": "編集",
-  "delete": "削除"
+  "delete": "削除",
+  "appBar": {
+    "mcpWorkflow": "MCPワークフロー",
+    "mcpGallery": "MCPギャラリー"
+  }
 }

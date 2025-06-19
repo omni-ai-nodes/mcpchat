@@ -48,6 +48,10 @@
   "title": "通用设置",
   "resetData": "重置数据",
   "language": "语言",
+  "appBar": {
+    "mcpWorkflow": "MCP工作流",
+    "mcpGallery": "Mcp广场"
+  },
   "languageSelect": "选择语言",
   "searchEngine": "搜索引擎",
   "searchEngineSelect": "选择搜索引擎",

@@ -70,5 +70,9 @@
   "reset": "Reset",
   "format": "Format",
   "edit": "Edit",
-  "delete": "Delete"
+  "delete": "Delete",
+  "appBar": {
+    "mcpWorkflow": "MCP Workflow",
+    "mcpGallery": "MCP Gallery"
+  }
 }
