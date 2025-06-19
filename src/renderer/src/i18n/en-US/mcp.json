@@ -222,6 +222,8 @@
     "addServerFailed": "Failed to add server",
     "updateServerFailed": "Failed to update server",
     "removeServerFailed": "Failed to remove server",
+    "serverUpdatedSuccessfully": "Server {name} updated successfully",
+    "serverRemovedSuccessfully": "Server {name} removed successfully",
     "maxDefaultServersReached": "Maximum number of default servers (30) reached",
     "toggleDefaultServerFailed": "Failed to toggle default server status",
     "resetToDefaultFailed": "Failed to reset to default servers",

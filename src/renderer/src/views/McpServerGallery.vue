@@ -4,9 +4,11 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useMcpStore } from '@/stores/mcp'
+import { useToast } from '@/components/ui/toast/use-toast'
 import McpServerForm from '@/components/mcp-config/mcpServerForm.vue'
 import McpServers from '@/components/mcp-config/components/McpServers.vue'
 import McpSettings from '@/components/settings/McpSettings.vue'
+import type { MCPServerConfig } from '@/types/mcp'
 import {
   Dialog,
   DialogContent,
@@ -37,6 +39,7 @@ const DropdownMenuSeparator = defineAsyncComponent(() => import('@/components/ui
 const { t } = useI18n()
 const router = useRouter()
 const mcpStore = useMcpStore()
+const { toast } = useToast()
 
 // McpServers 组件引用
 const mcpServersRef = ref<InstanceType<typeof McpServers> | null>(null)
@@ -97,6 +100,12 @@ const searchQuery = ref('')
 const filterStatus = ref('all')
 const viewMode = ref<'grid' | 'list'>('grid')
 const showAddDialog = ref(false)
+
+// 编辑和删除服务器相关状态
+const isEditServerDialogOpen = ref(false)
+const isRemoveConfirmDialogOpen = ref(false)
+const selectedServer = ref<string>('')
+const selectedServerConfig = ref<ServerItem | null>(null)
 
 // 检查服务是否已安装
 const isServerInstalled = (server: ServerItem): boolean => {
@@ -365,11 +374,98 @@ const addServer = () => {
 }
 
 const editServer = (server: ServerItem) => {
-  console.log('编辑服务器:', server)
+  // 检查服务器是否已安装到本地
+  const localServer = mcpStore.serverList.find(local => {
+    return local.name === server.name || 
+           local.name.includes(server.name) || 
+           server.name.includes(local.name) ||
+           (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+  })
+  
+  if (!localServer) {
+    // 如果服务器未安装，提示用户先安装
+    console.log('服务器未安装，无法编辑')
+    return
+  }
+  
+  selectedServer.value = localServer.name
+  selectedServerConfig.value = server
+  isEditServerDialogOpen.value = true
 }
 
 const deleteServer = (server: ServerItem) => {
-  console.log('删除服务器:', server)
+  // 检查服务器是否已安装到本地
+  const localServer = mcpStore.serverList.find(local => {
+    return local.name === server.name || 
+           local.name.includes(server.name) || 
+           server.name.includes(local.name) ||
+           (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+  })
+  
+  if (!localServer) {
+    // 如果服务器未安装，提示用户
+    console.log('服务器未安装，无法删除')
+    return
+  }
+  
+  // 检查是否为内置服务器
+  const config = mcpStore.config.mcpServers[localServer.name]
+  if (config?.type === 'inmemory') {
+    console.log('内置服务器无法删除')
+    return
+  }
+  
+  selectedServer.value = localServer.name
+  selectedServerConfig.value = server
+  isRemoveConfirmDialogOpen.value = true
+}
+
+// 处理编辑服务器
+const handleEditServer = async (serverName: string, serverConfig: Partial<MCPServerConfig>) => {
+  const success = await mcpStore.updateServer(serverName, serverConfig)
+  if (success) {
+    isEditServerDialogOpen.value = false
+    selectedServer.value = ''
+    selectedServerConfig.value = null
+    // 重新同步服务器状态
+    syncServerStatuses()
+    toast({
+      title: t('mcp.editServer'),
+      description: t('mcp.serverUpdatedSuccessfully', { name: serverName })
+    })
+  }
+}
+
+// 处理删除服务器
+const handleRemoveServer = async (serverName: string) => {
+  const config = mcpStore.config.mcpServers[serverName]
+  if (config?.type === 'inmemory') {
+    toast({
+      title: t('settings.mcp.cannotRemoveBuiltIn'),
+      description: t('settings.mcp.builtInServerCannotBeRemoved'),
+      variant: 'destructive'
+    })
+    return
+  }
+  
+  const success = await mcpStore.removeServer(serverName)
+  if (success) {
+    isRemoveConfirmDialogOpen.value = false
+    selectedServer.value = ''
+    selectedServerConfig.value = null
+    // 重新同步服务器状态
+    syncServerStatuses()
+    toast({
+      title: t('mcp.deleteServer'),
+      description: t('mcp.serverRemovedSuccessfully', { name: serverName })
+    })
+  }
+}
+
+// 确认删除服务器
+const confirmRemoveServer = async () => {
+  const serverName = selectedServer.value
+  await handleRemoveServer(serverName)
 }
 
 const toggleServer = async (server: ServerItem) => {
@@ -941,6 +1037,46 @@ const goToMcpSettings = () => {
     </DialogContent>
   </Dialog>
   
+  <!-- 编辑服务器对话框 -->
+  <Dialog v-model:open="isEditServerDialogOpen">
+    <DialogContent class="w-[95vw] max-w-[500px] px-0 h-[85vh] max-h-[500px] flex flex-col">
+      <DialogHeader class="px-3 flex-shrink-0 pb-2">
+        <DialogTitle class="text-base">
+          {{ t('settings.mcp.editServerDialog.title') }}
+        </DialogTitle>
+        <DialogDescription class="text-sm">
+          {{ t('settings.mcp.editServerDialog.description') }}
+        </DialogDescription>
+      </DialogHeader>
+      <McpServerForm
+        v-if="selectedServer && mcpStore.config.mcpServers[selectedServer]"
+        :server-name="selectedServer"
+        :initial-config="mcpStore.config.mcpServers[selectedServer]"
+        @submit="(name, config) => handleEditServer(name, config)"
+      />
+    </DialogContent>
+  </Dialog>
+
+  <!-- 删除服务器确认对话框 -->
+  <Dialog v-model:open="isRemoveConfirmDialogOpen">
+    <DialogContent class="w-[95vw] max-w-[400px]">
+      <DialogHeader>
+        <DialogTitle>{{ t('settings.mcp.removeServerDialog.title') }}</DialogTitle>
+        <DialogDescription>
+          {{ t('settings.mcp.confirmRemoveServer', { name: selectedServer }) }}
+        </DialogDescription>
+      </DialogHeader>
+      <div class="flex justify-end gap-2 mt-4">
+        <Button variant="outline" size="sm" @click="isRemoveConfirmDialogOpen = false">
+          {{ t('mcp.confirmDelete.cancel') }}
+        </Button>
+        <Button variant="destructive" size="sm" @click="confirmRemoveServer">
+          {{ t('mcp.confirmDelete.confirm') }}
+        </Button>
+      </div>
+    </DialogContent>
+  </Dialog>
+
   <!-- 隐藏的 McpServers 组件，用于调用其方法 -->
   <McpServers ref="mcpServersRef" style="display: none;" />
 </template>

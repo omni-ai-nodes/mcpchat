@@ -11,6 +11,8 @@
     "addServerFailed": "添加服务器失败",
     "updateServerFailed": "更新服务器失败",
     "removeServerFailed": "删除服务器失败",
+    "serverUpdatedSuccessfully": "服务器 {name} 更新成功",
+    "serverRemovedSuccessfully": "服务器 {name} 删除成功",
     "maxDefaultServersReached": "最多只能设置30个默认服务器",
     "toggleDefaultServerFailed": "切换默认服务器状态失败",
     "resetToDefaultFailed": "恢复默认服务器失败",
