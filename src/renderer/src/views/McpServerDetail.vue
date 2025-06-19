@@ -151,6 +151,27 @@
         </div>
       </div>
     </div>
+
+    <!-- 隐藏的 McpServers 组件，用于调用其方法 -->
+    <McpServers ref="mcpServersRef" style="display: none;" />
+
+    <!-- 安装服务器弹窗 -->
+    <Dialog v-model:open="isInstallDialogOpen">
+      <DialogContent class="w-[95vw] max-w-[500px] px-0 h-[85vh] max-h-[500px] flex flex-col">
+        <DialogHeader class="px-3 flex-shrink-0 pb-2">
+          <DialogTitle class="text-base">
+            {{ t('mcp.mcpGallery.installDialog.title') }}
+          </DialogTitle>
+          <DialogDescription class="text-sm">
+            {{ t('mcp.mcpGallery.installDialog.description') }}
+          </DialogDescription>
+        </DialogHeader>
+        <McpServerForm
+          :default-json-config="prefilledJsonConfig"
+          @submit="handleInstallSubmit"
+        />
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -160,6 +181,15 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { Button } from '@/components/ui/button'
+import McpServerForm from '@/components/mcp-config/mcpServerForm.vue'
+import McpServers from '@/components/mcp-config/components/McpServers.vue'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
+} from '@/components/ui/dialog'
 
 const route = useRoute()
 const router = useRouter()
@@ -170,6 +200,13 @@ const loading = ref(false)
 const error = ref('')
 const serverDetail = ref<any>(null)
 const activeTab = ref('quickstart')
+
+// 安装对话框状态
+const isInstallDialogOpen = ref(false)
+const prefilledJsonConfig = ref('')
+
+// McpServers 组件引用
+const mcpServersRef = ref<InstanceType<typeof McpServers> | null>(null)
 
 // 标签页配置
 const tabs = computed(() => [
@@ -229,8 +266,80 @@ const openGithub = (url: string) => {
 
 // 安装服务器
 const installServer = () => {
-  // TODO: 实现安装逻辑
-  console.log('Install server:', serverDetail.value)
+  console.log('安装服务器:', serverDetail.value)
+  
+  if (!serverDetail.value) {
+    alert('服务器信息不可用')
+    return
+  }
+  
+  // 如果有 DeployJson 配置信息，预填充到弹窗中
+  if (serverDetail.value.DeployJson) {
+    try {
+      // 解析原始 JSON 配置
+      const deployConfig = JSON.parse(serverDetail.value.DeployJson)
+      
+      // 自动为每个服务器配置添加 icons 和 type 字段
+      if (deployConfig.mcpServers) {
+        Object.keys(deployConfig.mcpServers).forEach(serverKey => {
+          const serverConfig = deployConfig.mcpServers[serverKey]
+          
+          // 添加 icons 字段，使用 ServerItem 的 icon
+          if (!serverConfig.icons) {
+            serverConfig.icons = serverDetail.value.Logo || '🔧'
+          }
+          
+          // 添加默认 type 字段
+          if (!serverConfig.type) {
+            serverConfig.type = 'stdio'
+          }
+          // 添加 简介
+          if (!serverConfig.descriptions) {
+            serverConfig.descriptions = serverDetail.value.Introdution || ''
+          }
+        })
+      }
+      
+      // 将修改后的配置转换回 JSON 字符串
+      const enhancedDeployJson = JSON.stringify(deployConfig, null, 2)
+      
+      // 设置预填充配置并打开弹窗
+      prefilledJsonConfig.value = enhancedDeployJson
+      isInstallDialogOpen.value = true
+      
+      console.log(`准备安装服务器 "${serverDetail.value.Name}"，已预填充配置`)
+    } catch (error) {
+      console.error('DeployJson 格式错误:', error)
+      alert(`服务器 "${serverDetail.value.Name}" 的部署配置格式错误：\n\n${serverDetail.value.DeployJson}`)
+    }
+  } else {
+    alert(`服务器 "${serverDetail.value.Name}" 没有部署配置信息`)
+  }
+}
+
+// 处理表单提交
+const handleInstallSubmit = async (name: string, config: any) => {
+  console.log('安装服务器配置:', name, config)
+  
+  try {
+    // 调用 McpServers 组件的 handleAddServer 方法
+    if (mcpServersRef.value) {
+      await mcpServersRef.value.handleAddServer(name, {
+        ...config,
+        type: 'gallery' // 确保类型为 gallery
+      })
+      console.log('服务器添加成功:', name)
+    } else {
+      console.error('McpServers 组件引用不可用')
+    }
+  } catch (error) {
+    console.error('添加服务器时发生错误:', error)
+  }
+  
+  // 关闭弹窗
+  isInstallDialogOpen.value = false
+  // 清空预填充配置
+  prefilledJsonConfig.value = ''
 }
 
 // 复制部署配置

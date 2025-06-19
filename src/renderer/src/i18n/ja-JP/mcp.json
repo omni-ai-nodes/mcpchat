@@ -260,6 +260,11 @@
     "starting": "開始中",
     "error": "エラー",
     "stopped": "停止中",
-    "install": "インストール"
+    "notInstalled": "未インストール",
+    "install": "インストール",
+    "installDialog": {
+      "title": "MCPサーバーをインストール",
+      "description": "新しいMCPサーバーを設定してシステムにインストールします"
+    }
   }
 }

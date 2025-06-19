@@ -260,6 +260,11 @@
     "starting": "Démarrage",
     "error": "Erreur",
     "stopped": "Arrêté",
-    "install": "Installer"
+    "notInstalled": "Non installé",
+    "install": "Installer",
+    "installDialog": {
+      "title": "Installer le serveur MCP",
+      "description": "Configurer et installer un nouveau serveur MCP sur votre système"
+    }
   }
 }

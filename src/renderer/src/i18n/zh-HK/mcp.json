@@ -260,6 +260,11 @@
     "starting": "啟動中",
     "error": "錯誤",
     "stopped": "已停止",
-    "install": "安裝"
+    "notInstalled": "未安裝",
+    "install": "安裝",
+    "installDialog": {
+      "title": "安裝MCP伺服器",
+      "description": "配置並安裝新的MCP伺服器到您的系統中"
+    }
   }
 }

@@ -260,6 +260,10 @@
     "starting": "시작 중",
     "error": "오류",
     "stopped": "중지됨",
-    "install": "설치"
+    "install": "설치",
+    "installDialog": {
+      "title": "MCP 서버 설치",
+      "description": "새로운 MCP 서버를 구성하고 시스템에 설치합니다"
+    }
   }
 }

@@ -261,7 +261,11 @@
     "error": "Error",
     "stopped": "Stopped",
     "notInstalled": "Not Installed",
-    "install": "Install"
+    "install": "Install",
+    "installDialog": {
+      "title": "Install MCP Server",
+      "description": "Configure and install a new MCP server to your system"
+    }
   },
   "serverDetail": {
     "introduction": "Introduction",

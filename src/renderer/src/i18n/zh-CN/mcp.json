@@ -261,7 +261,11 @@
     "error": "错误",
     "stopped": "已停止",
     "notInstalled": "未安装",
-    "install": "安装"
+    "install": "安装",
+    "installDialog": {
+      "title": "安装MCP服务器",
+      "description": "配置并安装新的MCP服务器到您的系统中"
+    }
   },
   "serverDetail": {
     "introduction": "介绍",
