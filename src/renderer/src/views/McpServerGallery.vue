@@ -584,8 +584,7 @@ const goToMcpSettings = () => {
           <Card
             v-for="server in filteredServers"
             :key="server.id"
-            class="group cursor-pointer hover:shadow-lg transition-all duration-200 overflow-hidden border hover:border-primary"
-            @click="goToServerDetail(server)"
+            class="group hover:shadow-lg transition-all duration-200 overflow-hidden border hover:border-primary"
           >
             <div class="px-4 py-3">
               <!-- 头部：图标、名称、状态、菜单 -->
@@ -625,9 +624,18 @@ const goToMcpSettings = () => {
                   variant="ghost"
                   size="icon"
                   class="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mr-1"
-                  @click="openGithub(server.github)"
+                  @click.stop="openGithub(server.github)"
                 >
                   <Icon icon="lucide:github" class="h-3 w-3" />
+                </Button>
+                <!-- 详情按钮 -->
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mr-1"
+                  @click.stop="goToServerDetail(server)"
+                >
+                  <Icon icon="lucide:info" class="h-3 w-3" />
                 </Button>
                 <!-- 操作菜单 -->
                 <DropdownMenu>
@@ -679,7 +687,8 @@ const goToMcpSettings = () => {
 
               <!-- 描述 -->
               <div class="mb-3">
-                <p class="text-xs text-secondary-foreground line-clamp-2 leading-4 h-8">
+                <p class="text-xs text-secondary-foreground line-clamp-2 leading-4 h-8 cursor-pointer hover:text-primary transition-colors"
+                   @click="goToServerDetail(server)">
                   {{ server.description }}
                 </p>
               </div>
@@ -728,8 +737,7 @@ const goToMcpSettings = () => {
           <Card
             v-for="server in filteredServers"
             :key="server.id"
-            class="group cursor-pointer hover:shadow-md transition-all duration-200"
-            @click="goToServerDetail(server)"
+            class="group hover:shadow-md transition-all duration-200"
           >
             <CardContent class="p-4">
               <div class="flex items-center gap-4">
@@ -771,12 +779,22 @@ const goToMcpSettings = () => {
                       variant="ghost"
                       size="icon"
                       class="h-5 w-5"
-                      @click="openGithub(server.github)"
+                      @click.stop="openGithub(server.github)"
                     >
                       <Icon icon="lucide:github" class="h-3 w-3" />
                     </Button>
+                    <!-- 详情按钮 -->
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      class="h-5 w-5"
+                      @click.stop="goToServerDetail(server)"
+                    >
+                      <Icon icon="lucide:info" class="h-3 w-3" />
+                    </Button>
                   </div>
-                  <p class="text-sm text-muted-foreground line-clamp-1">{{ server.description }}</p>
+                  <p class="text-sm text-muted-foreground line-clamp-1 cursor-pointer hover:text-primary transition-colors"
+                     @click="goToServerDetail(server)">{{ server.description }}</p>
                 </div>
                 <div class="flex items-center gap-3">
                   <!-- 状态显示 -->
