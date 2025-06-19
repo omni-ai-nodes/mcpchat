@@ -388,9 +388,61 @@ const editServer = (server: ServerItem) => {
     return
   }
   
-  selectedServer.value = localServer.name
-  selectedServerConfig.value = server
-  isEditServerDialogOpen.value = true
+  // 处理配置信息，参考 McpServerDetail 的实现
+  if (server.deployJson) {
+    try {
+      // 解析原始 JSON 配置
+      const deployConfig = JSON.parse(server.deployJson)
+      
+      // 自动为每个服务器配置添加 icons、type 和 descriptions 字段
+      if (deployConfig.mcpServers) {
+        Object.keys(deployConfig.mcpServers).forEach(serverKey => {
+          const serverConfig = deployConfig.mcpServers[serverKey]
+          
+          // 添加 icons 字段，使用 ServerItem 的 icon
+          if (!serverConfig.icons) {
+            serverConfig.icons = server.icon || '🔧'
+          }
+          
+          // 添加默认 type 字段
+          if (!serverConfig.type) {
+            serverConfig.type = 'stdio'
+          }
+          
+          // 添加简介
+          if (!serverConfig.descriptions) {
+            serverConfig.descriptions = server.description || ''
+          }
+        })
+      }
+      
+      // 将修改后的配置转换回 JSON 字符串
+      const enhancedDeployJson = JSON.stringify(deployConfig, null, 2)
+      
+      // 创建增强的服务器配置
+      const enhancedServerConfig = {
+        ...server,
+        deployJson: enhancedDeployJson
+      }
+      
+      selectedServer.value = localServer.name
+      selectedServerConfig.value = enhancedServerConfig
+      isEditServerDialogOpen.value = true
+      
+      console.log(`准备编辑服务器 "${server.name}"，已增强配置`)
+    } catch (error) {
+      console.error('DeployJson 格式错误:', error)
+      // 如果解析失败，使用原始配置
+      selectedServer.value = localServer.name
+      selectedServerConfig.value = server
+      isEditServerDialogOpen.value = true
+    }
+  } else {
+    // 如果没有 deployJson，直接使用原始配置
+    selectedServer.value = localServer.name
+    selectedServerConfig.value = server
+    isEditServerDialogOpen.value = true
+  }
 }
 
 const deleteServer = (server: ServerItem) => {
@@ -1049,9 +1101,9 @@ const goToMcpSettings = () => {
         </DialogDescription>
       </DialogHeader>
       <McpServerForm
-        v-if="selectedServer && mcpStore.config.mcpServers[selectedServer]"
+        v-if="selectedServer && selectedServerConfig && selectedServerConfig.deployJson"
         :server-name="selectedServer"
-        :initial-config="mcpStore.config.mcpServers[selectedServer]"
+        :default-json-config="selectedServerConfig.deployJson"
         @submit="(name, config) => handleEditServer(name, config)"
       />
     </DialogContent>
