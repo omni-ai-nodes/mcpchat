@@ -439,8 +439,8 @@ const startConnection = (nodeId: string, port: string, type: 'input' | 'output')
       }
       
       // 计算端口的实际中心位置
-      const x = type === 'output' ? node.x + 200 + 8 : node.x - 8 // 端口外偏移8px
-      const y = node.y + 20 + portIndex * 30 + 8 // 端口顶部位置 + 端口半径8px
+      const x = type === 'output' ? node.x + 200 + 2 : node.x - 2 // 端口外偏移2px
+    const y = node.y + 20 + portIndex * 30 + 8 // 端口顶部位置 + 端口半径8px
       
       // 验证计算出的坐标
       if (isFinite(x) && isFinite(y)) {
@@ -464,11 +464,11 @@ const getConnectionPath = (connection: Connection) => {
   
   if (!fromNode || !toNode) return ''
   
-  // 计算输出端口的实际位置（节点右侧外8px，端口中心）
-  const fromX = fromNode.x + 200 + 8 // 节点宽度200px + 端口外偏移8px
+  // 计算输出端口的实际位置（节点右侧外2px，端口中心）
+  const fromX = fromNode.x + 200 + 2 // 节点宽度200px + 端口外偏移2px
   const fromY = fromNode.y + 20 + 8  // 端口顶部位置20px + 端口半径8px
-  // 计算输入端口的实际位置（节点左侧外8px，端口中心）
-  const toX = toNode.x - 8           // 输入端口在左侧外8px
+  // 计算输入端口的实际位置（节点左侧外2px，端口中心）
+  const toX = toNode.x - 2           // 输入端口在左侧外2px
   const toY = toNode.y + 20 + 8      // 端口顶部位置20px + 端口半径8px
   
   // 验证坐标值是否有效
@@ -600,7 +600,7 @@ const onCanvasMouseMove = (event: MouseEvent) => {
         const node = workflowNodes.value.find(n => n.id === nodeId)
         if (node) {
           const portIndex = type === 'input' ? (node.inputs?.indexOf(port) || 0) : (node.outputs?.indexOf(port) || 0)
-          const portX = type === 'output' ? node.x + 200 + 8 : node.x - 8
+          const portX = type === 'output' ? node.x + 200 + 2 : node.x - 2
           const portY = node.y + 20 + portIndex * 30 + 8
           tempConnection.value.x2 = portX
           tempConnection.value.y2 = portY
@@ -1028,11 +1028,11 @@ onMounted(() => {
 }
 
 .node-input-port {
-  left: -6px;
+  left: -2px;
 }
 
 .node-output-port {
-  right: -6px;
+  right: -2px;
 }
 
 .port {
