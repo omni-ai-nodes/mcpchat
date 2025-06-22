@@ -499,6 +499,11 @@ class ConnectionManager {
   // 开始连接
   startConnection(nodeId: string, port: string, type: 'input' | 'output') {
     if (!this.isConnecting.value) {
+      // 只有output端口才自动断开现有连接
+      if (type === 'output') {
+        this.disconnectPortConnections(nodeId, port, type)
+      }
+      
       this.isConnecting.value = true
       this.connectionStart.value = { nodeId, port, type }
       this.clearSelection()
@@ -717,6 +722,36 @@ class ConnectionManager {
       return this.styles.selected
     }
     return this.styles.normal
+  }
+  
+  // 断开指定端口的所有连接
+  disconnectPortConnections(nodeId: string, port: string, type: 'input' | 'output') {
+    const connectionsToRemove: string[] = []
+    
+    connections.value.forEach(connection => {
+      let shouldRemove = false
+      
+      if (type === 'input') {
+        // 输入端口：检查连接的目标端
+        if (connection.to === nodeId && connection.toPort === port) {
+          shouldRemove = true
+        }
+      } else {
+        // 输出端口：检查连接的源端
+        if (connection.from === nodeId && connection.fromPort === port) {
+          shouldRemove = true
+        }
+      }
+      
+      if (shouldRemove) {
+        connectionsToRemove.push(connection.id)
+      }
+    })
+    
+    // 删除找到的连接
+    connectionsToRemove.forEach(connectionId => {
+      this.deleteConnection(connectionId)
+    })
   }
 }
 
