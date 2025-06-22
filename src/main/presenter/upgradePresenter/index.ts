@@ -287,7 +287,10 @@ export class UpgradePresenter implements IUpgradePresenter {
           // 使用electron-updater检查更新，但不自动下载
           await autoUpdater.checkForUpdates()
         } catch (err) {
-          console.error('自动更新检查失败，回退到手动更新', err)
+          // 静默处理网络连接错误
+          if (!(err instanceof Error && (err.message.includes('ENOTFOUND') || err.message.includes('getaddrinfo')))) {
+            console.error('自动更新检查失败，回退到手动更新', err)
+          }
           // 如果自动更新失败，回退到手动更新
           this._status = 'available'
 
@@ -302,12 +305,17 @@ export class UpgradePresenter implements IUpgradePresenter {
         eventBus.sendToRenderer(UPDATE_EVENTS.STATUS_CHANGED, SendTarget.ALL_WINDOWS, { status: this._status })
       }
     } catch (error: Error | unknown) {
-      this._status = 'error'
-      this._error = error instanceof Error ? error.message : String(error)
-      eventBus.sendToRenderer(UPDATE_EVENTS.STATUS_CHANGED, SendTarget.ALL_WINDOWS, {
-        status: this._status,
-        error: this._error
-      })
+      // 静默处理网络错误，不显示错误信息
+      if (error instanceof Error && (error.message.includes('ENOTFOUND') || error.message.includes('getaddrinfo'))) {
+        this._status = 'not-available'
+      } else {
+        this._status = 'error'
+        this._error = error instanceof Error ? error.message : String(error)
+        eventBus.sendToRenderer(UPDATE_EVENTS.STATUS_CHANGED, SendTarget.ALL_WINDOWS, {
+          status: this._status,
+          error: this._error
+        })
+      }
     }
   }
 
@@ -356,13 +364,18 @@ export class UpgradePresenter implements IUpgradePresenter {
       autoUpdater.downloadUpdate()
       return true
     } catch (error: Error | unknown) {
-      this._status = 'error'
-      this._error = error instanceof Error ? error.message : String(error)
-      eventBus.sendToRenderer(UPDATE_EVENTS.STATUS_CHANGED, SendTarget.ALL_WINDOWS, {
-        status: this._status,
-        error: this._error
-      })
-      return false
+      // 静默处理网络错误，不显示错误信息
+      if (error instanceof Error && (error.message.includes('ENOTFOUND') || error.message.includes('getaddrinfo'))) {
+        return false
+      } else {
+        this._status = 'error'
+        this._error = error instanceof Error ? error.message : String(error)
+        eventBus.sendToRenderer(UPDATE_EVENTS.STATUS_CHANGED, SendTarget.ALL_WINDOWS, {
+          status: this._status,
+          error: this._error
+        })
+        return false
+      }
     }
   }
 
