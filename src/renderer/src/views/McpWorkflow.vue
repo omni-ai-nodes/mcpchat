@@ -438,8 +438,9 @@ const startConnection = (nodeId: string, port: string, type: 'input' | 'output')
         portIndex = index >= 0 ? index : 0
       }
       
-      const x = type === 'output' ? node.x + 200 : node.x
-      const y = node.y + 20 + portIndex * 30
+      // 计算端口的实际中心位置
+      const x = type === 'output' ? node.x + 200 + 6 : node.x - 6 // 端口外偏移6px
+      const y = node.y + 20 + portIndex * 30 + 6 // 端口顶部位置 + 端口半径6px
       
       // 验证计算出的坐标
       if (isFinite(x) && isFinite(y)) {
@@ -463,11 +464,12 @@ const getConnectionPath = (connection: Connection) => {
   
   if (!fromNode || !toNode) return ''
   
-  // 输出端口在节点右侧，输入端口在节点左侧
-  const fromX = fromNode.x + 200 // 节点宽度200px，输出端口在右侧
-  const fromY = fromNode.y + 40  // 端口垂直居中位置
-  const toX = toNode.x           // 输入端口在左侧
-  const toY = toNode.y + 40
+  // 计算输出端口的实际位置（节点右侧外6px，端口中心）
+  const fromX = fromNode.x + 200 + 6 // 节点宽度200px + 端口外偏移6px
+  const fromY = fromNode.y + 20 + 6  // 端口顶部位置20px + 端口半径6px
+  // 计算输入端口的实际位置（节点左侧外6px，端口中心）
+  const toX = toNode.x - 6           // 输入端口在左侧外6px
+  const toY = toNode.y + 20 + 6      // 端口顶部位置20px + 端口半径6px
   
   // 验证坐标值是否有效
   if (!isFinite(fromX) || !isFinite(fromY) || !isFinite(toX) || !isFinite(toY)) {
@@ -676,8 +678,8 @@ const getPortAtPosition = (x: number, y: number) => {
     // 检查输入端口
     if (node.inputs) {
       for (let i = 0; i < node.inputs.length; i++) {
-        const portX = node.x - 6 // 端口中心位置，调整为更精确的位置
-        const portY = node.y + 20 + i * 30 + 6 // 加上端口半径偏移
+        const portX = node.x - 6 // 端口中心位置（节点左侧外6px）
+        const portY = node.y + 20 + i * 30 + 6 // 端口中心位置（顶部20px + 索引*30px + 半径6px）
         const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
         if (distance <= 15) { // 扩大端口检测范围
           return { nodeId: node.id, port: node.inputs[i], type: 'input' as const }
@@ -688,8 +690,8 @@ const getPortAtPosition = (x: number, y: number) => {
     // 检查输出端口
     if (node.outputs) {
       for (let i = 0; i < node.outputs.length; i++) {
-        const portX = node.x + 200 + 6 // 端口中心位置，节点宽度200px
-        const portY = node.y + 20 + i * 30 + 6 // 加上端口半径偏移
+        const portX = node.x + 200 + 6 // 端口中心位置（节点右侧外6px）
+        const portY = node.y + 20 + i * 30 + 6 // 端口中心位置（顶部20px + 索引*30px + 半径6px）
         const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
         if (distance <= 15) { // 扩大端口检测范围
           return { nodeId: node.id, port: node.outputs[i], type: 'output' as const }
