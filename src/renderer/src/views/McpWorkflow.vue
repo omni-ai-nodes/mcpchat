@@ -391,12 +391,25 @@ const addNode = (template: NodeTemplate) => {
   console.log('节点已添加:', newNode)
 }
 
+// 添加节流机制优化连接线更新
+let updateAnimationFrame: number | null = null
+
 const updateNode = (nodeId: string, updates: Partial<WorkflowNode>) => {
   const nodeIndex = workflowNodes.value.findIndex(n => n.id === nodeId)
   if (nodeIndex !== -1) {
     workflowNodes.value[nodeIndex] = { ...workflowNodes.value[nodeIndex], ...updates }
     // 同步到当前工作流
     currentWorkflow.nodes = [...workflowNodes.value]
+    
+    // 使用 requestAnimationFrame 优化连接线重绘
+    if (updateAnimationFrame) {
+      cancelAnimationFrame(updateAnimationFrame)
+    }
+    updateAnimationFrame = requestAnimationFrame(() => {
+      // 强制触发连接线重新计算
+      connections.value = [...connections.value]
+      updateAnimationFrame = null
+    })
   }
 }
 
@@ -438,9 +451,9 @@ const startConnection = (nodeId: string, port: string, type: 'input' | 'output')
         portIndex = index >= 0 ? index : 0
       }
       
-      // 计算端口的实际中心位置
-      const x = type === 'output' ? node.x + 200 + 2 : node.x - 2 // 端口外偏移2px
-    const y = node.y + 20 + portIndex * 30 + 8 // 端口顶部位置 + 端口半径8px
+      // 计算端口的实际中心位置（与端口样式完全对齐）
+      const x = type === 'output' ? node.x + 200 + 2 + 8 : node.x - 16 + 8 // 端口中心位置
+      const y = node.y + 20 + portIndex * 30 + 8 // 端口顶部位置 + 端口半径8px
       
       // 验证计算出的坐标
       if (isFinite(x) && isFinite(y)) {
@@ -464,12 +477,12 @@ const getConnectionPath = (connection: Connection) => {
   
   if (!fromNode || !toNode) return ''
   
-  // 计算输出端口的实际位置（节点右侧外2px，端口中心）
-  const fromX = fromNode.x + 200 + 2 // 节点宽度200px + 端口外偏移2px
-  const fromY = fromNode.y + 20 + 8  // 端口顶部位置20px + 端口半径8px
-  // 计算输入端口的实际位置（节点左侧外2px，端口中心）
-  const toX = toNode.x - 2           // 输入端口在左侧外2px
-  const toY = toNode.y + 20 + 8      // 端口顶部位置20px + 端口半径8px
+  // 计算输出端口的实际位置（与端口样式完全对齐）
+  const fromX = fromNode.x + 200 + 2 + 8 // 节点宽度200px + 端口right偏移2px + 端口半径8px（端口中心）
+  const fromY = fromNode.y + 20 + 8      // 端口顶部位置20px + 端口半径8px
+  // 计算输入端口的实际位置（与端口样式完全对齐）
+  const toX = toNode.x - 16 + 8          // 输入端口left偏移-16px + 端口半径8px（端口中心）
+  const toY = toNode.y + 20 + 8          // 端口顶部位置20px + 端口半径8px
   
   // 验证坐标值是否有效
   if (!isFinite(fromX) || !isFinite(fromY) || !isFinite(toX) || !isFinite(toY)) {
@@ -542,84 +555,81 @@ const onDrop = (event: DragEvent) => {
   }
 }
 
+// 添加鼠标移动事件节流
+let mouseMoveAnimationFrame: number | null = null
+
 const onCanvasMouseMove = (event: MouseEvent) => {
-  if (isConnecting.value && tempConnection.value && canvasRef.value) {
+  if (!isConnecting.value || !tempConnection.value || !canvasRef.value) return
+  
+  // 使用 requestAnimationFrame 节流鼠标移动事件
+  if (mouseMoveAnimationFrame) {
+    cancelAnimationFrame(mouseMoveAnimationFrame)
+  }
+  
+  mouseMoveAnimationFrame = requestAnimationFrame(() => {
+    if (!isConnecting.value || !tempConnection.value || !canvasRef.value) return
+    
     const rect = canvasRef.value.getBoundingClientRect()
     const mouseX = event.clientX - rect.left
     const mouseY = event.clientY - rect.top
     
-    // 调试信息：确认鼠标事件正常触发
-    // console.log('鼠标移动:', { mouseX, mouseY, isConnecting: isConnecting.value })
-    
     // 检测是否悬停在端口上
     const hoveredPort = getPortAtPosition(mouseX, mouseY)
-    if (hoveredPort && connectionStart.value) {
-      // 如果悬停在有效端口上，立即创建连接
-      const { nodeId, port, type } = hoveredPort
-      if (connectionStart.value.nodeId !== nodeId && connectionStart.value.type !== type) {
-        // 检查是否已存在完全相同的连接
-        const fromNode = connectionStart.value.type === 'output' ? connectionStart.value.nodeId : nodeId
-        const toNode = connectionStart.value.type === 'output' ? nodeId : connectionStart.value.nodeId
-        const fromPort = connectionStart.value.type === 'output' ? connectionStart.value.port : port
-        const toPort = connectionStart.value.type === 'output' ? port : connectionStart.value.port
-        
-        const existingConnection = connections.value.find(conn => 
-          conn.from === fromNode && conn.to === toNode && conn.fromPort === fromPort && conn.toPort === toPort
-        )
-        
-        if (!existingConnection) {
-          // 立即建立新连接
-          const newConnection: Connection = {
-            id: `conn_${Date.now()}`,
-            from: fromNode,
-            to: toNode,
-            fromPort: fromPort,
-            toPort: toPort
-          }
-          connections.value.push(newConnection)
-          
-          // 同步到当前工作流
-          currentWorkflow.connections = [...connections.value]
-          
-          console.log('快速连接已建立:', newConnection)
-          
-          // 重置连接状态
-          isConnecting.value = false
-          connectionStart.value = null
-          tempConnection.value = null
-          return
-        }
-      }
-    }
     
-    // 如果没有立即连接，继续显示临时连接线
-    if (hoveredPort && connectionStart.value) {
-      const { nodeId, port, type } = hoveredPort
-      if (connectionStart.value.nodeId !== nodeId && connectionStart.value.type !== type) {
-        // 计算端口位置
-        const node = workflowNodes.value.find(n => n.id === nodeId)
-        if (node) {
-          const portIndex = type === 'input' ? (node.inputs?.indexOf(port) || 0) : (node.outputs?.indexOf(port) || 0)
-          const portX = type === 'output' ? node.x + 200 + 2 : node.x - 2
-          const portY = node.y + 20 + portIndex * 30 + 8
-          tempConnection.value.x2 = portX
-          tempConnection.value.y2 = portY
-          // 添加端口高亮效果
-          tempConnection.value.isHoveringPort = true
+    if (hoveredPort) {
+      // 悬停在端口上，吸附到端口中心
+      const portElement = document.querySelector(`[data-port-id="${hoveredPort.nodeId}-${hoveredPort.port}-${hoveredPort.type}"]`) as HTMLElement
+      if (portElement) {
+        const portRect = portElement.getBoundingClientRect()
+        const canvasRect = canvasRef.value.getBoundingClientRect()
+        
+        // 计算端口中心相对于画布的位置
+        const portCenterX = portRect.left + portRect.width / 2 - canvasRect.left
+        const portCenterY = portRect.top + portRect.height / 2 - canvasRect.top
+        
+        tempConnection.value.x2 = portCenterX
+        tempConnection.value.y2 = portCenterY
+        tempConnection.value.isHoveringPort = true
+        
+        // 检查连接是否有效
+        if (connectionStart.value) {
+          const isValidConnection = (
+            connectionStart.value.type !== hoveredPort.type && // 不能连接同类型端口
+            connectionStart.value.nodeId !== hoveredPort.nodeId // 不能连接同一节点
+          )
+          
+          tempConnection.value.isValidConnection = isValidConnection
         }
       } else {
-        // 无效连接，跟随鼠标
-        tempConnection.value.x2 = mouseX
-        tempConnection.value.y2 = mouseY
-        tempConnection.value.isHoveringPort = false
+        // 如果没有找到端口元素，使用计算位置
+        const { nodeId, port, type } = hoveredPort
+        if (connectionStart.value && connectionStart.value.nodeId !== nodeId && connectionStart.value.type !== type) {
+          // 计算端口位置
+          const node = workflowNodes.value.find(n => n.id === nodeId)
+          if (node) {
+            const portIndex = type === 'input' ? (node.inputs?.indexOf(port) || 0) : (node.outputs?.indexOf(port) || 0)
+            const portX = type === 'output' ? node.x + 200 + 2 + 8 : node.x - 16 + 8
+            const portY = node.y + 20 + portIndex * 30 + 8
+            tempConnection.value.x2 = portX
+            tempConnection.value.y2 = portY
+            tempConnection.value.isHoveringPort = true
+          }
+        } else {
+          // 无效连接，跟随鼠标
+          tempConnection.value.x2 = mouseX
+          tempConnection.value.y2 = mouseY
+          tempConnection.value.isHoveringPort = false
+        }
       }
     } else {
-      // 没有悬停在端口上，跟随鼠标移动
+      // 没有悬停在端口上，跟随鼠标
       tempConnection.value.x2 = mouseX
       tempConnection.value.y2 = mouseY
       tempConnection.value.isHoveringPort = false
     }
-  }
+    
+    mouseMoveAnimationFrame = null
+  })
 }
 
 const onCanvasMouseUp = (event: MouseEvent) => {
@@ -831,14 +841,26 @@ const deployWorkflow = () => {
 // 生命周期
 onMounted(() => {
   // 添加全局鼠标事件监听，确保连接线能在整个窗口范围内移动
+  let globalMouseMoveFrame: number | null = null
+  
   const handleGlobalMouseMove = (event: MouseEvent) => {
-    if (isConnecting.value && tempConnection.value && canvasRef.value) {
+    if (!isConnecting.value || !tempConnection.value || !canvasRef.value) return
+    
+    // 使用 requestAnimationFrame 节流全局鼠标移动事件
+    if (globalMouseMoveFrame) {
+      cancelAnimationFrame(globalMouseMoveFrame)
+    }
+    
+    globalMouseMoveFrame = requestAnimationFrame(() => {
+      if (!isConnecting.value || !tempConnection.value || !canvasRef.value) return
+      
       const rect = canvasRef.value.getBoundingClientRect()
       const mouseX = event.clientX - rect.left
       const mouseY = event.clientY - rect.top
       
       // 如果鼠标在画布范围内，使用画布的鼠标移动逻辑
       if (mouseX >= 0 && mouseY >= 0 && mouseX <= rect.width && mouseY <= rect.height) {
+        globalMouseMoveFrame = null
         return // 让画布的鼠标移动事件处理
       }
       
@@ -846,7 +868,8 @@ onMounted(() => {
       tempConnection.value.x2 = mouseX
       tempConnection.value.y2 = mouseY
       tempConnection.value.isHoveringPort = false
-    }
+      globalMouseMoveFrame = null
+    })
   }
   
   const handleGlobalMouseUp = () => {
@@ -861,10 +884,24 @@ onMounted(() => {
   document.addEventListener('mousemove', handleGlobalMouseMove)
   document.addEventListener('mouseup', handleGlobalMouseUp)
   
-  // 清理事件监听器
+  // 清理事件监听器和动画帧
   onUnmounted(() => {
     document.removeEventListener('mousemove', handleGlobalMouseMove)
     document.removeEventListener('mouseup', handleGlobalMouseUp)
+    
+    // 清理所有待处理的动画帧
+    if (updateAnimationFrame) {
+      cancelAnimationFrame(updateAnimationFrame)
+      updateAnimationFrame = null
+    }
+    if (mouseMoveAnimationFrame) {
+      cancelAnimationFrame(mouseMoveAnimationFrame)
+      mouseMoveAnimationFrame = null
+    }
+    if (globalMouseMoveFrame) {
+      cancelAnimationFrame(globalMouseMoveFrame)
+      globalMouseMoveFrame = null
+    }
   })
 })
 </script>

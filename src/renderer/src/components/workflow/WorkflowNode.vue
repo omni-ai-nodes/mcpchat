@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 
 interface WorkflowNode {
@@ -188,6 +188,13 @@ const isPortHighlighted = (port: string, type: 'input' | 'output') => {
   
   return false
 }
+
+// 组件卸载时清理
+onUnmounted(() => {
+  // 清理可能残留的事件监听器
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+})
 </script>
 
 <style scoped>
