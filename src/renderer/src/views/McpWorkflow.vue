@@ -151,6 +151,9 @@
                 style="pointer-events: all;"
                 @click="selectConnection(connection, $event)"
               />
+              
+
+              
               <!-- 连接端点（仅在选中时显示） -->
               <template v-if="selectedConnection?.id === connection.id">
                 <circle 
@@ -685,25 +688,14 @@ class ConnectionManager {
     const node = workflowNodes.value.find(n => n.id === nodeId)
     if (!node) return null
     
-    const nodeWidth = 200
-    const nodeHeight = 120
-    const portSize = 12
+    const nodeWidth = 220
+    const headerHeight = 32 // 更新为新的头部高度
     
-    let portIndex = 0
-    if (type === 'input' && node.inputs) {
-      const index = node.inputs.indexOf(port)
-      portIndex = index >= 0 ? index : 0
-    } else if (type === 'output' && node.outputs) {
-      const index = node.outputs.indexOf(port)
-      portIndex = index >= 0 ? index : 0
-    }
-    
-    const portSpacing = 30
-    const startY = node.y + 40
-    
+    // 计算端口圆点的中心位置
+    // 根据用户测试的正确配置调整位置
     return {
-      x: type === 'input' ? node.x : node.x + nodeWidth,
-      y: startY + portIndex * portSpacing + portSize / 2
+      x: type === 'input' ? node.x + 30 : node.x + nodeWidth - 30, // 圆点中心位置
+      y: node.y + 20 // 头部位置 + 20px偏移
     }
   }
   
@@ -784,12 +776,14 @@ const getConnectionPath = (connection: Connection) => {
   
   if (!fromNode || !toNode) return ''
   
-  // 计算输出端口的实际位置（与端口样式完全对齐）
-  const fromX = fromNode.x + 200 + 2 + 8 // 节点宽度200px + 端口right偏移2px + 端口半径8px（端口中心）
-  const fromY = fromNode.y + 20 + 8      // 端口顶部位置20px + 端口半径8px
-  // 计算输入端口的实际位置（与端口样式完全对齐）
-  const toX = toNode.x - 16 + 8          // 输入端口left偏移-16px + 端口半径8px（端口中心）
-  const toY = toNode.y + 20 + 8          // 端口顶部位置20px + 端口半径8px
+  // 计算输出端口圆点的中心位置
+  // 根据用户测试的正确配置调整位置
+  const fromX = fromNode.x + 220 - 30    // 节点宽度220px - 30px偏移
+  const fromY = fromNode.y + 20          // 头部位置 + 20px偏移
+  // 计算输入端口圆点的中心位置
+  // 对应调整输入端口位置
+  const toX = toNode.x + 30              // 节点左边缘 + 30px偏移
+  const toY = toNode.y + 20              // 头部位置 + 20px偏移
   
   // 验证坐标值是否有效
   if (!isFinite(fromX) || !isFinite(fromY) || !isFinite(toX) || !isFinite(toY)) {
@@ -820,6 +814,49 @@ const getConnectionPath = (connection: Connection) => {
   
   return `M ${fromX} ${fromY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${toX} ${toY}`
 }
+
+// 获取连接线中点位置
+const getConnectionMidpoint = (connection: Connection) => {
+  const fromNode = workflowNodes.value.find(n => n.id === connection.from)
+  const toNode = workflowNodes.value.find(n => n.id === connection.to)
+  
+  if (!fromNode || !toNode) return { x: 0, y: 0 }
+  
+  // 使用与getConnectionPath相同的端口位置计算
+  const fromX = fromNode.x + 220 - 30    // 输出端口圆点中心位置
+  const fromY = fromNode.y + 20          // 输出端口圆点中心位置
+  const toX = toNode.x + 30              // 输入端口圆点中心位置
+  const toY = toNode.y + 20              // 输入端口圆点中心位置
+  
+  // 计算贝塞尔曲线的中点（t=0.5时的位置）
+  const deltaX = toX - fromX
+  const deltaY = toY - fromY
+  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+  
+  if (distance === 0) {
+    return { x: fromX, y: fromY }
+  }
+  
+  const baseOffset = Math.min(distance * 0.4, 120)
+  const verticalInfluence = Math.abs(deltaY) / distance
+  const controlOffset = baseOffset * (1 + verticalInfluence * 0.2)
+  
+  const isReverse = deltaX < 0
+  const cp1X = fromX + (isReverse ? Math.min(controlOffset, 80) : controlOffset)
+  const cp1Y = fromY + deltaY * 0.05
+  const cp2X = toX - (isReverse ? Math.min(controlOffset, 80) : controlOffset)
+  const cp2Y = toY - deltaY * 0.05
+  
+  // 贝塞尔曲线在t=0.5时的位置公式
+  const t = 0.5
+  const x = Math.pow(1-t, 3) * fromX + 3 * Math.pow(1-t, 2) * t * cp1X + 3 * (1-t) * Math.pow(t, 2) * cp2X + Math.pow(t, 3) * toX
+  const y = Math.pow(1-t, 3) * fromY + 3 * Math.pow(1-t, 2) * t * cp1Y + 3 * (1-t) * Math.pow(t, 2) * cp2Y + Math.pow(t, 3) * toY
+  
+  return { x, y }
+}
+
+// 从中点删除连接
+
 
 const selectNode = (nodeId: string) => {
   const node = workflowNodes.value.find(n => n.id === nodeId)
@@ -897,26 +934,26 @@ const onCanvasMouseMove = (event: MouseEvent) => {
           tempConnection.value.isValidConnection = isValidConnection
         }
       } else {
-        // 如果没有找到端口元素，使用计算位置
-        const { nodeId, port, type } = hoveredPort
-        if (connectionStart.value && connectionStart.value.nodeId !== nodeId && connectionStart.value.type !== type) {
-          // 计算端口位置
-          const node = workflowNodes.value.find(n => n.id === nodeId)
-          if (node) {
-            const portIndex = type === 'input' ? (node.inputs?.indexOf(port) || 0) : (node.outputs?.indexOf(port) || 0)
-            const portX = type === 'output' ? node.x + 200 + 2 + 8 : node.x - 16 + 8
-            const portY = node.y + 20 + portIndex * 30 + 8
-            tempConnection.value.x2 = portX
-            tempConnection.value.y2 = portY
-            tempConnection.value.isHoveringPort = true
+          // 如果没有找到端口元素，使用计算位置
+          const { nodeId, port, type } = hoveredPort
+          if (connectionStart.value && connectionStart.value.nodeId !== nodeId && connectionStart.value.type !== type) {
+            // 计算端口位置
+            const node = workflowNodes.value.find(n => n.id === nodeId)
+            if (node) {
+              // 计算端口圆点的底部位置
+              const portX = type === 'output' ? node.x + 220 + 8 : node.x - 8 // 圆点中心位置
+              const portY = node.y + 16 + 7 // 头部中心 + 圆点半径 + 边框 = 底部位置
+              tempConnection.value.x2 = portX
+              tempConnection.value.y2 = portY
+              tempConnection.value.isHoveringPort = true
+            }
+          } else {
+            // 无效连接，跟随鼠标
+            tempConnection.value.x2 = mouseX
+            tempConnection.value.y2 = mouseY
+            tempConnection.value.isHoveringPort = false
           }
-        } else {
-          // 无效连接，跟随鼠标
-          tempConnection.value.x2 = mouseX
-          tempConnection.value.y2 = mouseY
-          tempConnection.value.isHoveringPort = false
         }
-      }
     } else {
       // 没有悬停在端口上，跟随鼠标
       tempConnection.value.x2 = mouseX
@@ -1034,38 +1071,28 @@ const getPortAtPosition = (x: number, y: number) => {
     if (inNodeArea) {
       // 检查输入端口区域（节点左半部分）
       if (x <= node.x + nodeWidth / 2 && node.inputs && node.inputs.length > 0) {
-        // 根据Y坐标确定最近的输入端口
-        let closestPortIndex = 0
-        let minDistance = Infinity
-        
-        for (let i = 0; i < node.inputs.length; i++) {
-          const portY = node.y + 20 + i * 30 + 8
-          const distance = Math.abs(y - portY)
-          if (distance < minDistance) {
-            minDistance = distance
-            closestPortIndex = i
-          }
+        // 端口现在在头部，检查是否在头部区域
+        const headerHeight = 32
+        if (y >= node.y && y <= node.y + headerHeight) {
+          // 在头部区域，返回第一个输入端口
+          return { nodeId: node.id, port: node.inputs[0], type: 'input' as const }
         }
         
-        return { nodeId: node.id, port: node.inputs[closestPortIndex], type: 'input' as const }
+        // 如果不在头部区域，返回第一个输入端口作为默认
+        return { nodeId: node.id, port: node.inputs[0], type: 'input' as const }
       }
       
       // 检查输出端口区域（节点右半部分）
       if (x > node.x + nodeWidth / 2 && node.outputs && node.outputs.length > 0) {
-        // 根据Y坐标确定最近的输出端口
-        let closestPortIndex = 0
-        let minDistance = Infinity
-        
-        for (let i = 0; i < node.outputs.length; i++) {
-          const portY = node.y + 20 + i * 30 + 8
-          const distance = Math.abs(y - portY)
-          if (distance < minDistance) {
-            minDistance = distance
-            closestPortIndex = i
-          }
+        // 端口现在在头部，检查是否在头部区域
+        const headerHeight = 32
+        if (y >= node.y && y <= node.y + headerHeight) {
+          // 在头部区域，返回第一个输出端口
+          return { nodeId: node.id, port: node.outputs[0], type: 'output' as const }
         }
         
-        return { nodeId: node.id, port: node.outputs[closestPortIndex], type: 'output' as const }
+        // 如果不在头部区域，返回第一个输出端口作为默认
+         return { nodeId: node.id, port: node.outputs[0], type: 'output' as const }
       }
     }
   }
