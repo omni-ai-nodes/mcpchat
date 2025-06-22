@@ -52,6 +52,23 @@
     "mcpWorkflow": "MCP工作流",
     "mcpGallery": "Mcp广场"
   },
+  "mcp": {
+    "workflow": {
+      "toolPanel": "工具面板",
+      "toolPanelDesc": "拖拽节点到画布创建工作流",
+      "inputNodes": "输入节点",
+      "processNodes": "处理节点",
+      "outputNodes": "输出节点",
+      "untitled": "未命名工作流",
+      "draft": "草稿",
+      "save": "保存",
+      "run": "运行",
+      "deploy": "部署",
+      "emptyCanvas": "空白画布",
+      "emptyCanvasDesc": "从左侧工具面板拖拽节点到此处开始创建工作流",
+      "properties": "属性面板"
+    }
+  },
   "languageSelect": "选择语言",
   "searchEngine": "搜索引擎",
   "searchEngineSelect": "选择搜索引擎",

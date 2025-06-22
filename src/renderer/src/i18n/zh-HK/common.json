@@ -70,5 +70,26 @@
   "reset": "重置",
   "format": "格式化",
   "edit": "編輯",
-  "delete": "刪除"
+  "delete": "刪除",
+  "appBar": {
+    "mcpWorkflow": "MCP工作流",
+    "mcpGallery": "MCP廣場"
+  },
+  "mcp": {
+    "workflow": {
+      "toolPanel": "工具面板",
+      "toolPanelDesc": "拖拽節點到畫布創建工作流",
+      "inputNodes": "輸入節點",
+      "processNodes": "處理節點",
+      "outputNodes": "輸出節點",
+      "untitled": "未命名工作流",
+      "draft": "草稿",
+      "save": "保存",
+      "run": "運行",
+      "deploy": "部署",
+      "emptyCanvas": "空白畫布",
+      "emptyCanvasDesc": "從左側工具面板拖拽節點到此處開始創建工作流",
+      "properties": "屬性面板"
+    }
+  }
 }

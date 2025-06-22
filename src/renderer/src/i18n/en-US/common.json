@@ -74,5 +74,22 @@
   "appBar": {
     "mcpWorkflow": "MCP Workflow",
     "mcpGallery": "MCP Gallery"
+  },
+  "mcp": {
+    "workflow": {
+      "toolPanel": "Tool Panel",
+      "toolPanelDesc": "Drag nodes to canvas to create workflow",
+      "inputNodes": "Input Nodes",
+      "processNodes": "Process Nodes",
+      "outputNodes": "Output Nodes",
+      "untitled": "Untitled Workflow",
+      "draft": "Draft",
+      "save": "Save",
+      "run": "Run",
+      "deploy": "Deploy",
+      "emptyCanvas": "Empty Canvas",
+      "emptyCanvasDesc": "Drag nodes from the tool panel to start creating your workflow",
+      "properties": "Properties Panel"
+    }
   }
 }

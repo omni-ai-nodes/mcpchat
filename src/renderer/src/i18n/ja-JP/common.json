@@ -74,5 +74,22 @@
   "appBar": {
     "mcpWorkflow": "MCPワークフロー",
     "mcpGallery": "MCPギャラリー"
+  },
+  "mcp": {
+    "workflow": {
+      "toolPanel": "ツールパネル",
+      "toolPanelDesc": "ノードをキャンバスにドラッグしてワークフローを作成",
+      "inputNodes": "入力ノード",
+      "processNodes": "処理ノード",
+      "outputNodes": "出力ノード",
+      "untitled": "無題のワークフロー",
+      "draft": "下書き",
+      "save": "保存",
+      "run": "実行",
+      "deploy": "デプロイ",
+      "emptyCanvas": "空のキャンバス",
+      "emptyCanvasDesc": "ツールパネルからノードをドラッグしてワークフローの作成を開始",
+      "properties": "プロパティパネル"
+    }
   }
 }

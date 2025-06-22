@@ -74,5 +74,22 @@
   "appBar": {
     "mcpWorkflow": "Flux de travail MCP",
     "mcpGallery": "Galerie MCP"
+  },
+  "mcp": {
+    "workflow": {
+      "toolPanel": "Panneau d'outils",
+      "toolPanelDesc": "Glissez les nœuds sur le canevas pour créer un flux de travail",
+      "inputNodes": "Nœuds d'entrée",
+      "processNodes": "Nœuds de traitement",
+      "outputNodes": "Nœuds de sortie",
+      "untitled": "Flux de travail sans titre",
+      "draft": "Brouillon",
+      "save": "Enregistrer",
+      "run": "Exécuter",
+      "deploy": "Déployer",
+      "emptyCanvas": "Canevas vide",
+      "emptyCanvasDesc": "Glissez les nœuds du panneau d'outils pour commencer à créer votre flux de travail",
+      "properties": "Panneau des propriétés"
+    }
   }
 }

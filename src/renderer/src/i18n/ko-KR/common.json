@@ -74,5 +74,22 @@
   "appBar": {
     "mcpWorkflow": "MCP 워크플로",
     "mcpGallery": "MCP 갤러리"
+  },
+  "mcp": {
+    "workflow": {
+      "toolPanel": "도구 패널",
+      "toolPanelDesc": "노드를 캔버스로 드래그하여 워크플로 생성",
+      "inputNodes": "입력 노드",
+      "processNodes": "처리 노드",
+      "outputNodes": "출력 노드",
+      "untitled": "제목 없는 워크플로",
+      "draft": "초안",
+      "save": "저장",
+      "run": "실행",
+      "deploy": "배포",
+      "emptyCanvas": "빈 캔버스",
+      "emptyCanvasDesc": "도구 패널에서 노드를 드래그하여 워크플로 생성을 시작하세요",
+      "properties": "속성 패널"
+    }
   }
 }
