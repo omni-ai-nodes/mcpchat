@@ -130,7 +130,8 @@
         <!-- 工作流画布 -->
         <div 
           ref="canvasRef" 
-          class="relative w-full h-full"
+          class="relative w-full h-full min-h-full"
+          style="min-height: 100%; pointer-events: auto;"
           @drop="onDrop"
           @dragover="onDragOver"
           @mousemove="onCanvasMouseMove"
@@ -221,7 +222,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -556,6 +557,9 @@ const onCanvasMouseMove = (event: MouseEvent) => {
     const mouseX = event.clientX - rect.left
     const mouseY = event.clientY - rect.top
     
+    // 调试信息：确认鼠标事件正常触发
+    // console.log('鼠标移动:', { mouseX, mouseY, isConnecting: isConnecting.value })
+    
     // 检测是否悬停在端口上
     const hoveredPort = getPortAtPosition(mouseX, mouseY)
     if (hoveredPort && connectionStart.value) {
@@ -566,19 +570,21 @@ const onCanvasMouseMove = (event: MouseEvent) => {
         const node = workflowNodes.value.find(n => n.id === nodeId)
         if (node) {
           const portIndex = type === 'input' ? (node.inputs?.indexOf(port) || 0) : (node.outputs?.indexOf(port) || 0)
-          const portX = type === 'output' ? node.x + 200 : node.x
-          const portY = node.y + 20 + portIndex * 30
+          const portX = type === 'output' ? node.x + 200 + 6 : node.x - 6
+          const portY = node.y + 20 + portIndex * 30 + 6
           tempConnection.value.x2 = portX
           tempConnection.value.y2 = portY
           // 添加端口高亮效果
           tempConnection.value.isHoveringPort = true
         }
       } else {
+        // 无效连接，跟随鼠标
         tempConnection.value.x2 = mouseX
         tempConnection.value.y2 = mouseY
         tempConnection.value.isHoveringPort = false
       }
     } else {
+      // 没有悬停在端口上，跟随鼠标移动
       tempConnection.value.x2 = mouseX
       tempConnection.value.y2 = mouseY
       tempConnection.value.isHoveringPort = false
@@ -766,6 +772,46 @@ const deployWorkflow = () => {
   // TODO: 实现工作流部署逻辑
   alert(`工作流部署成功！\n名称: ${currentWorkflow.name || '未命名工作流'}\n节点数量: ${workflowNodes.value.length}\n连接数量: ${connections.value.length}`)
 }
+
+// 生命周期
+onMounted(() => {
+  // 添加全局鼠标事件监听，确保连接线能在整个窗口范围内移动
+  const handleGlobalMouseMove = (event: MouseEvent) => {
+    if (isConnecting.value && tempConnection.value && canvasRef.value) {
+      const rect = canvasRef.value.getBoundingClientRect()
+      const mouseX = event.clientX - rect.left
+      const mouseY = event.clientY - rect.top
+      
+      // 如果鼠标在画布范围内，使用画布的鼠标移动逻辑
+      if (mouseX >= 0 && mouseY >= 0 && mouseX <= rect.width && mouseY <= rect.height) {
+        return // 让画布的鼠标移动事件处理
+      }
+      
+      // 鼠标在画布外，直接跟随鼠标位置
+      tempConnection.value.x2 = mouseX
+      tempConnection.value.y2 = mouseY
+      tempConnection.value.isHoveringPort = false
+    }
+  }
+  
+  const handleGlobalMouseUp = () => {
+    if (isConnecting.value) {
+      // 在画布外释放鼠标，取消连接
+      isConnecting.value = false
+      tempConnection.value = null
+      connectionStart.value = null
+    }
+  }
+  
+  document.addEventListener('mousemove', handleGlobalMouseMove)
+  document.addEventListener('mouseup', handleGlobalMouseUp)
+  
+  // 清理事件监听器
+  onUnmounted(() => {
+    document.removeEventListener('mousemove', handleGlobalMouseMove)
+    document.removeEventListener('mouseup', handleGlobalMouseUp)
+  })
+})
 </script>
 
 <style scoped>
@@ -864,7 +910,7 @@ const deployWorkflow = () => {
 .workspace-canvas {
   flex: 1;
   position: relative;
-  overflow: hidden;
+  overflow: auto;
   background: 
     radial-gradient(circle at 20px 20px, #333 1px, transparent 1px),
     radial-gradient(circle at 60px 60px, #333 1px, transparent 1px);
