@@ -439,8 +439,8 @@ const startConnection = (nodeId: string, port: string, type: 'input' | 'output')
       }
       
       // 计算端口的实际中心位置
-      const x = type === 'output' ? node.x + 200 + 6 : node.x - 6 // 端口外偏移6px
-      const y = node.y + 20 + portIndex * 30 + 6 // 端口顶部位置 + 端口半径6px
+      const x = type === 'output' ? node.x + 200 + 8 : node.x - 8 // 端口外偏移8px
+      const y = node.y + 20 + portIndex * 30 + 8 // 端口顶部位置 + 端口半径8px
       
       // 验证计算出的坐标
       if (isFinite(x) && isFinite(y)) {
@@ -464,12 +464,12 @@ const getConnectionPath = (connection: Connection) => {
   
   if (!fromNode || !toNode) return ''
   
-  // 计算输出端口的实际位置（节点右侧外6px，端口中心）
-  const fromX = fromNode.x + 200 + 6 // 节点宽度200px + 端口外偏移6px
-  const fromY = fromNode.y + 20 + 6  // 端口顶部位置20px + 端口半径6px
-  // 计算输入端口的实际位置（节点左侧外6px，端口中心）
-  const toX = toNode.x - 6           // 输入端口在左侧外6px
-  const toY = toNode.y + 20 + 6      // 端口顶部位置20px + 端口半径6px
+  // 计算输出端口的实际位置（节点右侧外8px，端口中心）
+  const fromX = fromNode.x + 200 + 8 // 节点宽度200px + 端口外偏移8px
+  const fromY = fromNode.y + 20 + 8  // 端口顶部位置20px + 端口半径8px
+  // 计算输入端口的实际位置（节点左侧外8px，端口中心）
+  const toX = toNode.x - 8           // 输入端口在左侧外8px
+  const toY = toNode.y + 20 + 8      // 端口顶部位置20px + 端口半径8px
   
   // 验证坐标值是否有效
   if (!isFinite(fromX) || !isFinite(fromY) || !isFinite(toX) || !isFinite(toY)) {
@@ -561,8 +561,8 @@ const onCanvasMouseMove = (event: MouseEvent) => {
         const node = workflowNodes.value.find(n => n.id === nodeId)
         if (node) {
           const portIndex = type === 'input' ? (node.inputs?.indexOf(port) || 0) : (node.outputs?.indexOf(port) || 0)
-          const portX = type === 'output' ? node.x + 200 + 6 : node.x - 6
-          const portY = node.y + 20 + portIndex * 30 + 6
+          const portX = type === 'output' ? node.x + 200 + 8 : node.x - 8
+          const portY = node.y + 20 + portIndex * 30 + 8
           tempConnection.value.x2 = portX
           tempConnection.value.y2 = portY
           // 添加端口高亮效果
@@ -592,24 +592,24 @@ const onCanvasMouseUp = (event: MouseEvent) => {
     // 检测是否在端口上释放
     const hoveredPort = getPortAtPosition(mouseX, mouseY)
     if (hoveredPort && connectionStart.value.nodeId !== hoveredPort.nodeId && connectionStart.value.type !== hoveredPort.type) {
-      // 检查是否已存在相同连接
-      const existingConnection = connections.value.find(conn => {
-        const fromNode = connectionStart.value.type === 'output' ? connectionStart.value.nodeId : hoveredPort.nodeId
-        const toNode = connectionStart.value.type === 'output' ? hoveredPort.nodeId : connectionStart.value.nodeId
-        const fromPort = connectionStart.value.type === 'output' ? connectionStart.value.port : hoveredPort.port
-        const toPort = connectionStart.value.type === 'output' ? hoveredPort.port : connectionStart.value.port
-        
-        return conn.from === fromNode && conn.to === toNode && conn.fromPort === fromPort && conn.toPort === toPort
-      })
+      // 检查是否已存在完全相同的连接（相同的起始节点、目标节点和端口）
+      const fromNode = connectionStart.value.type === 'output' ? connectionStart.value.nodeId : hoveredPort.nodeId
+      const toNode = connectionStart.value.type === 'output' ? hoveredPort.nodeId : connectionStart.value.nodeId
+      const fromPort = connectionStart.value.type === 'output' ? connectionStart.value.port : hoveredPort.port
+      const toPort = connectionStart.value.type === 'output' ? hoveredPort.port : connectionStart.value.port
+      
+      const existingConnection = connections.value.find(conn => 
+        conn.from === fromNode && conn.to === toNode && conn.fromPort === fromPort && conn.toPort === toPort
+      )
       
       if (!existingConnection) {
         // 建立新连接
         const newConnection: Connection = {
           id: `conn_${Date.now()}`,
-          from: connectionStart.value.type === 'output' ? connectionStart.value.nodeId : hoveredPort.nodeId,
-          to: connectionStart.value.type === 'output' ? hoveredPort.nodeId : connectionStart.value.nodeId,
-          fromPort: connectionStart.value.type === 'output' ? connectionStart.value.port : hoveredPort.port,
-          toPort: connectionStart.value.type === 'output' ? hoveredPort.port : connectionStart.value.port
+          from: fromNode,
+          to: toNode,
+          fromPort: fromPort,
+          toPort: toPort
         }
         connections.value.push(newConnection)
         
@@ -678,10 +678,10 @@ const getPortAtPosition = (x: number, y: number) => {
     // 检查输入端口
     if (node.inputs) {
       for (let i = 0; i < node.inputs.length; i++) {
-        const portX = node.x - 6 // 端口中心位置（节点左侧外6px）
-        const portY = node.y + 20 + i * 30 + 6 // 端口中心位置（顶部20px + 索引*30px + 半径6px）
+        const portX = node.x - 8 // 端口中心位置（节点左侧外8px）
+        const portY = node.y + 20 + i * 30 + 8 // 端口中心位置（顶部20px + 索引*30px + 半径8px）
         const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
-        if (distance <= 15) { // 扩大端口检测范围
+        if (distance <= 30) { // 增大端口吸附范围，提供更好的用户体验
           return { nodeId: node.id, port: node.inputs[i], type: 'input' as const }
         }
       }
@@ -690,10 +690,10 @@ const getPortAtPosition = (x: number, y: number) => {
     // 检查输出端口
     if (node.outputs) {
       for (let i = 0; i < node.outputs.length; i++) {
-        const portX = node.x + 200 + 6 // 端口中心位置（节点右侧外6px）
-        const portY = node.y + 20 + i * 30 + 6 // 端口中心位置（顶部20px + 索引*30px + 半径6px）
+        const portX = node.x + 200 + 8 // 端口中心位置（节点右侧外8px）
+        const portY = node.y + 20 + i * 30 + 8 // 端口中心位置（顶部20px + 索引*30px + 半径8px）
         const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
-        if (distance <= 15) { // 扩大端口检测范围
+        if (distance <= 30) { // 增大端口吸附范围，提供更好的用户体验
           return { nodeId: node.id, port: node.outputs[i], type: 'output' as const }
         }
       }
