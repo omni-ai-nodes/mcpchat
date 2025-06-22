@@ -278,7 +278,7 @@ const isPortHighlighted = (port: string, type: 'input' | 'output') => {
 }
 
 .node-input-port {
-  left: -2px;
+  left: -16px;
 }
 
 .node-output-port {

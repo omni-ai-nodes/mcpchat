@@ -1028,7 +1028,7 @@ onMounted(() => {
 }
 
 .node-input-port {
-  left: -2px;
+  left: -16px;
 }
 
 .node-output-port {
