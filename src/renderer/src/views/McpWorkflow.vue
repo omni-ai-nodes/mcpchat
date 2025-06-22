@@ -19,7 +19,9 @@
                 v-for="node in inputNodes" 
                 :key="node.type"
                 class="p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
+                draggable="true"
                 @click="addNode(node)"
+                @dragstart="onDragStart(node, $event)"
               >
                 <div class="flex items-center gap-3">
                   <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
@@ -42,7 +44,9 @@
                 v-for="node in processNodes" 
                 :key="node.type"
                 class="p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
+                draggable="true"
                 @click="addNode(node)"
+                @dragstart="onDragStart(node, $event)"
               >
                 <div class="flex items-center gap-3">
                   <div class="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900 flex items-center justify-center">
@@ -65,7 +69,9 @@
                 v-for="node in outputNodes" 
                 :key="node.type"
                 class="p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
+                draggable="true"
                 @click="addNode(node)"
+                @dragstart="onDragStart(node, $event)"
               >
                 <div class="flex items-center gap-3">
                   <div class="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
@@ -127,37 +133,50 @@
           class="relative w-full h-full"
           @drop="onDrop"
           @dragover="onDragOver"
+          @mousemove="onCanvasMouseMove"
+          @mouseup="onCanvasMouseUp"
+          @click="onCanvasClick"
         >
           <!-- 工作流节点 -->
-          <div 
-            v-for="node in workflowNodes" 
-            :key="node.id"
-            class="absolute"
-            :style="{ left: node.x + 'px', top: node.y + 'px' }"
-          >
-            <WorkflowNode 
+          <WorkflowNode
+              v-for="node in workflowNodes"
+              :key="node.id"
               :node="node"
-              @update="updateNode"
+              :is-selected="selectedNode?.id === node.id"
+              @select="selectNode"
               @delete="deleteNode"
-              @connect="startConnection"
+              @update="updateNode"
+              @start-connection="startConnection"
             />
-          </div>
 
           <!-- 连接线 -->
           <svg class="absolute inset-0 pointer-events-none" style="z-index: 1">
             <defs>
               <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280" />
+                <polygon points="0 0, 10 3.5, 0 7" fill="#60a5fa" />
               </marker>
             </defs>
+            <!-- 已建立的连接 -->
             <path 
               v-for="connection in connections" 
               :key="connection.id"
               :d="getConnectionPath(connection)"
-              stroke="#6b7280"
-              stroke-width="2"
+              stroke="#60a5fa"
+              stroke-width="3"
               fill="none"
               marker-end="url(#arrowhead)"
+              class="cursor-pointer hover:stroke-red-400"
+              @click="deleteConnection(connection.id)"
+            />
+            <!-- 临时连接线 -->
+            <path 
+              v-if="tempConnection"
+              :d="getTempConnectionPath()"
+              stroke="#60a5fa"
+              stroke-width="2"
+              fill="none"
+              stroke-dasharray="5,5"
+              opacity="0.7"
             />
           </svg>
 
@@ -194,6 +213,8 @@ import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Icon } from '@iconify/vue'
+import WorkflowNode from '@/components/workflow/WorkflowNode.vue'
+import NodeProperties from '@/components/workflow/NodeProperties.vue'
 
 const { t } = useI18n()
 
@@ -352,14 +373,15 @@ const addNode = (template: NodeTemplate) => {
     id: `node_${Date.now()}`,
     type: template.type,
     name: template.name,
-    x: 300,
-    y: 200,
+    x: Math.random() * 400 + 200,
+    y: Math.random() * 300 + 150,
     config: {},
     inputs: template.category === 'input' ? [] : ['input'],
     outputs: template.category === 'output' ? [] : ['output']
   }
   
   workflowNodes.value.push(newNode)
+  selectedNode.value = newNode
 }
 
 const updateNode = (nodeId: string, updates: Partial<WorkflowNode>) => {
@@ -377,9 +399,27 @@ const deleteNode = (nodeId: string) => {
   }
 }
 
-const startConnection = (nodeId: string, port: string) => {
-  console.log('开始连接:', nodeId, port)
-  // TODO: 实现连接逻辑
+// 连接状态
+const isConnecting = ref(false)
+const connectionStart = ref<{ nodeId: string, port: string, type: 'input' | 'output' } | null>(null)
+const tempConnection = ref<{ x1: number, y1: number, x2: number, y2: number } | null>(null)
+
+const startConnection = (nodeId: string, port: string, type: 'input' | 'output') => {
+  // 只处理开始连接，不处理完成连接（完成连接由mouseup事件处理）
+  if (!isConnecting.value) {
+    // 开始连接
+    isConnecting.value = true
+    connectionStart.value = { nodeId, port, type }
+    
+    // 计算起始位置
+    const node = workflowNodes.value.find(n => n.id === nodeId)
+    if (node) {
+      const portIndex = type === 'input' ? (node.inputs?.indexOf(port) || 0) : (node.outputs?.indexOf(port) || 0)
+      const x = type === 'output' ? node.x + 200 : node.x
+      const y = node.y + 20 + portIndex * 30
+      tempConnection.value = { x1: x, y1: y, x2: x, y2: y }
+    }
+  }
 }
 
 const updateSelectedNode = (updates: Partial<WorkflowNode>) => {
@@ -390,25 +430,183 @@ const updateSelectedNode = (updates: Partial<WorkflowNode>) => {
 }
 
 const getConnectionPath = (connection: Connection) => {
-  // 简化的连接线路径计算
+  // 连接线路径计算
   const fromNode = workflowNodes.value.find(n => n.id === connection.from)
   const toNode = workflowNodes.value.find(n => n.id === connection.to)
   
   if (!fromNode || !toNode) return ''
   
-  const fromX = fromNode.x + 150
-  const fromY = fromNode.y + 50
-  const toX = toNode.x
-  const toY = toNode.y + 50
+  // 输出端口在节点右侧，输入端口在节点左侧
+  const fromX = fromNode.x + 200 // 节点宽度200px，输出端口在右侧
+  const fromY = fromNode.y + 40  // 端口垂直居中位置
+  const toX = toNode.x           // 输入端口在左侧
+  const toY = toNode.y + 40
   
-  const midX = (fromX + toX) / 2
+  // 创建更自然的贝塞尔曲线
+  const distance = Math.abs(toX - fromX)
+  const controlOffset = Math.min(distance * 0.5, 100)
+  const cp1X = fromX + controlOffset
+  const cp1Y = fromY
+  const cp2X = toX - controlOffset
+  const cp2Y = toY
   
-  return `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`
+  return `M ${fromX} ${fromY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${toX} ${toY}`
+}
+
+const selectNode = (nodeId: string) => {
+  const node = workflowNodes.value.find(n => n.id === nodeId)
+  selectedNode.value = node || null
+}
+
+const onDragStart = (template: NodeTemplate, event: DragEvent) => {
+  if (event.dataTransfer) {
+    event.dataTransfer.setData('text/plain', template.type)
+    event.dataTransfer.effectAllowed = 'copy'
+  }
 }
 
 const onDrop = (event: DragEvent) => {
   event.preventDefault()
-  // TODO: 处理拖拽放置
+  const nodeType = event.dataTransfer?.getData('text/plain')
+  if (nodeType) {
+    const template = [...inputNodes, ...processNodes, ...outputNodes].find(n => n.type === nodeType)
+    if (template) {
+      const rect = canvasRef.value?.getBoundingClientRect()
+      if (rect) {
+        const newNode: WorkflowNode = {
+          id: `node_${Date.now()}`,
+          type: template.type,
+          name: template.name,
+          x: event.clientX - rect.left - 100,
+          y: event.clientY - rect.top - 40,
+          config: {},
+          inputs: template.category === 'input' ? [] : ['input'],
+          outputs: template.category === 'output' ? [] : ['output']
+        }
+        workflowNodes.value.push(newNode)
+        selectedNode.value = newNode
+      }
+    }
+  }
+}
+
+const onCanvasMouseMove = (event: MouseEvent) => {
+  if (isConnecting.value && tempConnection.value && canvasRef.value) {
+    const rect = canvasRef.value.getBoundingClientRect()
+    const mouseX = event.clientX - rect.left
+    const mouseY = event.clientY - rect.top
+    
+    // 检测是否悬停在端口上
+    const hoveredPort = getPortAtPosition(mouseX, mouseY)
+    if (hoveredPort && connectionStart.value) {
+      // 如果悬停在有效端口上，连接到该端口
+      const { nodeId, port, type } = hoveredPort
+      if (connectionStart.value.nodeId !== nodeId && connectionStart.value.type !== type) {
+        // 计算端口位置
+        const node = workflowNodes.value.find(n => n.id === nodeId)
+        if (node) {
+          const portIndex = type === 'input' ? (node.inputs?.indexOf(port) || 0) : (node.outputs?.indexOf(port) || 0)
+          const portX = type === 'output' ? node.x + 200 : node.x
+          const portY = node.y + 20 + portIndex * 30
+          tempConnection.value.x2 = portX
+          tempConnection.value.y2 = portY
+        }
+      } else {
+        tempConnection.value.x2 = mouseX
+        tempConnection.value.y2 = mouseY
+      }
+    } else {
+      tempConnection.value.x2 = mouseX
+      tempConnection.value.y2 = mouseY
+    }
+  }
+}
+
+const onCanvasMouseUp = (event: MouseEvent) => {
+  if (isConnecting.value && connectionStart.value && canvasRef.value) {
+    const rect = canvasRef.value.getBoundingClientRect()
+    const mouseX = event.clientX - rect.left
+    const mouseY = event.clientY - rect.top
+    
+    // 检测是否在端口上释放
+    const hoveredPort = getPortAtPosition(mouseX, mouseY)
+    if (hoveredPort && connectionStart.value.nodeId !== hoveredPort.nodeId && connectionStart.value.type !== hoveredPort.type) {
+      // 建立连接
+      const newConnection: Connection = {
+        id: `conn_${Date.now()}`,
+        from: connectionStart.value.type === 'output' ? connectionStart.value.nodeId : hoveredPort.nodeId,
+        to: connectionStart.value.type === 'output' ? hoveredPort.nodeId : connectionStart.value.nodeId,
+        fromPort: connectionStart.value.type === 'output' ? connectionStart.value.port : hoveredPort.port,
+        toPort: connectionStart.value.type === 'output' ? hoveredPort.port : connectionStart.value.port
+      }
+      connections.value.push(newConnection)
+    }
+    
+    // 重置连接状态
+    isConnecting.value = false
+    connectionStart.value = null
+    tempConnection.value = null
+  }
+}
+
+const onCanvasClick = (event: MouseEvent) => {
+  if (isConnecting.value) {
+    // 取消连接
+    isConnecting.value = false
+    connectionStart.value = null
+    tempConnection.value = null
+  }
+}
+
+const getTempConnectionPath = () => {
+  if (!tempConnection.value) return ''
+  const { x1, y1, x2, y2 } = tempConnection.value
+  
+  // 创建与正式连接线相同的贝塞尔曲线
+  const distance = Math.abs(x2 - x1)
+  const controlOffset = Math.min(distance * 0.5, 100)
+  const cp1X = x1 + controlOffset
+  const cp1Y = y1
+  const cp2X = x2 - controlOffset
+  const cp2Y = y2
+  
+  return `M ${x1} ${y1} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${x2} ${y2}`
+}
+
+const getPortAtPosition = (x: number, y: number) => {
+  for (const node of workflowNodes.value) {
+    // 检查输入端口
+    if (node.inputs) {
+      for (let i = 0; i < node.inputs.length; i++) {
+        const portX = node.x - 8 // 端口中心位置
+        const portY = node.y + 20 + i * 30
+        const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
+        if (distance <= 12) { // 端口半径范围
+          return { nodeId: node.id, port: node.inputs[i], type: 'input' as const }
+        }
+      }
+    }
+    
+    // 检查输出端口
+    if (node.outputs) {
+      for (let i = 0; i < node.outputs.length; i++) {
+        const portX = node.x + 208 // 端口中心位置
+        const portY = node.y + 20 + i * 30
+        const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
+        if (distance <= 12) { // 端口半径范围
+          return { nodeId: node.id, port: node.outputs[i], type: 'output' as const }
+        }
+      }
+    }
+  }
+  return null
+}
+
+const deleteConnection = (connectionId: string) => {
+  const index = connections.value.findIndex(c => c.id === connectionId)
+  if (index > -1) {
+    connections.value.splice(index, 1)
+  }
 }
 
 const onDragOver = (event: DragEvent) => {
