@@ -140,11 +140,6 @@
         >
           <!-- 连接线层 -->
           <svg class="absolute inset-0 pointer-events-none" style="z-index: 1; width: 100%; height: 100%;">
-            <defs>
-              <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#60a5fa" />
-              </marker>
-            </defs>
             <!-- 已建立的连接 -->
             <path 
               v-for="connection in connections" 
@@ -153,7 +148,6 @@
               stroke="#60a5fa"
               stroke-width="3"
               fill="none"
-              marker-end="url(#arrowhead)"
               class="connection-path cursor-pointer"
               style="pointer-events: stroke;"
               @click="deleteConnection(connection.id)"
