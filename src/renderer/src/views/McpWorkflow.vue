@@ -163,16 +163,7 @@
               :opacity="tempConnection.isHoveringPort ? '0.9' : '0.7'"
               class="temp-connection"
             />
-            <!-- 临时连接线的端点指示器 -->
-            <circle 
-              v-if="tempConnection"
-              :cx="tempConnection.x2"
-              :cy="tempConnection.y2"
-              :r="tempConnection.isHoveringPort ? '6' : '4'"
-              :fill="tempConnection.isHoveringPort ? '#10b981' : '#60a5fa'"
-              :opacity="tempConnection.isHoveringPort ? '0.9' : '0.6'"
-              class="connection-endpoint"
-            />
+
           </svg>
 
           <!-- 节点层 -->
@@ -1037,10 +1028,7 @@ onMounted(() => {
   transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
 }
 
-/* 端点指示器动画 */
-.connection-endpoint {
-  transition: all 0.2s ease;
-}
+
 
 .connections-svg {
   position: absolute;
