@@ -555,26 +555,15 @@ const onDrop = (event: DragEvent) => {
   }
 }
 
-// 添加鼠标移动事件节流
-let mouseMoveAnimationFrame: number | null = null
-
 const onCanvasMouseMove = (event: MouseEvent) => {
   if (!isConnecting.value || !tempConnection.value || !canvasRef.value) return
   
-  // 使用 requestAnimationFrame 节流鼠标移动事件
-  if (mouseMoveAnimationFrame) {
-    cancelAnimationFrame(mouseMoveAnimationFrame)
-  }
+  const rect = canvasRef.value.getBoundingClientRect()
+  const mouseX = event.clientX - rect.left
+  const mouseY = event.clientY - rect.top
   
-  mouseMoveAnimationFrame = requestAnimationFrame(() => {
-    if (!isConnecting.value || !tempConnection.value || !canvasRef.value) return
-    
-    const rect = canvasRef.value.getBoundingClientRect()
-    const mouseX = event.clientX - rect.left
-    const mouseY = event.clientY - rect.top
-    
-    // 检测是否悬停在端口上
-    const hoveredPort = getPortAtPosition(mouseX, mouseY)
+  // 检测是否悬停在端口上
+  const hoveredPort = getPortAtPosition(mouseX, mouseY)
     
     if (hoveredPort) {
       // 悬停在端口上，吸附到端口中心
@@ -627,11 +616,7 @@ const onCanvasMouseMove = (event: MouseEvent) => {
       tempConnection.value.y2 = mouseY
       tempConnection.value.isHoveringPort = false
     }
-    
-    mouseMoveAnimationFrame = null
-  })
 }
-
 const onCanvasMouseUp = (event: MouseEvent) => {
   if (isConnecting.value && connectionStart.value && canvasRef.value) {
     const rect = canvasRef.value.getBoundingClientRect()
@@ -841,35 +826,22 @@ const deployWorkflow = () => {
 // 生命周期
 onMounted(() => {
   // 添加全局鼠标事件监听，确保连接线能在整个窗口范围内移动
-  let globalMouseMoveFrame: number | null = null
-  
   const handleGlobalMouseMove = (event: MouseEvent) => {
     if (!isConnecting.value || !tempConnection.value || !canvasRef.value) return
     
-    // 使用 requestAnimationFrame 节流全局鼠标移动事件
-    if (globalMouseMoveFrame) {
-      cancelAnimationFrame(globalMouseMoveFrame)
+    const rect = canvasRef.value.getBoundingClientRect()
+    const mouseX = event.clientX - rect.left
+    const mouseY = event.clientY - rect.top
+    
+    // 如果鼠标在画布范围内，使用画布的鼠标移动逻辑
+    if (mouseX >= 0 && mouseY >= 0 && mouseX <= rect.width && mouseY <= rect.height) {
+      return // 让画布的鼠标移动事件处理
     }
     
-    globalMouseMoveFrame = requestAnimationFrame(() => {
-      if (!isConnecting.value || !tempConnection.value || !canvasRef.value) return
-      
-      const rect = canvasRef.value.getBoundingClientRect()
-      const mouseX = event.clientX - rect.left
-      const mouseY = event.clientY - rect.top
-      
-      // 如果鼠标在画布范围内，使用画布的鼠标移动逻辑
-      if (mouseX >= 0 && mouseY >= 0 && mouseX <= rect.width && mouseY <= rect.height) {
-        globalMouseMoveFrame = null
-        return // 让画布的鼠标移动事件处理
-      }
-      
-      // 鼠标在画布外，直接跟随鼠标位置
-      tempConnection.value.x2 = mouseX
-      tempConnection.value.y2 = mouseY
-      tempConnection.value.isHoveringPort = false
-      globalMouseMoveFrame = null
-    })
+    // 鼠标在画布外，直接跟随鼠标位置
+    tempConnection.value.x2 = mouseX
+    tempConnection.value.y2 = mouseY
+    tempConnection.value.isHoveringPort = false
   }
   
   const handleGlobalMouseUp = () => {
@@ -893,14 +865,6 @@ onMounted(() => {
     if (updateAnimationFrame) {
       cancelAnimationFrame(updateAnimationFrame)
       updateAnimationFrame = null
-    }
-    if (mouseMoveAnimationFrame) {
-      cancelAnimationFrame(mouseMoveAnimationFrame)
-      mouseMoveAnimationFrame = null
-    }
-    if (globalMouseMoveFrame) {
-      cancelAnimationFrame(globalMouseMoveFrame)
-      globalMouseMoveFrame = null
     }
   })
 })
