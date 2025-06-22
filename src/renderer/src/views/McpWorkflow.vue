@@ -144,8 +144,8 @@
             <g v-for="connection in connections" :key="connection.id">
               <path 
                 :d="getConnectionPath(connection)"
-                :stroke="selectedConnection?.id === connection.id ? '#f59e0b' : '#60a5fa'"
-                :stroke-width="selectedConnection?.id === connection.id ? '4' : '3'"
+                :stroke="connectionManager.getConnectionStyle(connection).stroke"
+                :stroke-width="connectionManager.getConnectionStyle(connection).strokeWidth"
                 fill="none"
                 class="connection-path cursor-pointer"
                 style="pointer-events: all;"
@@ -451,44 +451,288 @@ const deleteNode = (nodeId: string) => {
   console.log('节点已删除:', nodeId)
 }
 
-// 连接状态
-const isConnecting = ref(false)
-const connectionStart = ref<{ nodeId: string, port: string, type: 'input' | 'output' } | null>(null)
-const tempConnection = ref<{ x1: number, y1: number, x2: number, y2: number, isHoveringPort?: boolean } | null>(null)
-const selectedConnection = ref<Connection | null>(null)
-const isDraggingConnection = ref(false)
-const draggingConnectionEnd = ref<'from' | 'to' | null>(null)
-
-const startConnection = (nodeId: string, port: string, type: 'input' | 'output') => {
-  // 只处理开始连接，不处理完成连接（完成连接由mouseup事件处理）
-  if (!isConnecting.value) {
-    // 开始连接
-    isConnecting.value = true
-    connectionStart.value = { nodeId, port, type }
-    
-    // 计算起始位置
-    const node = workflowNodes.value.find(n => n.id === nodeId)
-    if (node && isFinite(node.x) && isFinite(node.y)) {
-      // 修复portIndex计算，确保不会是-1
-      let portIndex = 0
-      if (type === 'input' && node.inputs) {
-        const index = node.inputs.indexOf(port)
-        portIndex = index >= 0 ? index : 0
-      } else if (type === 'output' && node.outputs) {
-        const index = node.outputs.indexOf(port)
-        portIndex = index >= 0 ? index : 0
+// 连接线管理系统
+class ConnectionManager {
+  // 连接状态
+  isConnecting = ref(false)
+  connectionStart = ref<{ nodeId: string, port: string, type: 'input' | 'output' } | null>(null)
+  tempConnection = ref<{ x1: number, y1: number, x2: number, y2: number, isHoveringPort?: boolean } | null>(null)
+  selectedConnection = ref<Connection | null>(null)
+  isDraggingConnection = ref(false)
+  draggingConnectionEnd = ref<'from' | 'to' | null>(null)
+  
+  // 连接线样式配置
+  styles = {
+    normal: { stroke: '#60a5fa', strokeWidth: 3 },
+    selected: { stroke: '#f59e0b', strokeWidth: 4 },
+    hover: { stroke: '#3b82f6', strokeWidth: 3.5 }
+  }
+  
+  constructor() {
+    this.setupEventListeners()
+  }
+  
+  // 设置事件监听
+  setupEventListeners() {
+    // 键盘事件监听
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (this.selectedConnection.value) {
+          this.deleteConnection(this.selectedConnection.value.id)
+          event.preventDefault()
+        }
       }
+      if (event.key === 'Escape') {
+        this.cancelConnection()
+        this.clearSelection()
+      }
+    }
+    
+    document.addEventListener('keydown', handleKeyDown)
+    
+    // 清理函数
+    onUnmounted(() => {
+      document.removeEventListener('keydown', handleKeyDown)
+    })
+  }
+  
+  // 开始连接
+  startConnection(nodeId: string, port: string, type: 'input' | 'output') {
+    if (!this.isConnecting.value) {
+      this.isConnecting.value = true
+      this.connectionStart.value = { nodeId, port, type }
+      this.clearSelection()
       
-      // 计算端口的实际中心位置（与端口样式完全对齐）
-      const x = type === 'output' ? node.x + 200 + 2 + 8 : node.x - 16 + 8 // 端口中心位置
-      const y = node.y + 20 + portIndex * 30 + 8 // 端口顶部位置 + 端口半径8px
-      
-      // 验证计算出的坐标
-      if (isFinite(x) && isFinite(y)) {
-        tempConnection.value = { x1: x, y1: y, x2: x, y2: y, isHoveringPort: false }
+      const startPos = this.getPortPosition(nodeId, port, type)
+      if (startPos) {
+        this.tempConnection.value = {
+          x1: startPos.x,
+          y1: startPos.y,
+          x2: startPos.x,
+          y2: startPos.y
+        }
       }
     }
   }
+  
+  // 完成连接
+  completeConnection(targetNodeId: string, targetPort: string, targetType: 'input' | 'output') {
+    if (!this.isConnecting.value || !this.connectionStart.value) return false
+    
+    const start = this.connectionStart.value
+    
+    // 验证连接规则
+    if (!this.validateConnection(start, { nodeId: targetNodeId, port: targetPort, type: targetType })) {
+      this.cancelConnection()
+      return false
+    }
+    
+    // 创建新连接
+    const newConnection = this.createConnection(start, targetNodeId, targetPort, targetType)
+    if (newConnection) {
+      connections.value.push(newConnection)
+      currentWorkflow.connections = [...connections.value]
+      
+      // 如果是拖拽重连，选中新连接
+      if (this.isDraggingConnection.value) {
+        this.selectedConnection.value = newConnection
+      }
+    }
+    
+    this.resetConnectionState()
+    return true
+  }
+  
+  // 验证连接规则
+  validateConnection(start: any, target: any): boolean {
+    // 不能连接到自己
+    if (start.nodeId === target.nodeId) return false
+    
+    // 输入只能连接到输出，输出只能连接到输入
+    if (start.type === target.type) return false
+    
+    // 检查是否已存在相同连接
+    const fromNode = start.type === 'output' ? start.nodeId : target.nodeId
+    const toNode = start.type === 'output' ? target.nodeId : start.nodeId
+    const fromPort = start.type === 'output' ? start.port : target.port
+    const toPort = start.type === 'output' ? target.port : start.port
+    
+    return !connections.value.some(conn => 
+      conn.from === fromNode && conn.to === toNode && 
+      conn.fromPort === fromPort && conn.toPort === toPort
+    )
+  }
+  
+  // 创建连接
+  createConnection(start: any, targetNodeId: string, targetPort: string, targetType: 'input' | 'output'): Connection | null {
+    const fromNode = start.type === 'output' ? start.nodeId : targetNodeId
+    const toNode = start.type === 'output' ? targetNodeId : start.nodeId
+    const fromPort = start.type === 'output' ? start.port : targetPort
+    const toPort = start.type === 'output' ? targetPort : start.port
+    
+    return {
+      id: `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      from: fromNode,
+      to: toNode,
+      fromPort: fromPort,
+      toPort: toPort
+    }
+  }
+  
+  // 选中连接
+  selectConnection(connection: Connection, event?: MouseEvent) {
+    if (event) {
+      event.stopPropagation()
+    }
+    this.selectedConnection.value = connection
+    selectedNode.value = null
+  }
+  
+  // 删除连接
+  deleteConnection(connectionId: string) {
+    const index = connections.value.findIndex(c => c.id === connectionId)
+    if (index > -1) {
+      connections.value.splice(index, 1)
+      currentWorkflow.connections = [...connections.value]
+      
+      // 如果删除的是选中的连接，清除选中状态
+      if (this.selectedConnection.value?.id === connectionId) {
+        this.selectedConnection.value = null
+      }
+    }
+  }
+  
+  // 开始拖拽重连
+  startConnectionDrag(connection: Connection, endpoint: 'from' | 'to', event: MouseEvent) {
+    event.stopPropagation()
+    
+    // 删除原连接
+    this.deleteConnection(connection.id)
+    
+    // 设置拖拽状态
+    this.isDraggingConnection.value = true
+    this.draggingConnectionEnd.value = endpoint
+    
+    // 根据拖拽的端点确定连接起始信息
+    if (endpoint === 'from') {
+      this.connectionStart.value = {
+        nodeId: connection.to,
+        port: connection.toPort,
+        type: 'input'
+      }
+    } else {
+      this.connectionStart.value = {
+        nodeId: connection.from,
+        port: connection.fromPort,
+        type: 'output'
+      }
+    }
+    
+    this.isConnecting.value = true
+    
+    // 设置临时连接线起始位置
+    const startPos = this.getPortPosition(
+      this.connectionStart.value.nodeId,
+      this.connectionStart.value.port,
+      this.connectionStart.value.type
+    )
+    
+    if (startPos) {
+      this.tempConnection.value = {
+        x1: startPos.x,
+        y1: startPos.y,
+        x2: event.clientX,
+        y2: event.clientY
+      }
+    }
+  }
+  
+  // 更新临时连接线
+  updateTempConnection(x: number, y: number, isHoveringPort = false) {
+    if (this.tempConnection.value) {
+      this.tempConnection.value.x2 = x
+      this.tempConnection.value.y2 = y
+      this.tempConnection.value.isHoveringPort = isHoveringPort
+    }
+  }
+  
+  // 取消连接
+  cancelConnection() {
+    this.resetConnectionState()
+  }
+  
+  // 清除选中状态
+  clearSelection() {
+    this.selectedConnection.value = null
+  }
+  
+  // 重置连接状态
+  resetConnectionState() {
+    this.isConnecting.value = false
+    this.connectionStart.value = null
+    this.tempConnection.value = null
+    this.isDraggingConnection.value = false
+    this.draggingConnectionEnd.value = null
+  }
+  
+  // 获取端口位置
+  getPortPosition(nodeId: string, port: string, type: 'input' | 'output') {
+    const node = workflowNodes.value.find(n => n.id === nodeId)
+    if (!node) return null
+    
+    const nodeWidth = 200
+    const nodeHeight = 120
+    const portSize = 12
+    
+    let portIndex = 0
+    if (type === 'input' && node.inputs) {
+      const index = node.inputs.indexOf(port)
+      portIndex = index >= 0 ? index : 0
+    } else if (type === 'output' && node.outputs) {
+      const index = node.outputs.indexOf(port)
+      portIndex = index >= 0 ? index : 0
+    }
+    
+    const portSpacing = 30
+    const startY = node.y + 40
+    
+    return {
+      x: type === 'input' ? node.x : node.x + nodeWidth,
+      y: startY + portIndex * portSpacing + portSize / 2
+    }
+  }
+  
+  // 获取连接线端点坐标
+  getConnectionEndpoint(connection: Connection, endpoint: 'from' | 'to') {
+    if (endpoint === 'from') {
+      return this.getPortPosition(connection.from, connection.fromPort, 'output') || { x: 0, y: 0 }
+    } else {
+      return this.getPortPosition(connection.to, connection.toPort, 'input') || { x: 0, y: 0 }
+    }
+  }
+  
+  // 获取连接线样式
+  getConnectionStyle(connection: Connection) {
+    if (this.selectedConnection.value?.id === connection.id) {
+      return this.styles.selected
+    }
+    return this.styles.normal
+  }
+}
+
+// 创建连接管理器实例
+const connectionManager = new ConnectionManager()
+
+// 导出响应式状态供模板使用
+const isConnecting = connectionManager.isConnecting
+const connectionStart = connectionManager.connectionStart
+const tempConnection = connectionManager.tempConnection
+const selectedConnection = connectionManager.selectedConnection
+const isDraggingConnection = connectionManager.isDraggingConnection
+const draggingConnectionEnd = connectionManager.draggingConnectionEnd
+
+const startConnection = (nodeId: string, port: string, type: 'input' | 'output') => {
+  connectionManager.startConnection(nodeId, port, type)
 }
 
 const updateSelectedNode = (updates: Partial<WorkflowNode>) => {
@@ -699,14 +943,11 @@ const onCanvasMouseUp = (event: MouseEvent) => {
 
 const onCanvasClick = (event: MouseEvent) => {
   if (isConnecting.value) {
-    // 取消连接
-    isConnecting.value = false
-    connectionStart.value = null
-    tempConnection.value = null
+    connectionManager.cancelConnection()
   }
   // 点击空白区域取消选中
   selectedNode.value = null
-  selectedConnection.value = null
+  connectionManager.clearSelection()
 }
 
 const getTempConnectionPath = () => {
@@ -797,69 +1038,25 @@ const getPortAtPosition = (x: number, y: number) => {
 }
 
 const selectConnection = (connection: Connection, event: MouseEvent) => {
-  console.log('selectConnection 被调用:', connection.id)
-  event.stopPropagation()
-  selectedConnection.value = connection
-  selectedNode.value = null // 取消节点选中
-  console.log('连接已选中:', connection.id, selectedConnection.value)
+  connectionManager.selectConnection(connection, event)
 }
 
 const deleteConnection = (connectionId: string) => {
-  const index = connections.value.findIndex(c => c.id === connectionId)
-  if (index > -1) {
-    connections.value.splice(index, 1)
-    // 同步到当前工作流
-    currentWorkflow.connections = [...connections.value]
-    console.log('连接已删除:', connectionId)
-  }
+  connectionManager.deleteConnection(connectionId)
 }
 
 const deleteSelectedConnection = () => {
-  console.log('deleteSelectedConnection 被调用, selectedConnection:', selectedConnection.value)
   if (selectedConnection.value) {
-    const connectionId = selectedConnection.value.id
-    deleteConnection(connectionId)
-    selectedConnection.value = null
-    console.log('连接删除完成, connectionId:', connectionId)
-  } else {
-    console.log('没有选中的连接可删除')
+    connectionManager.deleteConnection(selectedConnection.value.id)
   }
 }
 
 const startConnectionDrag = (connection: Connection, end: 'from' | 'to', event: MouseEvent) => {
-  event.stopPropagation()
-  selectedConnection.value = connection
-  isDraggingConnection.value = true
-  draggingConnectionEnd.value = end
-  
-  // 删除原连接
-  deleteConnection(connection.id)
-  
-  // 开始新的连接
-  const sourceEnd = end === 'from' ? 'to' : 'from'
-  const sourceNodeId = sourceEnd === 'from' ? connection.from : connection.to
-  const sourcePort = sourceEnd === 'from' ? connection.fromPort : connection.toPort
-  const sourceType = sourceEnd === 'from' ? 'output' : 'input'
-  
-  startConnection(sourceNodeId, sourcePort, sourceType)
+  connectionManager.startConnectionDrag(connection, end, event)
 }
 
 const getConnectionEndpoint = (connection: Connection, end: 'from' | 'to') => {
-  const nodeId = end === 'from' ? connection.from : connection.to
-  const port = end === 'from' ? connection.fromPort : connection.toPort
-  const type = end === 'from' ? 'output' : 'input'
-  
-  const node = workflowNodes.value.find(n => n.id === nodeId)
-  if (!node) return { x: 0, y: 0 }
-  
-  const portIndex = type === 'input' 
-    ? (node.inputs?.indexOf(port) || 0) 
-    : (node.outputs?.indexOf(port) || 0)
-  
-  const x = type === 'output' ? node.x + 200 + 2 + 8 : node.x - 16 + 8
-  const y = node.y + 20 + portIndex * 30 + 8
-  
-  return { x, y }
+  return connectionManager.getConnectionEndpoint(connection, end)
 }
 
 const onDragOver = (event: DragEvent) => {
@@ -934,50 +1131,25 @@ onMounted(() => {
     }
     
     // 鼠标在画布外，直接跟随鼠标位置
-    tempConnection.value.x2 = mouseX
-    tempConnection.value.y2 = mouseY
-    tempConnection.value.isHoveringPort = false
+    connectionManager.updateTempConnection(mouseX, mouseY, false)
   }
   
   const handleGlobalMouseUp = () => {
     if (isConnecting.value) {
       // 在画布外释放鼠标，取消连接
-      isConnecting.value = false
-      connectionStart.value = null
-      tempConnection.value = null
-    }
-    
-    // 重置拖拽状态
-    if (isDraggingConnection.value) {
-      isDraggingConnection.value = false
-      draggingConnectionEnd.value = null
+      connectionManager.cancelConnection()
     }
   }
   
   document.addEventListener('mousemove', handleGlobalMouseMove)
   document.addEventListener('mouseup', handleGlobalMouseUp)
   
-  // 添加键盘事件监听
-  const handleKeyDown = (event: KeyboardEvent) => {
-    console.log('键盘事件:', event.key, 'selectedConnection:', selectedConnection.value)
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      if (selectedConnection.value) {
-        console.log('删除选中的连接:', selectedConnection.value.id)
-        deleteSelectedConnection()
-        event.preventDefault()
-      } else {
-        console.log('没有选中的连接可删除')
-      }
-    }
-  }
-  
-  document.addEventListener('keydown', handleKeyDown)
+  // 键盘事件处理已移至ConnectionManager中
   
   // 清理事件监听器和动画帧
   onUnmounted(() => {
     document.removeEventListener('mousemove', handleGlobalMouseMove)
     document.removeEventListener('mouseup', handleGlobalMouseUp)
-    document.removeEventListener('keydown', handleKeyDown)
     if (updateAnimationFrame) {
       cancelAnimationFrame(updateAnimationFrame)
       updateAnimationFrame = null
