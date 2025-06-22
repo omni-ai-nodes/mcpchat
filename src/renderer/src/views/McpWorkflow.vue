@@ -143,6 +143,8 @@
               :key="node.id"
               :node="node"
               :is-selected="selectedNode?.id === node.id"
+              :is-connecting="isConnecting"
+              :connection-start="connectionStart"
               @select="selectNode"
               @delete="deleteNode"
               @update="updateNode"
@@ -165,18 +167,29 @@
               stroke-width="3"
               fill="none"
               marker-end="url(#arrowhead)"
-              class="cursor-pointer hover:stroke-red-400"
+              class="connection-path cursor-pointer"
               @click="deleteConnection(connection.id)"
             />
             <!-- 临时连接线 -->
             <path 
               v-if="tempConnection"
               :d="getTempConnectionPath()"
-              stroke="#60a5fa"
-              stroke-width="2"
+              :stroke="tempConnection.isHoveringPort ? '#10b981' : '#60a5fa'"
+              :stroke-width="tempConnection.isHoveringPort ? '3' : '2'"
               fill="none"
-              stroke-dasharray="5,5"
-              opacity="0.7"
+              :stroke-dasharray="tempConnection.isHoveringPort ? 'none' : '5,5'"
+              :opacity="tempConnection.isHoveringPort ? '0.9' : '0.7'"
+              class="temp-connection"
+            />
+            <!-- 临时连接线的端点指示器 -->
+            <circle 
+              v-if="tempConnection"
+              :cx="tempConnection.x2"
+              :cy="tempConnection.y2"
+              :r="tempConnection.isHoveringPort ? '6' : '4'"
+              :fill="tempConnection.isHoveringPort ? '#10b981' : '#60a5fa'"
+              :opacity="tempConnection.isHoveringPort ? '0.9' : '0.6'"
+              class="connection-endpoint"
             />
           </svg>
 
@@ -382,12 +395,18 @@ const addNode = (template: NodeTemplate) => {
   
   workflowNodes.value.push(newNode)
   selectedNode.value = newNode
+  
+  // 同步到当前工作流
+  currentWorkflow.nodes = [...workflowNodes.value]
+  console.log('节点已添加:', newNode)
 }
 
 const updateNode = (nodeId: string, updates: Partial<WorkflowNode>) => {
   const nodeIndex = workflowNodes.value.findIndex(n => n.id === nodeId)
   if (nodeIndex !== -1) {
     workflowNodes.value[nodeIndex] = { ...workflowNodes.value[nodeIndex], ...updates }
+    // 同步到当前工作流
+    currentWorkflow.nodes = [...workflowNodes.value]
   }
 }
 
@@ -397,12 +416,17 @@ const deleteNode = (nodeId: string) => {
   if (selectedNode.value?.id === nodeId) {
     selectedNode.value = null
   }
+  
+  // 同步到当前工作流
+  currentWorkflow.nodes = [...workflowNodes.value]
+  currentWorkflow.connections = [...connections.value]
+  console.log('节点已删除:', nodeId)
 }
 
 // 连接状态
 const isConnecting = ref(false)
 const connectionStart = ref<{ nodeId: string, port: string, type: 'input' | 'output' } | null>(null)
-const tempConnection = ref<{ x1: number, y1: number, x2: number, y2: number } | null>(null)
+const tempConnection = ref<{ x1: number, y1: number, x2: number, y2: number, isHoveringPort?: boolean } | null>(null)
 
 const startConnection = (nodeId: string, port: string, type: 'input' | 'output') => {
   // 只处理开始连接，不处理完成连接（完成连接由mouseup事件处理）
@@ -413,11 +437,24 @@ const startConnection = (nodeId: string, port: string, type: 'input' | 'output')
     
     // 计算起始位置
     const node = workflowNodes.value.find(n => n.id === nodeId)
-    if (node) {
-      const portIndex = type === 'input' ? (node.inputs?.indexOf(port) || 0) : (node.outputs?.indexOf(port) || 0)
+    if (node && isFinite(node.x) && isFinite(node.y)) {
+      // 修复portIndex计算，确保不会是-1
+      let portIndex = 0
+      if (type === 'input' && node.inputs) {
+        const index = node.inputs.indexOf(port)
+        portIndex = index >= 0 ? index : 0
+      } else if (type === 'output' && node.outputs) {
+        const index = node.outputs.indexOf(port)
+        portIndex = index >= 0 ? index : 0
+      }
+      
       const x = type === 'output' ? node.x + 200 : node.x
       const y = node.y + 20 + portIndex * 30
-      tempConnection.value = { x1: x, y1: y, x2: x, y2: y }
+      
+      // 验证计算出的坐标
+      if (isFinite(x) && isFinite(y)) {
+        tempConnection.value = { x1: x, y1: y, x2: x, y2: y, isHoveringPort: false }
+      }
     }
   }
 }
@@ -442,13 +479,32 @@ const getConnectionPath = (connection: Connection) => {
   const toX = toNode.x           // 输入端口在左侧
   const toY = toNode.y + 40
   
+  // 验证坐标值是否有效
+  if (!isFinite(fromX) || !isFinite(fromY) || !isFinite(toX) || !isFinite(toY)) {
+    return ''
+  }
+  
   // 创建更自然的贝塞尔曲线
-  const distance = Math.abs(toX - fromX)
-  const controlOffset = Math.min(distance * 0.5, 100)
-  const cp1X = fromX + controlOffset
-  const cp1Y = fromY
-  const cp2X = toX - controlOffset
-  const cp2Y = toY
+  const deltaX = toX - fromX
+  const deltaY = toY - fromY
+  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+  
+  // 防止除零错误
+  if (distance === 0) {
+    return `M ${fromX} ${fromY} L ${toX} ${toY}`
+  }
+  
+  // 根据距离和方向动态调整控制点
+  const baseOffset = Math.min(distance * 0.4, 120)
+  const verticalInfluence = Math.abs(deltaY) / distance
+  const controlOffset = baseOffset * (1 + verticalInfluence * 0.2)
+  
+  // 处理反向连接的情况
+  const isReverse = deltaX < 0
+  const cp1X = fromX + (isReverse ? Math.min(controlOffset, 80) : controlOffset)
+  const cp1Y = fromY + deltaY * 0.05
+  const cp2X = toX - (isReverse ? Math.min(controlOffset, 80) : controlOffset)
+  const cp2Y = toY - deltaY * 0.05
   
   return `M ${fromX} ${fromY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${toX} ${toY}`
 }
@@ -485,6 +541,10 @@ const onDrop = (event: DragEvent) => {
         }
         workflowNodes.value.push(newNode)
         selectedNode.value = newNode
+        
+        // 同步到当前工作流
+        currentWorkflow.nodes = [...workflowNodes.value]
+        console.log('拖拽添加节点:', newNode)
       }
     }
   }
@@ -510,14 +570,18 @@ const onCanvasMouseMove = (event: MouseEvent) => {
           const portY = node.y + 20 + portIndex * 30
           tempConnection.value.x2 = portX
           tempConnection.value.y2 = portY
+          // 添加端口高亮效果
+          tempConnection.value.isHoveringPort = true
         }
       } else {
         tempConnection.value.x2 = mouseX
         tempConnection.value.y2 = mouseY
+        tempConnection.value.isHoveringPort = false
       }
     } else {
       tempConnection.value.x2 = mouseX
       tempConnection.value.y2 = mouseY
+      tempConnection.value.isHoveringPort = false
     }
   }
 }
@@ -531,15 +595,32 @@ const onCanvasMouseUp = (event: MouseEvent) => {
     // 检测是否在端口上释放
     const hoveredPort = getPortAtPosition(mouseX, mouseY)
     if (hoveredPort && connectionStart.value.nodeId !== hoveredPort.nodeId && connectionStart.value.type !== hoveredPort.type) {
-      // 建立连接
-      const newConnection: Connection = {
-        id: `conn_${Date.now()}`,
-        from: connectionStart.value.type === 'output' ? connectionStart.value.nodeId : hoveredPort.nodeId,
-        to: connectionStart.value.type === 'output' ? hoveredPort.nodeId : connectionStart.value.nodeId,
-        fromPort: connectionStart.value.type === 'output' ? connectionStart.value.port : hoveredPort.port,
-        toPort: connectionStart.value.type === 'output' ? hoveredPort.port : connectionStart.value.port
+      // 检查是否已存在相同连接
+      const existingConnection = connections.value.find(conn => {
+        const fromNode = connectionStart.value.type === 'output' ? connectionStart.value.nodeId : hoveredPort.nodeId
+        const toNode = connectionStart.value.type === 'output' ? hoveredPort.nodeId : connectionStart.value.nodeId
+        const fromPort = connectionStart.value.type === 'output' ? connectionStart.value.port : hoveredPort.port
+        const toPort = connectionStart.value.type === 'output' ? hoveredPort.port : connectionStart.value.port
+        
+        return conn.from === fromNode && conn.to === toNode && conn.fromPort === fromPort && conn.toPort === toPort
+      })
+      
+      if (!existingConnection) {
+        // 建立新连接
+        const newConnection: Connection = {
+          id: `conn_${Date.now()}`,
+          from: connectionStart.value.type === 'output' ? connectionStart.value.nodeId : hoveredPort.nodeId,
+          to: connectionStart.value.type === 'output' ? hoveredPort.nodeId : connectionStart.value.nodeId,
+          fromPort: connectionStart.value.type === 'output' ? connectionStart.value.port : hoveredPort.port,
+          toPort: connectionStart.value.type === 'output' ? hoveredPort.port : connectionStart.value.port
+        }
+        connections.value.push(newConnection)
+        
+        // 同步到当前工作流
+        currentWorkflow.connections = [...connections.value]
+        
+        console.log('连接已建立:', newConnection)
       }
-      connections.value.push(newConnection)
     }
     
     // 重置连接状态
@@ -562,13 +643,31 @@ const getTempConnectionPath = () => {
   if (!tempConnection.value) return ''
   const { x1, y1, x2, y2 } = tempConnection.value
   
-  // 创建与正式连接线相同的贝塞尔曲线
-  const distance = Math.abs(x2 - x1)
-  const controlOffset = Math.min(distance * 0.5, 100)
+  // 验证坐标值是否有效
+  if (!isFinite(x1) || !isFinite(y1) || !isFinite(x2) || !isFinite(y2)) {
+    return ''
+  }
+  
+  // 创建更自然的贝塞尔曲线，根据距离和方向调整控制点
+  const deltaX = x2 - x1
+  const deltaY = y2 - y1
+  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+  
+  // 防止除零错误
+  if (distance === 0) {
+    return `M ${x1} ${y1} L ${x2} ${y2}`
+  }
+  
+  // 动态调整控制点偏移量
+  const baseOffset = Math.min(distance * 0.4, 120)
+  const verticalInfluence = Math.abs(deltaY) / distance
+  const controlOffset = baseOffset * (1 + verticalInfluence * 0.3)
+  
+  // 根据连接方向调整控制点
   const cp1X = x1 + controlOffset
-  const cp1Y = y1
+  const cp1Y = y1 + deltaY * 0.1 // 轻微跟随垂直方向
   const cp2X = x2 - controlOffset
-  const cp2Y = y2
+  const cp2Y = y2 - deltaY * 0.1
   
   return `M ${x1} ${y1} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${x2} ${y2}`
 }
@@ -606,6 +705,9 @@ const deleteConnection = (connectionId: string) => {
   const index = connections.value.findIndex(c => c.id === connectionId)
   if (index > -1) {
     connections.value.splice(index, 1)
+    // 同步到当前工作流
+    currentWorkflow.connections = [...connections.value]
+    console.log('连接已删除:', connectionId)
   }
 }
 
@@ -614,18 +716,55 @@ const onDragOver = (event: DragEvent) => {
 }
 
 const saveWorkflow = () => {
-  console.log('保存工作流')
-  // TODO: 保存工作流
+  // 更新当前工作流数据
+  currentWorkflow.nodes = [...workflowNodes.value]
+  currentWorkflow.connections = [...connections.value]
+  
+  console.log('保存工作流:', {
+    name: currentWorkflow.name || '未命名工作流',
+    nodes: currentWorkflow.nodes.length,
+    connections: currentWorkflow.connections.length,
+    data: currentWorkflow
+  })
+  
+  // TODO: 实现实际的保存逻辑（保存到本地存储或服务器）
+  alert(`工作流已保存！\n节点数量: ${currentWorkflow.nodes.length}\n连接数量: ${currentWorkflow.connections.length}`)
 }
 
 const runWorkflow = () => {
-  console.log('运行工作流')
-  // TODO: 运行工作流
+  if (workflowNodes.value.length === 0) {
+    alert('工作流为空，请先添加节点')
+    return
+  }
+  
+  console.log('运行工作流:', {
+    nodes: workflowNodes.value,
+    connections: connections.value
+  })
+  
+  // TODO: 实现工作流执行逻辑
+  alert(`开始运行工作流...\n节点数量: ${workflowNodes.value.length}\n连接数量: ${connections.value.length}`)
 }
 
 const deployWorkflow = () => {
-  console.log('部署工作流')
-  // TODO: 部署工作流
+  if (workflowNodes.value.length === 0) {
+    alert('工作流为空，请先添加节点')
+    return
+  }
+  
+  if (connections.value.length === 0) {
+    alert('工作流没有连接，请先连接节点')
+    return
+  }
+  
+  console.log('部署工作流:', {
+    name: currentWorkflow.name || '未命名工作流',
+    nodes: workflowNodes.value,
+    connections: connections.value
+  })
+  
+  // TODO: 实现工作流部署逻辑
+  alert(`工作流部署成功！\n名称: ${currentWorkflow.name || '未命名工作流'}\n节点数量: ${workflowNodes.value.length}\n连接数量: ${connections.value.length}`)
 }
 </script>
 
@@ -803,11 +942,56 @@ const deployWorkflow = () => {
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s;
+  position: relative;
+  z-index: 10;
 }
 
 .port:hover {
   background: #93c5fd;
   transform: scale(1.2);
+  box-shadow: 0 0 8px rgba(96, 165, 250, 0.6);
+}
+
+.port.connecting {
+  background: #10b981;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.8);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+/* 连接线动画 */
+.connection-path {
+  fill: none;
+  stroke: #60a5fa;
+  stroke-width: 2;
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+.connection-path:hover {
+  stroke: #ef4444;
+  stroke-width: 3;
+  opacity: 1;
+}
+
+/* 临时连接线样式 */
+.temp-connection {
+  transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
+}
+
+/* 端点指示器动画 */
+.connection-endpoint {
+  transition: all 0.2s ease;
 }
 
 .connections-svg {

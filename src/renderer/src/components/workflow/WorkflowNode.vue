@@ -15,6 +15,10 @@
         v-for="(input, index) in node.inputs" 
         :key="input"
         class="port input-port"
+        :class="{ 
+          'connecting': isPortHighlighted(input, 'input'),
+          'connectable': props.isConnecting && props.connectionStart?.nodeId !== props.node.id && props.connectionStart?.type === 'output'
+        }"
         :style="{ top: `${20 + index * 30}px` }"
         @mousedown.stop="startPortDrag(input, 'input', $event)"
         @mouseup.stop="endPortDrag(input, 'input', $event)"
@@ -31,6 +35,10 @@
         v-for="(output, index) in node.outputs" 
         :key="output"
         class="port output-port"
+        :class="{ 
+          'connecting': isPortHighlighted(output, 'output'),
+          'connectable': props.isConnecting && props.connectionStart?.nodeId !== props.node.id && props.connectionStart?.type === 'input'
+        }"
         :style="{ top: `${20 + index * 30}px` }"
         @mousedown.stop="startPortDrag(output, 'output', $event)"
         @mouseup.stop="endPortDrag(output, 'output', $event)"
@@ -78,6 +86,8 @@ interface WorkflowNode {
 interface Props {
   node: WorkflowNode
   isSelected?: boolean
+  isConnecting?: boolean
+  connectionStart?: { nodeId: string, port: string, type: 'input' | 'output' } | null
 }
 
 const props = defineProps<Props>()
@@ -157,6 +167,26 @@ const endPortDrag = (port: string, type: 'input' | 'output', event: MouseEvent) 
   event.preventDefault()
   event.stopPropagation()
   // 端口的mouseup事件由画布处理，这里不需要额外处理
+}
+
+// 检查端口是否应该高亮
+const isPortHighlighted = (port: string, type: 'input' | 'output') => {
+  if (!props.isConnecting || !props.connectionStart) return false
+  
+  // 如果是连接起始端口，显示连接状态
+  if (props.connectionStart.nodeId === props.node.id && 
+      props.connectionStart.port === port && 
+      props.connectionStart.type === type) {
+    return true
+  }
+  
+  // 如果是可连接的目标端口（不同节点，不同类型），显示高亮
+  if (props.connectionStart.nodeId !== props.node.id && 
+      props.connectionStart.type !== type) {
+    return true
+  }
+  
+  return false
 }
 </script>
 
@@ -275,5 +305,32 @@ const endPortDrag = (port: string, type: 'input' | 'output', event: MouseEvent) 
 
 .output-port {
   background: #f59e0b;
+}
+
+.port.connecting {
+  background: #10b981;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.8);
+  animation: pulse 1.5s infinite;
+}
+
+.port.connectable {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+  transform: scale(1.1);
+}
+
+.port.connectable:hover {
+  background: #fbbf24;
+  transform: scale(1.3);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.8);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 </style>
