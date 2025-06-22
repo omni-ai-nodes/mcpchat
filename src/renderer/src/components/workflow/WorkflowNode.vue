@@ -94,6 +94,10 @@ const isDragging = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
 const nodeStart = ref({ x: 0, y: 0 })
 
+// 节点拖拽更新节流控制
+let lastDragUpdate = 0
+const DRAG_UPDATE_THROTTLE = 16 // 约60fps的更新频率
+
 const getNodeIcon = (type: string) => {
   const iconMap: Record<string, string> = {
     'file-input': '📁',
@@ -140,7 +144,12 @@ const onDrag = (event: MouseEvent) => {
   const newX = nodeStart.value.x + deltaX
   const newY = nodeStart.value.y + deltaY
   
-  emit('update', props.node.id, { x: newX, y: newY })
+  // 使用节流控制，确保流畅的拖拽体验同时避免过度更新
+  const now = Date.now()
+  if (now - lastDragUpdate >= DRAG_UPDATE_THROTTLE) {
+    emit('update', props.node.id, { x: newX, y: newY })
+    lastDragUpdate = now
+  }
 }
 
 const stopDrag = () => {

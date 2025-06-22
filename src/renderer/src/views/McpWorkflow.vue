@@ -297,6 +297,10 @@ const currentWorkflow = reactive<CurrentWorkflow>({
   connections: []
 })
 
+// 画布缩放和偏移
+const scale = ref(1)
+const offset = ref({ x: 0, y: 0 })
+
 // 节点模板
 const inputNodes: NodeTemplate[] = [
   {
@@ -429,15 +433,36 @@ const updateNode = (nodeId: string, updates: Partial<WorkflowNode>) => {
     // 同步到当前工作流
     currentWorkflow.nodes = [...workflowNodes.value]
     
-    // 使用 requestAnimationFrame 优化连接线重绘
-    if (updateAnimationFrame) {
-      cancelAnimationFrame(updateAnimationFrame)
+    // 如果是位置更新，立即更新节点缓存以确保连接线实时响应
+    if (updates.x !== undefined || updates.y !== undefined) {
+      // 立即更新缓存中的节点边界信息
+      const updatedNode = workflowNodes.value[nodeIndex]
+      const cacheIndex = cachedNodeBounds.findIndex(cache => cache.id === nodeId)
+      if (cacheIndex !== -1) {
+        cachedNodeBounds[cacheIndex].bounds = {
+          left: updatedNode.x - 30,
+          right: updatedNode.x + 250,
+          top: updatedNode.y,
+          bottom: updatedNode.y + 40
+        }
+      }
+      
+      // 对于位置更新，使用节流控制的高频更新
+      const now = Date.now()
+      if (now - lastConnectionUpdate >= CONNECTION_UPDATE_THROTTLE) {
+        connections.value = [...connections.value]
+        lastConnectionUpdate = now
+      }
+    } else {
+      // 对于非位置更新，使用 requestAnimationFrame 优化
+      if (updateAnimationFrame) {
+        cancelAnimationFrame(updateAnimationFrame)
+      }
+      updateAnimationFrame = requestAnimationFrame(() => {
+        connections.value = [...connections.value]
+        updateAnimationFrame = null
+      })
     }
-    updateAnimationFrame = requestAnimationFrame(() => {
-      // 强制触发连接线重新计算
-      connections.value = [...connections.value]
-      updateAnimationFrame = null
-    })
   }
 }
 
@@ -927,8 +952,8 @@ const onCanvasMouseMove = (event: MouseEvent) => {
     lastPortCacheClean = now
   }
   
-  const mouseX = event.clientX - cachedCanvasRect.left
-  const mouseY = event.clientY - cachedCanvasRect.top
+  const mouseX = (event.clientX - cachedCanvasRect.left) / scale.value + offset.value.x
+  const mouseY = (event.clientY - cachedCanvasRect.top) / scale.value + offset.value.y
   
   // 快速检测是否悬停在端口上
   const hoveredPort = getPortAtPosition(mouseX, mouseY)
@@ -987,11 +1012,11 @@ const onCanvasMouseMove = (event: MouseEvent) => {
 const onCanvasMouseUp = (event: MouseEvent) => {
   if (isConnecting.value && connectionStart.value && canvasRef.value) {
     const rect = canvasRef.value.getBoundingClientRect()
-    const mouseX = event.clientX - rect.left
-    const mouseY = event.clientY - rect.top
+    const x = (event.clientX - rect.left) / scale.value + offset.value.x
+    const y = (event.clientY - rect.top) / scale.value + offset.value.y
     
-    // 检测是否在端口上释放
-    const hoveredPort = getPortAtPosition(mouseX, mouseY)
+    // 使用优化后的端口检测，支持更大的检测区域
+    const hoveredPort = getPortAtPosition(x, y)
     if (hoveredPort && connectionStart.value.nodeId !== hoveredPort.nodeId && connectionStart.value.type !== hoveredPort.type) {
       // 检查是否已存在完全相同的连接（相同的起始节点、目标节点和端口）
       const fromNode = connectionStart.value.type === 'output' ? connectionStart.value.nodeId : hoveredPort.nodeId
@@ -1004,25 +1029,30 @@ const onCanvasMouseUp = (event: MouseEvent) => {
       )
       
       if (!existingConnection) {
-        // 建立新连接
-        const newConnection: Connection = {
-          id: `conn_${Date.now()}`,
-          from: fromNode,
-          to: toNode,
-          fromPort: fromPort,
-          toPort: toPort
+          // 建立新连接
+          const newConnection: Connection = {
+            id: `conn_${Date.now()}`,
+            from: fromNode,
+            to: toNode,
+            fromPort: fromPort,
+            toPort: toPort
+          }
+          connections.value.push(newConnection)
+          
+          // 立即同步到当前工作流，避免延迟
+          currentWorkflow.connections = [...connections.value]
+          console.log('连接已建立:', newConnection)
+          
+          // 如果是拖拽重连，选中新连接
+          if (isDraggingConnection.value) {
+            selectedConnection.value = newConnection
+          }
+          
+          // 立即触发连接线重绘，确保视觉反馈即时
+          nextTick(() => {
+            connections.value = [...connections.value]
+          })
         }
-        connections.value.push(newConnection)
-        
-        // 同步到当前工作流
-        currentWorkflow.connections = [...connections.value]
-        console.log('连接已建立:', newConnection)
-        
-        // 如果是拖拽重连，选中新连接
-        if (isDraggingConnection.value) {
-          selectedConnection.value = newConnection
-        }
-      }
     }
     
     // 重置连接状态
@@ -1082,6 +1112,10 @@ const getTempConnectionPath = () => {
 let cachedNodeBounds: Array<{id: string, bounds: {left: number, right: number, top: number, bottom: number}, hasInputs: boolean, hasOutputs: boolean}> = []
 let lastNodeCacheUpdate = 0
 
+// 连接线更新节流控制
+let lastConnectionUpdate = 0
+const CONNECTION_UPDATE_THROTTLE = 16 // 约60fps的更新频率
+
 const getPortAtPosition = (x: number, y: number) => {
   // 更新节点边界缓存（每100ms更新一次）
   const now = Date.now()
@@ -1089,8 +1123,8 @@ const getPortAtPosition = (x: number, y: number) => {
     cachedNodeBounds = workflowNodes.value.map(node => ({
       id: node.id,
       bounds: {
-        left: node.x - 20,
-        right: node.x + 240,
+        left: node.x - 30,
+        right: node.x + 250,
         top: node.y,
         bottom: node.y + 40
       },
@@ -1113,13 +1147,13 @@ const getPortAtPosition = (x: number, y: number) => {
     const node = workflowNodes.value.find(n => n.id === cachedNode.id)
     if (!node || !isFinite(node.x) || !isFinite(node.y)) continue
     
-    // 检查输入端口区域（左侧区域）
-    if (hasInputs && x >= node.x - 20 && x <= node.x + 60) {
+    // 扩大header-inputs检测区域（左侧区域，包含整个左半部分）
+    if (hasInputs && x >= node.x - 30 && x <= node.x + 110) {
       return { nodeId: node.id, port: node.inputs![0], type: 'input' as const }
     }
     
-    // 检查输出端口区域（右侧区域）
-    if (hasOutputs && x >= node.x + 160 && x <= node.x + 240) {
+    // 扩大header-outputs检测区域（右侧区域，包含整个右半部分）
+    if (hasOutputs && x >= node.x + 110 && x <= node.x + 250) {
       return { nodeId: node.id, port: node.outputs![0], type: 'output' as const }
     }
   }
