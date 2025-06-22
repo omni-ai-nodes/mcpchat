@@ -138,22 +138,8 @@
           @mouseup="onCanvasMouseUp"
           @click="onCanvasClick"
         >
-          <!-- 工作流节点 -->
-          <WorkflowNode
-              v-for="node in workflowNodes"
-              :key="node.id"
-              :node="node"
-              :is-selected="selectedNode?.id === node.id"
-              :is-connecting="isConnecting"
-              :connection-start="connectionStart"
-              @select="selectNode"
-              @delete="deleteNode"
-              @update="updateNode"
-              @start-connection="startConnection"
-            />
-
-          <!-- 连接线 -->
-          <svg class="absolute inset-0 pointer-events-none" style="z-index: 1">
+          <!-- 连接线层 -->
+          <svg class="absolute inset-0 pointer-events-none" style="z-index: 1; width: 100%; height: 100%;">
             <defs>
               <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
                 <polygon points="0 0, 10 3.5, 0 7" fill="#60a5fa" />
@@ -169,6 +155,7 @@
               fill="none"
               marker-end="url(#arrowhead)"
               class="connection-path cursor-pointer"
+              style="pointer-events: stroke;"
               @click="deleteConnection(connection.id)"
             />
             <!-- 临时连接线 -->
@@ -194,12 +181,29 @@
             />
           </svg>
 
-          <!-- 空状态 -->
-          <div v-if="workflowNodes.length === 0" class="absolute inset-0 flex items-center justify-center">
-            <div class="text-center text-muted-foreground">
-              <Icon icon="lucide:workflow" class="w-16 h-16 mx-auto mb-4 opacity-50" />
-              <h3 class="text-lg font-medium mb-2">{{ t('common.mcp.workflow.emptyCanvas') }}</h3>
-              <p class="text-sm">{{ t('common.mcp.workflow.emptyCanvasDesc') }}</p>
+          <!-- 节点层 -->
+          <div class="nodes-container" style="position: relative; z-index: 10; width: 100%; height: 100%;">
+            <!-- 工作流节点 -->
+            <WorkflowNode
+                v-for="node in workflowNodes"
+                :key="node.id"
+                :node="node"
+                :is-selected="selectedNode?.id === node.id"
+                :is-connecting="isConnecting"
+                :connection-start="connectionStart"
+                @select="selectNode"
+                @delete="deleteNode"
+                @update="updateNode"
+                @start-connection="startConnection"
+              />
+            
+            <!-- 空状态 -->
+            <div v-if="workflowNodes.length === 0" class="absolute inset-0 flex items-center justify-center" style="z-index: 5;">
+              <div class="text-center text-muted-foreground">
+                <Icon icon="lucide:workflow" class="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <h3 class="text-lg font-medium mb-2">{{ t('common.mcp.workflow.emptyCanvas') }}</h3>
+                <p class="text-sm">{{ t('common.mcp.workflow.emptyCanvasDesc') }}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -679,14 +683,18 @@ const getTempConnectionPath = () => {
 }
 
 const getPortAtPosition = (x: number, y: number) => {
+  // 扩大检测范围，确保在整个画布区域都能检测到端口
   for (const node of workflowNodes.value) {
+    // 验证节点坐标有效性
+    if (!isFinite(node.x) || !isFinite(node.y)) continue
+    
     // 检查输入端口
     if (node.inputs) {
       for (let i = 0; i < node.inputs.length; i++) {
-        const portX = node.x - 8 // 端口中心位置
-        const portY = node.y + 20 + i * 30
+        const portX = node.x - 6 // 端口中心位置，调整为更精确的位置
+        const portY = node.y + 20 + i * 30 + 6 // 加上端口半径偏移
         const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
-        if (distance <= 12) { // 端口半径范围
+        if (distance <= 15) { // 扩大端口检测范围
           return { nodeId: node.id, port: node.inputs[i], type: 'input' as const }
         }
       }
@@ -695,10 +703,10 @@ const getPortAtPosition = (x: number, y: number) => {
     // 检查输出端口
     if (node.outputs) {
       for (let i = 0; i < node.outputs.length; i++) {
-        const portX = node.x + 208 // 端口中心位置
-        const portY = node.y + 20 + i * 30
+        const portX = node.x + 200 + 6 // 端口中心位置，节点宽度200px
+        const portY = node.y + 20 + i * 30 + 6 // 加上端口半径偏移
         const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
-        if (distance <= 12) { // 端口半径范围
+        if (distance <= 15) { // 扩大端口检测范围
           return { nodeId: node.id, port: node.outputs[i], type: 'output' as const }
         }
       }

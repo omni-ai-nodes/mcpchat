@@ -202,6 +202,7 @@ const isPortHighlighted = (port: string, type: 'input' | 'output') => {
   transition: all 0.2s;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   user-select: none;
+  z-index: 20; /* 确保节点在连接线之上 */
 }
 
 .workflow-node:hover {
@@ -273,6 +274,7 @@ const isPortHighlighted = (port: string, type: 'input' | 'output') => {
   position: absolute;
   top: 0;
   height: 100%;
+  z-index: 25; /* 端口容器的z-index */
 }
 
 .node-input-port {
@@ -292,6 +294,7 @@ const isPortHighlighted = (port: string, type: 'input' | 'output') => {
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s;
+  z-index: 30; /* 确保端口在最上层，便于交互 */
 }
 
 .port:hover {
