@@ -554,7 +554,46 @@ const onCanvasMouseMove = (event: MouseEvent) => {
     // 检测是否悬停在端口上
     const hoveredPort = getPortAtPosition(mouseX, mouseY)
     if (hoveredPort && connectionStart.value) {
-      // 如果悬停在有效端口上，连接到该端口
+      // 如果悬停在有效端口上，立即创建连接
+      const { nodeId, port, type } = hoveredPort
+      if (connectionStart.value.nodeId !== nodeId && connectionStart.value.type !== type) {
+        // 检查是否已存在完全相同的连接
+        const fromNode = connectionStart.value.type === 'output' ? connectionStart.value.nodeId : nodeId
+        const toNode = connectionStart.value.type === 'output' ? nodeId : connectionStart.value.nodeId
+        const fromPort = connectionStart.value.type === 'output' ? connectionStart.value.port : port
+        const toPort = connectionStart.value.type === 'output' ? port : connectionStart.value.port
+        
+        const existingConnection = connections.value.find(conn => 
+          conn.from === fromNode && conn.to === toNode && conn.fromPort === fromPort && conn.toPort === toPort
+        )
+        
+        if (!existingConnection) {
+          // 立即建立新连接
+          const newConnection: Connection = {
+            id: `conn_${Date.now()}`,
+            from: fromNode,
+            to: toNode,
+            fromPort: fromPort,
+            toPort: toPort
+          }
+          connections.value.push(newConnection)
+          
+          // 同步到当前工作流
+          currentWorkflow.connections = [...connections.value]
+          
+          console.log('快速连接已建立:', newConnection)
+          
+          // 重置连接状态
+          isConnecting.value = false
+          connectionStart.value = null
+          tempConnection.value = null
+          return
+        }
+      }
+    }
+    
+    // 如果没有立即连接，继续显示临时连接线
+    if (hoveredPort && connectionStart.value) {
       const { nodeId, port, type } = hoveredPort
       if (connectionStart.value.nodeId !== nodeId && connectionStart.value.type !== type) {
         // 计算端口位置
@@ -670,32 +709,53 @@ const getTempConnectionPath = () => {
 }
 
 const getPortAtPosition = (x: number, y: number) => {
-  // 扩大检测范围，确保在整个画布区域都能检测到端口
+  // 扩大检测范围到整个节点区域，只要接触节点就自动连接
   for (const node of workflowNodes.value) {
     // 验证节点坐标有效性
     if (!isFinite(node.x) || !isFinite(node.y)) continue
     
-    // 检查输入端口
-    if (node.inputs) {
-      for (let i = 0; i < node.inputs.length; i++) {
-        const portX = node.x - 8 // 端口中心位置（节点左侧外8px）
-        const portY = node.y + 20 + i * 30 + 8 // 端口中心位置（顶部20px + 索引*30px + 半径8px）
-        const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
-        if (distance <= 30) { // 增大端口吸附范围，提供更好的用户体验
-          return { nodeId: node.id, port: node.inputs[i], type: 'input' as const }
-        }
-      }
-    }
+    // 节点区域定义（200px宽，根据端口数量计算高度）
+    const nodeWidth = 200
+    const nodeHeight = Math.max(60, 20 + Math.max(node.inputs?.length || 0, node.outputs?.length || 0) * 30 + 20)
     
-    // 检查输出端口
-    if (node.outputs) {
-      for (let i = 0; i < node.outputs.length; i++) {
-        const portX = node.x + 200 + 8 // 端口中心位置（节点右侧外8px）
-        const portY = node.y + 20 + i * 30 + 8 // 端口中心位置（顶部20px + 索引*30px + 半径8px）
-        const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
-        if (distance <= 30) { // 增大端口吸附范围，提供更好的用户体验
-          return { nodeId: node.id, port: node.outputs[i], type: 'output' as const }
+    // 检查是否在节点区域内
+    const inNodeArea = x >= node.x && x <= node.x + nodeWidth && y >= node.y && y <= node.y + nodeHeight
+    
+    if (inNodeArea) {
+      // 检查输入端口区域（节点左半部分）
+      if (x <= node.x + nodeWidth / 2 && node.inputs && node.inputs.length > 0) {
+        // 根据Y坐标确定最近的输入端口
+        let closestPortIndex = 0
+        let minDistance = Infinity
+        
+        for (let i = 0; i < node.inputs.length; i++) {
+          const portY = node.y + 20 + i * 30 + 8
+          const distance = Math.abs(y - portY)
+          if (distance < minDistance) {
+            minDistance = distance
+            closestPortIndex = i
+          }
         }
+        
+        return { nodeId: node.id, port: node.inputs[closestPortIndex], type: 'input' as const }
+      }
+      
+      // 检查输出端口区域（节点右半部分）
+      if (x > node.x + nodeWidth / 2 && node.outputs && node.outputs.length > 0) {
+        // 根据Y坐标确定最近的输出端口
+        let closestPortIndex = 0
+        let minDistance = Infinity
+        
+        for (let i = 0; i < node.outputs.length; i++) {
+          const portY = node.y + 20 + i * 30 + 8
+          const distance = Math.abs(y - portY)
+          if (distance < minDistance) {
+            minDistance = distance
+            closestPortIndex = i
+          }
+        }
+        
+        return { nodeId: node.id, port: node.outputs[closestPortIndex], type: 'output' as const }
       }
     }
   }
