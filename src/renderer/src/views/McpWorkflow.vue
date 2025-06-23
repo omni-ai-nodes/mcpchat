@@ -892,13 +892,13 @@ class ConnectionManager {
     if (!node) return null
     
     const nodeWidth = 220
-    const headerHeight = 32 // 更新为新的头部高度
+    const headerHeight = 40 // 节点头部高度
     
-    // 计算端口圆点的中心位置
-    // 根据用户测试的正确配置调整位置
+    // 计算端口圆点的中心位置，与WorkflowNode组件中的实际位置保持一致
+    // input端口在节点左侧（left: -6px），output端口在节点右侧（right: -6px）
     return {
-      x: type === 'input' ? node.x + 30 : node.x + nodeWidth - 30, // 圆点中心位置
-      y: node.y + 20 // 头部位置 + 20px偏移
+      x: type === 'input' ? node.x - 6 + 5 : node.x + nodeWidth + 6 - 5, // 考虑端口的实际偏移位置
+      y: node.y + headerHeight / 2 // 头部中心位置
     }
   }
   
