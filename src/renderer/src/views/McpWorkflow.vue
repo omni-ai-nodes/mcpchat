@@ -401,9 +401,20 @@ const drawGrid = () => {
 const drawNodes = () => {
   if (!ctx.value) return
   
+  // 先绘制非选中的节点
   workflowNodes.value.forEach(node => {
-    drawNode(node)
+    if (selectedNode.value?.id !== node.id) {
+      drawNode(node)
+    }
   })
+  
+  // 最后绘制选中的节点，确保它在最上层
+  if (selectedNode.value) {
+    const selectedNodeData = workflowNodes.value.find(node => node.id === selectedNode.value?.id)
+    if (selectedNodeData) {
+      drawNode(selectedNodeData)
+    }
+  }
 }
 
 const drawNode = (node: WorkflowNode) => {
@@ -527,16 +538,39 @@ const drawTempConnection = () => {
   const cp2x = endX - controlOffset
   const cp2y = endY
   
-  context.strokeStyle = '#2196f3'
-  context.lineWidth = CONNECTION_WIDTH * scale.value
-  context.setLineDash([5, 5])
+  // 根据连接状态设置样式
+  if (temp.isBoundarySnap && temp.isValidConnection) {
+    // 边界感知且有效连接 - 绿色实线
+    context.strokeStyle = '#4caf50'
+    context.lineWidth = (CONNECTION_WIDTH + 1) * scale.value
+    context.setLineDash([])
+  } else if (temp.isValidConnection) {
+    // 有效连接 - 蓝色虚线
+    context.strokeStyle = '#2196f3'
+    context.lineWidth = CONNECTION_WIDTH * scale.value
+    context.setLineDash([5, 5])
+  } else {
+    // 无效连接 - 灰色虚线
+    context.strokeStyle = '#999999'
+    context.lineWidth = CONNECTION_WIDTH * scale.value
+    context.setLineDash([3, 3])
+  }
+  
   context.beginPath()
   context.moveTo(startX, startY)
   context.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY)
   context.stroke()
   context.setLineDash([])
   
-  console.log('绘制临时连接线:', temp)
+  // 如果是边界感知，在目标位置绘制一个高亮圆圈
+  if (temp.isBoundarySnap && temp.isValidConnection) {
+    context.fillStyle = '#4caf50'
+    context.globalAlpha = 0.3
+    context.beginPath()
+    context.arc(endX, endY, 12 * scale.value, 0, Math.PI * 2)
+    context.fill()
+    context.globalAlpha = 1.0
+  }
 }
 
 // 方法
@@ -1099,6 +1133,10 @@ const onCanvasMouseDown = (event: MouseEvent) => {
       // 开始连接
       console.log('开始从输出端口创建连接')
       connectionManager.startConnection(clickedPort.node.id, clickedPort.port, 'output')
+    } else if (clickedPort.type === 'input') {
+      // 开始连接
+      console.log('开始从输入端口创建连接')
+      connectionManager.startConnection(clickedPort.node.id, clickedPort.port, 'input')
     }
   } else if (clickedNode) {
     // 选择节点并开始拖拽
@@ -1143,10 +1181,13 @@ const onCanvasMouseUpCanvas = (event: MouseEvent) => {
   const pos = getCanvasPosition(event)
   
   if (connectionManager.tempConnection.value) {
-    const targetPort = getPortAtCanvasPosition(pos.x, pos.y)
-    if (targetPort && targetPort.type === 'input') {
-      connectionManager.completeConnection(targetPort.node.id, targetPort.port)
+    // 使用支持边界感知的getPortAtPosition函数
+    const targetResult = getPortAtPosition(pos.x, pos.y)
+    if (targetResult && (targetResult.type === 'input' || (targetResult.isBoundary && targetResult.type === 'input'))) {
+      console.log('检测到目标端口或边界:', targetResult)
+      connectionManager.completeConnection(targetResult.nodeId, targetResult.port, targetResult.type)
     } else {
+      console.log('未检测到有效目标，取消连接')
       connectionManager.cancelConnection()
     }
   }
@@ -1236,42 +1277,34 @@ const onCanvasMouseMove = (event: MouseEvent) => {
   const mouseX = (event.clientX - cachedCanvasRect.left) / scale.value + offset.value.x
   const mouseY = (event.clientY - cachedCanvasRect.top) / scale.value + offset.value.y
   
-  // 快速检测是否悬停在端口上
-  const hoveredPort = getPortAtPosition(mouseX, mouseY)
+  // 检测端口或节点边界
+  const hoveredTarget = getPortAtPosition(mouseX, mouseY)
     
-  if (hoveredPort) {
-    const currentPortKey = `${hoveredPort.nodeId}-${hoveredPort.type}`
-    const lastPortKey = lastHoveredPort ? `${lastHoveredPort.nodeId}-${lastHoveredPort.type}` : null
+  if (hoveredTarget) {
+    const currentTargetKey = `${hoveredTarget.nodeId}-${hoveredTarget.type}-${hoveredTarget.isBoundary ? 'boundary' : 'port'}`
+    const lastTargetKey = lastHoveredPort ? `${lastHoveredPort.nodeId}-${lastHoveredPort.type}-${lastHoveredPort.isBoundary ? 'boundary' : 'port'}` : null
     
-    // 检查是否悬停在同一个端口，避免重复计算
-    if (currentPortKey !== lastPortKey) {
-      // 尝试从缓存获取端口元素
-      let portElement = portElementCache.get(currentPortKey)
-      
-      if (portElement === undefined) {
-        // 缓存中没有，进行DOM查询
-        portElement = document.querySelector(
-          `[data-node-id="${hoveredPort.nodeId}"] .port.${hoveredPort.type}`
-        ) as HTMLElement
-        portElementCache.set(currentPortKey, portElement)
+    // 检查是否悬停在同一个目标，避免重复计算
+    if (currentTargetKey !== lastTargetKey) {
+      lastHoveredPort = { 
+        nodeId: hoveredTarget.nodeId, 
+        type: hoveredTarget.type, 
+        isBoundary: hoveredTarget.isBoundary,
+        element: null 
       }
       
-      lastHoveredPort = { nodeId: hoveredPort.nodeId, type: hoveredPort.type, element: portElement }
-      
-      // 直接使用计算位置，避免DOM查询
-      const { nodeId, port, type } = hoveredPort
+      const { nodeId, port, type, snapX, snapY, isBoundary } = hoveredTarget
       if (connectionStart.value && connectionStart.value.nodeId !== nodeId && connectionStart.value.type !== type) {
-        // 从缓存中查找节点，提高查找效率
-        const node = workflowNodes.value.find(n => n.id === nodeId)
-        if (node) {
-          // 使用与getPortPosition方法相同的坐标计算
-          const portX = type === 'input' ? node.x + 30 : node.x + 220 - 30
-          const portY = node.y + 20
-          
-          tempConnection.value.x2 = portX
-          tempConnection.value.y2 = portY
-          tempConnection.value.isHoveringPort = true
-          tempConnection.value.isValidConnection = true
+        // 有效连接目标，吸附到端口或边界位置
+        tempConnection.value.x2 = snapX || mouseX
+        tempConnection.value.y2 = snapY || mouseY
+        tempConnection.value.isHoveringPort = true
+        tempConnection.value.isValidConnection = true
+        tempConnection.value.isBoundarySnap = isBoundary
+        
+        // 添加视觉反馈
+        if (isBoundary) {
+          console.log(`边界感知: 连接线吸附到${type === 'input' ? '输入' : '输出'}端口`, { nodeId, port })
         }
       } else {
         // 无效连接，跟随鼠标
@@ -1279,15 +1312,17 @@ const onCanvasMouseMove = (event: MouseEvent) => {
         tempConnection.value.y2 = mouseY
         tempConnection.value.isHoveringPort = false
         tempConnection.value.isValidConnection = false
+        tempConnection.value.isBoundarySnap = false
       }
     }
   } else {
-    // 没有悬停在端口上，跟随鼠标
+    // 没有悬停在端口或边界上，跟随鼠标
     lastHoveredPort = null
     tempConnection.value.x2 = mouseX
     tempConnection.value.y2 = mouseY
     tempConnection.value.isHoveringPort = false
     tempConnection.value.isValidConnection = false
+    tempConnection.value.isBoundarySnap = false
   }
 }
 const onCanvasMouseUp = (event: MouseEvent) => {
@@ -1296,14 +1331,24 @@ const onCanvasMouseUp = (event: MouseEvent) => {
     const x = (event.clientX - rect.left) / scale.value + offset.value.x
     const y = (event.clientY - rect.top) / scale.value + offset.value.y
     
-    // 使用优化后的端口检测，支持更大的检测区域
-    const hoveredPort = getPortAtPosition(x, y)
-    if (hoveredPort && connectionStart.value.nodeId !== hoveredPort.nodeId && connectionStart.value.type !== hoveredPort.type) {
+    // 使用边界感知的端口检测
+    const hoveredTarget = getPortAtPosition(x, y)
+    if (hoveredTarget && connectionStart.value.nodeId !== hoveredTarget.nodeId && connectionStart.value.type !== hoveredTarget.type) {
       // 检查是否已存在完全相同的连接（相同的起始节点、目标节点和端口）
-      const fromNode = connectionStart.value.type === 'output' ? connectionStart.value.nodeId : hoveredPort.nodeId
-      const toNode = connectionStart.value.type === 'output' ? hoveredPort.nodeId : connectionStart.value.nodeId
-      const fromPort = connectionStart.value.type === 'output' ? connectionStart.value.port : hoveredPort.port
-      const toPort = connectionStart.value.type === 'output' ? hoveredPort.port : connectionStart.value.port
+      const fromNode = connectionStart.value.type === 'output' ? connectionStart.value.nodeId : hoveredTarget.nodeId
+      const toNode = connectionStart.value.type === 'output' ? hoveredTarget.nodeId : connectionStart.value.nodeId
+      const fromPort = connectionStart.value.type === 'output' ? connectionStart.value.port : hoveredTarget.port
+      const toPort = connectionStart.value.type === 'output' ? hoveredTarget.port : connectionStart.value.port
+      
+      // 添加边界感知的日志
+      if (hoveredTarget.isBoundary) {
+        console.log(`边界感知连接: 从${connectionStart.value.type}端口连接到${hoveredTarget.type}端口`, {
+          from: fromNode,
+          to: toNode,
+          fromPort,
+          toPort
+        })
+      }
       
       const existingConnection = connections.value.find(conn => 
         conn.from === fromNode && conn.to === toNode && conn.fromPort === fromPort && conn.toPort === toPort
@@ -1397,49 +1442,100 @@ let lastNodeCacheUpdate = 0
 let lastConnectionUpdate = 0
 const CONNECTION_UPDATE_THROTTLE = 16 // 约60fps的更新频率
 
-const getPortAtPosition = (x: number, y: number) => {
-  // 更新节点边界缓存（每100ms更新一次）
-  const now = Date.now()
-  if (now - lastNodeCacheUpdate > 100) {
-    cachedNodeBounds = workflowNodes.value.map(node => ({
-      id: node.id,
-      bounds: {
-        left: node.x - 30,
-        right: node.x + 250,
-        top: node.y,
-        bottom: node.y + 40
-      },
-      hasInputs: !!(node.inputs && node.inputs.length > 0),
-      hasOutputs: !!(node.outputs && node.outputs.length > 0)
-    }))
-    lastNodeCacheUpdate = now
+// 检测节点边界
+const getNodeBoundary = (x: number, y: number) => {
+  for (const node of workflowNodes.value) {
+    const nodeLeft = node.x
+    const nodeRight = node.x + NODE_WIDTH
+    const nodeTop = node.y
+    const nodeBottom = node.y + NODE_HEIGHT
+    
+    // 检查是否在节点边界附近（扩展检测区域）
+    const margin = 15 // 边界感知距离
+    if (x >= nodeLeft - margin && x <= nodeRight + margin &&
+        y >= nodeTop - margin && y <= nodeBottom + margin) {
+      
+      // 确定最近的边和对应的端口类型
+      const distToLeft = Math.abs(x - nodeLeft)
+      const distToRight = Math.abs(x - nodeRight)
+      const distToTop = Math.abs(y - nodeTop)
+      const distToBottom = Math.abs(y - nodeBottom)
+      
+      const minDist = Math.min(distToLeft, distToRight, distToTop, distToBottom)
+      
+      // 根据最近的边确定端口类型和位置
+      if (minDist === distToLeft && node.inputs.length > 0) {
+        // 左边界 - 输入端口
+        const portIndex = Math.min(Math.floor((y - nodeTop) / 20), node.inputs.length - 1)
+        const portY = nodeTop + (20 + portIndex * 20)
+        return {
+          nodeId: node.id,
+          port: node.inputs[portIndex].name || node.inputs[portIndex],
+          type: 'input' as const,
+          snapX: nodeLeft - PORT_RADIUS,
+          snapY: portY,
+          isBoundary: true
+        }
+      } else if (minDist === distToRight && node.outputs.length > 0) {
+        // 右边界 - 输出端口
+        const portIndex = Math.min(Math.floor((y - nodeTop) / 20), node.outputs.length - 1)
+        const portY = nodeTop + (20 + portIndex * 20)
+        return {
+          nodeId: node.id,
+          port: node.outputs[portIndex].name || node.outputs[portIndex],
+          type: 'output' as const,
+          snapX: nodeRight + PORT_RADIUS,
+          snapY: portY,
+          isBoundary: true
+        }
+      }
+    }
   }
-  
-  // 快速边界检查，使用缓存的边界信息
-  for (const cachedNode of cachedNodeBounds) {
-    const { bounds, hasInputs, hasOutputs } = cachedNode
-    
-    // 快速边界检查
-    if (x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) {
-      continue
-    }
-    
-    // 在节点区域内，进行精确检测
-    const node = workflowNodes.value.find(n => n.id === cachedNode.id)
-    if (!node || !isFinite(node.x) || !isFinite(node.y)) continue
-    
-    // 扩大header-inputs检测区域（左侧区域，包含整个左半部分）
-    if (hasInputs && x >= node.x - 30 && x <= node.x + 110) {
-      return { nodeId: node.id, port: node.inputs![0], type: 'input' as const }
-    }
-    
-    // 扩大header-outputs检测区域（右侧区域，包含整个右半部分）
-    if (hasOutputs && x >= node.x + 110 && x <= node.x + 250) {
-      return { nodeId: node.id, port: node.outputs![0], type: 'output' as const }
-    }
-  }
-  
   return null
+}
+
+const getPortAtPosition = (x: number, y: number) => {
+  // 首先检查精确的端口位置
+  for (const node of workflowNodes.value) {
+    // 检查输入端口
+    for (let i = 0; i < node.inputs.length; i++) {
+      const portX = node.x - PORT_RADIUS
+      const portY = node.y + (20 + i * 20)
+      
+      const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
+      if (distance <= PORT_RADIUS * 2) {
+        return { 
+          nodeId: node.id, 
+          port: node.inputs[i].name || node.inputs[i], 
+          type: 'input' as const,
+          snapX: portX,
+          snapY: portY,
+          isBoundary: false
+        }
+      }
+    }
+    
+    // 检查输出端口
+    for (let i = 0; i < node.outputs.length; i++) {
+      const portX = node.x + NODE_WIDTH + PORT_RADIUS
+      const portY = node.y + (20 + i * 20)
+      
+      const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
+      if (distance <= PORT_RADIUS * 2) {
+        return { 
+          nodeId: node.id, 
+          port: node.outputs[i].name || node.outputs[i], 
+          type: 'output' as const,
+          snapX: portX,
+          snapY: portY,
+          isBoundary: false
+        }
+      }
+    }
+  }
+  
+  // 如果没有精确命中端口，检查节点边界
+  return getNodeBoundary(x, y)
 }
 
 const selectConnection = (connection: Connection, event: MouseEvent) => {
