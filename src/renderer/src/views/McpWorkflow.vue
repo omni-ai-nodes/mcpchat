@@ -496,8 +496,8 @@ const drawConnection = (connection: Connection) => {
   if (!ctx.value) return
   
   const context = ctx.value
-  const startPos = getConnectionEndpoint(connection, 'start')
-  const endPos = getConnectionEndpoint(connection, 'end')
+  const startPos = connectionManager.getConnectionEndpoint(connection, 'from')
+  const endPos = connectionManager.getConnectionEndpoint(connection, 'to')
   
   if (!startPos || !endPos) return
   
@@ -513,7 +513,8 @@ const drawConnection = (connection: Connection) => {
   const cp2x = endX - controlOffset
   const cp2y = endY
   
-  context.strokeStyle = connectionManager.selectedConnection?.id === connection.id ? '#ff5722' : '#666666'
+  // 使用蓝色实线绘制正常连接
+  context.strokeStyle = connectionManager.selectedConnection.value?.id === connection.id ? '#ff5722' : '#2196f3'
   context.lineWidth = CONNECTION_WIDTH * scale.value
   context.beginPath()
   context.moveTo(startX, startY)
@@ -736,11 +737,15 @@ class ConnectionManager {
     if (newConnection) {
       connections.value.push(newConnection)
       currentWorkflow.connections = [...connections.value]
+      console.log('连接已创建并保存:', newConnection)
+      console.log('当前连接总数:', connections.value.length)
       
       // 如果是拖拽重连，选中新连接
       if (this.isDraggingConnection.value) {
         this.selectedConnection.value = newConnection
       }
+    } else {
+      console.log('连接创建失败')
     }
     
     this.resetConnectionState()
@@ -1135,12 +1140,7 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else {
     // 点击空白区域
     selectedNode.value = null
-    connectionManager.selectedConnection = null
-    
-    // 如果没有进行连接操作，删除最新连接
-    if (!connectionManager.tempConnection) {
-      connectionManager.deleteLatestConnection()
-    }
+    connectionManager.selectedConnection.value = null
   }
 }
 
@@ -1202,13 +1202,29 @@ const onCanvasMouseUpCanvas = (event: MouseEvent) => {
   const pos = getCanvasPosition(event)
   
   if (connectionManager.tempConnection.value) {
-    // 使用支持边界感知的getPortAtPosition函数
-    const targetResult = getPortAtPosition(pos.x, pos.y)
-    if (targetResult && (targetResult.type === 'input' || (targetResult.isBoundary && targetResult.type === 'input'))) {
-      console.log('检测到目标端口或边界:', targetResult)
-      connectionManager.completeConnection(targetResult.nodeId, targetResult.port, targetResult.type)
+    // 检测目标端口
+    const targetResult = getPortAtCanvasPosition(pos.x, pos.y)
+    if (targetResult && connectionManager.connectionStart.value) {
+      // 验证连接是否有效
+      const start = connectionManager.connectionStart.value
+      const isValidConnection = connectionManager.validateConnection(start, {
+        nodeId: targetResult.node.id,
+        port: targetResult.port,
+        type: targetResult.type
+      })
+      
+      if (isValidConnection) {
+        console.log('完成有效连接:', targetResult)
+        const success = connectionManager.completeConnection(targetResult.node.id, targetResult.port, targetResult.type)
+        if (!success) {
+          console.log('连接创建失败')
+        }
+      } else {
+        console.log('连接无效，取消连接')
+        connectionManager.cancelConnection()
+      }
     } else {
-      console.log('未检测到有效目标，取消连接')
+      console.log('未检测到目标端口，取消连接')
       connectionManager.cancelConnection()
     }
   }
@@ -1660,7 +1676,7 @@ onMounted(() => {
     }
     
     // 处理连接线
-    if (connectionManager.tempConnection) {
+    if (connectionManager.tempConnection.value) {
       // 如果鼠标在画布范围内，使用画布的鼠标移动逻辑
       if (event.clientX >= rect.left && event.clientY >= rect.top && 
           event.clientX <= rect.right && event.clientY <= rect.bottom) {
@@ -1668,12 +1684,12 @@ onMounted(() => {
       }
       
       // 鼠标在画布外，直接跟随鼠标位置
-      connectionManager.updateTempConnection(mouseX, mouseY)
+      connectionManager.updateTempConnection(mouseX, mouseY, false)
     }
   }
   
   const handleGlobalMouseUp = () => {
-    if (connectionManager.tempConnection) {
+    if (connectionManager.tempConnection.value) {
       // 在画布外释放鼠标，取消连接
       connectionManager.cancelConnection()
     }
