@@ -1082,17 +1082,11 @@ const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, po
     // 检查输入端口
     for (let i = 0; i < node.inputs.length; i++) {
       // 使用与 drawPort 相同的位置计算逻辑
-      const nodeX = (node.x + offset.value.x) * scale.value
-      const nodeY = (node.y + offset.value.y) * scale.value
-      const portX = nodeX - PORT_RADIUS * scale.value
-      const portY = nodeY + (20 + i * 20) * scale.value
+      const portX = node.x - PORT_RADIUS
+      const portY = node.y + (20 + i * 20)
       
-      // 将鼠标坐标转换为屏幕坐标进行比较
-      const mouseScreenX = (x + offset.value.x) * scale.value
-      const mouseScreenY = (y + offset.value.y) * scale.value
-      
-      const distance = Math.sqrt((mouseScreenX - portX) ** 2 + (mouseScreenY - portY) ** 2)
-      if (distance <= PORT_RADIUS * scale.value * 2) {
+      const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
+      if (distance <= PORT_RADIUS * 2) {
         return { node, port: node.inputs[i].name || node.inputs[i], type: 'input' }
       }
     }
@@ -1100,18 +1094,11 @@ const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, po
     // 检查输出端口
     for (let i = 0; i < node.outputs.length; i++) {
       // 使用与 drawPort 相同的位置计算逻辑
-      const nodeX = (node.x + offset.value.x) * scale.value
-      const nodeY = (node.y + offset.value.y) * scale.value
-      const nodeWidth = NODE_WIDTH * scale.value
-      const portX = nodeX + nodeWidth + PORT_RADIUS * scale.value
-      const portY = nodeY + (20 + i * 20) * scale.value
+      const portX = node.x + NODE_WIDTH + PORT_RADIUS
+      const portY = node.y + (20 + i * 20)
       
-      // 将鼠标坐标转换为屏幕坐标进行比较
-      const mouseScreenX = (x + offset.value.x) * scale.value
-      const mouseScreenY = (y + offset.value.y) * scale.value
-      
-      const distance = Math.sqrt((mouseScreenX - portX) ** 2 + (mouseScreenY - portY) ** 2)
-      if (distance <= PORT_RADIUS * scale.value * 2) {
+      const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
+      if (distance <= PORT_RADIUS * 2) {
         return { node, port: node.outputs[i].name || node.outputs[i], type: 'output' }
       }
     }
@@ -1169,8 +1156,42 @@ const onCanvasMouseMoveCanvas = (event: MouseEvent) => {
     updateNode(draggedNode.value.id, { x: newX, y: newY })
     console.log('拖拽节点到:', newX, newY)
   } else if (connectionManager.tempConnection.value) {
-    // 更新临时连接线
-    connectionManager.updateTempConnection(pos.x, pos.y)
+    // 检测是否悬停在端口上
+    const hoveredPort = getPortAtCanvasPosition(pos.x, pos.y)
+    let isValidConnection = false
+    let isBoundarySnap = false
+    
+    if (hoveredPort && connectionManager.connectionStart.value) {
+      // 验证连接是否有效
+      const start = connectionManager.connectionStart.value
+      isValidConnection = connectionManager.validateConnection(start, {
+        nodeId: hoveredPort.node.id,
+        port: hoveredPort.port,
+        type: hoveredPort.type
+      })
+      
+      if (isValidConnection) {
+        // 如果是有效连接，吸附到端口位置
+        const portPos = connectionManager.getPortPosition(hoveredPort.node.id, hoveredPort.port, hoveredPort.type)
+        if (portPos) {
+          isBoundarySnap = true
+          connectionManager.tempConnection.value.x2 = portPos.x
+          connectionManager.tempConnection.value.y2 = portPos.y
+          connectionManager.tempConnection.value.isHoveringPort = true
+          connectionManager.tempConnection.value.isValidConnection = isValidConnection
+          connectionManager.tempConnection.value.isBoundarySnap = isBoundarySnap
+          console.log('悬停在有效端口上:', hoveredPort.node.name, hoveredPort.port, hoveredPort.type)
+          return
+        }
+      }
+    }
+    
+    // 更新临时连接线到鼠标位置
+    connectionManager.tempConnection.value.x2 = pos.x
+    connectionManager.tempConnection.value.y2 = pos.y
+    connectionManager.tempConnection.value.isHoveringPort = false
+    connectionManager.tempConnection.value.isValidConnection = isValidConnection
+    connectionManager.tempConnection.value.isBoundarySnap = false
     console.log('更新临时连接线到:', pos.x, pos.y)
   }
 }
