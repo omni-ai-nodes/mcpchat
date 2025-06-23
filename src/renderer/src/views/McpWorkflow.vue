@@ -115,109 +115,25 @@
 
       <!-- 画布区域 -->
       <div class="flex-1 relative overflow-hidden bg-slate-50 dark:bg-slate-900">
-        <!-- 网格背景 -->
-        <div class="absolute inset-0 opacity-20">
-          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="currentColor" stroke-width="0.5"/>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-          </svg>
-        </div>
-
-        <!-- 工作流画布 -->
-        <div 
+        <!-- Canvas 画布 -->
+        <canvas 
           ref="canvasRef" 
-          class="relative w-full h-full min-h-full"
-          style="min-height: 100%; pointer-events: auto;"
+          class="absolute inset-0 w-full h-full"
+          style="z-index: 1; cursor: default;"
           @drop="onDrop"
           @dragover="onDragOver"
-          @mousemove="onCanvasMouseMove"
-          @mouseup="onCanvasMouseUp"
-          @click="onCanvasClick"
-        >
-          <!-- 连接线层 -->
-          <svg class="absolute inset-0" style="z-index: 1; width: 100%; height: 100%; pointer-events: none;">
-            <!-- 已建立的连接 -->
-            <g v-for="connection in connections" :key="connection.id">
-              <path 
-                :d="getConnectionPath(connection)"
-                :stroke="connectionManager.getConnectionStyle(connection).stroke"
-                :stroke-width="connectionManager.getConnectionStyle(connection).strokeWidth"
-                fill="none"
-                class="connection-path cursor-pointer"
-                style="pointer-events: all;"
-                @click="selectConnection(connection, $event)"
-              />
-              
-
-              
-              <!-- 连接端点（仅在选中时显示） -->
-              <template v-if="selectedConnection?.id === connection.id">
-                <circle 
-                  :cx="getConnectionEndpoint(connection, 'from').x"
-                  :cy="getConnectionEndpoint(connection, 'from').y"
-                  r="6"
-                  fill="#f59e0b"
-                  stroke="white"
-                  stroke-width="2"
-                  class="cursor-grab"
-                  style="pointer-events: all;"
-                  @mousedown="startConnectionDrag(connection, 'from', $event)"
-                />
-                <circle 
-                  :cx="getConnectionEndpoint(connection, 'to').x"
-                  :cy="getConnectionEndpoint(connection, 'to').y"
-                  r="6"
-                  fill="#f59e0b"
-                  stroke="white"
-                  stroke-width="2"
-                  class="cursor-grab"
-                  style="pointer-events: all;"
-                  @mousedown="startConnectionDrag(connection, 'to', $event)"
-                />
-              </template>
-            </g>
-            <!-- 临时连接线 -->
-            <path 
-              v-if="tempConnection"
-              :d="getTempConnectionPath()"
-              :stroke="tempConnection.isHoveringPort ? '#10b981' : '#60a5fa'"
-              :stroke-width="tempConnection.isHoveringPort ? '3' : '2'"
-              fill="none"
-              :stroke-dasharray="tempConnection.isHoveringPort ? 'none' : '5,5'"
-              :opacity="tempConnection.isHoveringPort ? '0.9' : '0.7'"
-              class="temp-connection"
-            />
-
-          </svg>
-
-          <!-- 节点层 -->
-          <div class="nodes-container" style="position: relative; z-index: 10; width: 100%; height: 100%;">
-            <!-- 工作流节点 -->
-            <WorkflowNode
-                v-for="node in workflowNodes"
-                :key="node.id"
-                :node="node"
-                :is-selected="selectedNode?.id === node.id"
-                :is-connecting="isConnecting"
-                :connection-start="connectionStart"
-                @select="selectNode"
-                @delete="deleteNode"
-                @update="updateNode"
-                @start-connection="startConnection"
-              />
-            
-            <!-- 空状态 -->
-            <div v-if="workflowNodes.length === 0" class="absolute inset-0 flex items-center justify-center" style="z-index: 5;">
-              <div class="text-center text-muted-foreground">
-                <Icon icon="lucide:workflow" class="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <h3 class="text-lg font-medium mb-2">{{ t('common.mcp.workflow.emptyCanvas') }}</h3>
-                <p class="text-sm">{{ t('common.mcp.workflow.emptyCanvasDesc') }}</p>
-              </div>
-            </div>
+          @mousemove="onCanvasMouseMoveCanvas"
+          @mouseup="onCanvasMouseUpCanvas"
+          @mousedown="onCanvasMouseDown"
+          @wheel="onCanvasWheelCanvas"
+        ></canvas>
+        
+        <!-- 空状态覆盖层 -->
+        <div v-if="workflowNodes.length === 0" class="absolute inset-0 flex items-center justify-center pointer-events-none" style="z-index: 5;">
+          <div class="text-center text-muted-foreground">
+            <Icon icon="lucide:workflow" class="w-16 h-16 mx-auto mb-4 opacity-50" />
+            <h3 class="text-lg font-medium mb-2">{{ t('common.mcp.workflow.emptyCanvas') }}</h3>
+            <p class="text-sm">{{ t('common.mcp.workflow.emptyCanvasDesc') }}</p>
           </div>
         </div>
       </div>
@@ -244,7 +160,6 @@ import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Icon } from '@iconify/vue'
-import WorkflowNode from '@/components/workflow/WorkflowNode.vue'
 import NodeProperties from '@/components/workflow/NodeProperties.vue'
 
 const { t } = useI18n()
@@ -286,7 +201,7 @@ interface CurrentWorkflow {
 }
 
 // 响应式数据
-const canvasRef = ref<HTMLElement>()
+const canvasRef = ref<HTMLCanvasElement>()
 const selectedNode = ref<WorkflowNode | null>(null)
 const workflowNodes = ref<WorkflowNode[]>([])
 const connections = ref<Connection[]>([])
@@ -297,9 +212,21 @@ const currentWorkflow = reactive<CurrentWorkflow>({
   connections: []
 })
 
-// 画布缩放和偏移
+// Canvas 相关变量
+const ctx = ref<CanvasRenderingContext2D | null>(null)
 const scale = ref(1)
 const offset = ref({ x: 0, y: 0 })
+const isDragging = ref(false)
+const dragStart = ref({ x: 0, y: 0 })
+const draggedNode = ref<WorkflowNode | null>(null)
+const animationFrameId = ref<number | null>(null)
+
+// Canvas 渲染配置
+const GRID_SIZE = 20
+const NODE_WIDTH = 220
+const NODE_HEIGHT = 80
+const PORT_RADIUS = 6
+const CONNECTION_WIDTH = 3
 
 // 节点模板
 const inputNodes: NodeTemplate[] = [
@@ -401,6 +328,216 @@ const outputNodes: NodeTemplate[] = [
     category: 'output'
   }
 ]
+
+// Canvas 初始化和渲染
+const initCanvas = () => {
+  if (!canvasRef.value) return
+  
+  const canvas = canvasRef.value
+  ctx.value = canvas.getContext('2d')
+  
+  // 设置Canvas尺寸
+  const resizeCanvas = () => {
+    const rect = canvas.parentElement?.getBoundingClientRect()
+    if (rect) {
+      canvas.width = rect.width
+      canvas.height = rect.height
+    }
+  }
+  
+  resizeCanvas()
+  window.addEventListener('resize', resizeCanvas)
+  
+  // 开始渲染循环
+  startRenderLoop()
+}
+
+const startRenderLoop = () => {
+  const render = () => {
+    if (ctx.value && canvasRef.value) {
+      clearCanvas()
+      drawGrid()
+      drawConnections()
+      drawNodes()
+      drawTempConnection()
+    }
+    animationFrameId.value = requestAnimationFrame(render)
+  }
+  render()
+}
+
+const clearCanvas = () => {
+  if (!ctx.value || !canvasRef.value) return
+  ctx.value.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
+}
+
+const drawGrid = () => {
+  if (!ctx.value || !canvasRef.value) return
+  
+  const canvas = canvasRef.value
+  const context = ctx.value
+  
+  context.strokeStyle = '#f0f0f0'
+  context.lineWidth = 1
+  
+  const startX = (-offset.value.x % GRID_SIZE) * scale.value
+  const startY = (-offset.value.y % GRID_SIZE) * scale.value
+  
+  for (let x = startX; x < canvas.width; x += GRID_SIZE * scale.value) {
+    context.beginPath()
+    context.moveTo(x, 0)
+    context.lineTo(x, canvas.height)
+    context.stroke()
+  }
+  
+  for (let y = startY; y < canvas.height; y += GRID_SIZE * scale.value) {
+    context.beginPath()
+    context.moveTo(0, y)
+    context.lineTo(canvas.width, y)
+    context.stroke()
+  }
+}
+
+const drawNodes = () => {
+  if (!ctx.value) return
+  
+  workflowNodes.value.forEach(node => {
+    drawNode(node)
+  })
+}
+
+const drawNode = (node: WorkflowNode) => {
+  if (!ctx.value) return
+  
+   const context = ctx.value
+  const x = (node.x + offset.value.x) * scale.value
+  const y = (node.y + offset.value.y) * scale.value
+  const width = NODE_WIDTH * scale.value
+  const height = NODE_HEIGHT * scale.value
+  
+  // 绘制节点背景（使用路径绘制圆角矩形）
+  const radius = 8 * scale.value
+  context.beginPath()
+  context.moveTo(x + radius, y)
+  context.lineTo(x + width - radius, y)
+  context.quadraticCurveTo(x + width, y, x + width, y + radius)
+  context.lineTo(x + width, y + height - radius)
+  context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
+  context.lineTo(x + radius, y + height)
+  context.quadraticCurveTo(x, y + height, x, y + height - radius)
+  context.lineTo(x, y + radius)
+  context.quadraticCurveTo(x, y, x + radius, y)
+  context.closePath()
+  
+  context.fillStyle = selectedNode.value?.id === node.id ? '#e3f2fd' : '#ffffff'
+  context.fill()
+  context.strokeStyle = '#d0d0d0'
+  context.lineWidth = 2
+  context.stroke()
+  
+  // 绘制节点标题
+  context.fillStyle = '#333333'
+  context.font = `${14 * scale.value}px Arial`
+  context.textAlign = 'center'
+  context.fillText(node.name, x + width / 2, y + 25 * scale.value)
+  
+  // 绘制节点类型
+  context.fillStyle = '#666666'
+  context.font = `${12 * scale.value}px Arial`
+  context.fillText(node.type, x + width / 2, y + 45 * scale.value)
+  
+  // 绘制输入端口
+  node.inputs.forEach((input, index) => {
+    const portY = y + (20 + index * 20) * scale.value
+    const portName = typeof input === 'string' ? input : input.name
+    drawPort(x - PORT_RADIUS * scale.value, portY, 'input', node.id, portName)
+  })
+  
+  // 绘制输出端口
+  node.outputs.forEach((output, index) => {
+    const portY = y + (20 + index * 20) * scale.value
+    const portName = typeof output === 'string' ? output : output.name
+    drawPort(x + width + PORT_RADIUS * scale.value, portY, 'output', node.id, portName)
+  })
+}
+
+const drawPort = (x: number, y: number, type: 'input' | 'output', nodeId: string, portName: string) => {
+  if (!ctx.value) return
+  
+  const context = ctx.value
+  const radius = PORT_RADIUS * scale.value
+  
+  context.fillStyle = type === 'input' ? '#4caf50' : '#2196f3'
+  context.beginPath()
+  context.arc(x, y, radius, 0, Math.PI * 2)
+  context.fill()
+}
+
+const drawConnections = () => {
+  if (!ctx.value) return
+  
+  connections.value.forEach(connection => {
+    drawConnection(connection)
+  })
+}
+
+const drawConnection = (connection: Connection) => {
+  if (!ctx.value) return
+  
+  const context = ctx.value
+  const startPos = getConnectionEndpoint(connection, 'start')
+  const endPos = getConnectionEndpoint(connection, 'end')
+  
+  if (!startPos || !endPos) return
+  
+  const startX = (startPos.x + offset.value.x) * scale.value
+  const startY = (startPos.y + offset.value.y) * scale.value
+  const endX = (endPos.x + offset.value.x) * scale.value
+  const endY = (endPos.y + offset.value.y) * scale.value
+  
+  // 绘制贝塞尔曲线
+  const controlOffset = Math.abs(endX - startX) * 0.5
+  const cp1x = startX + controlOffset
+  const cp1y = startY
+  const cp2x = endX - controlOffset
+  const cp2y = endY
+  
+  context.strokeStyle = connectionManager.selectedConnection?.id === connection.id ? '#ff5722' : '#666666'
+  context.lineWidth = CONNECTION_WIDTH * scale.value
+  context.beginPath()
+  context.moveTo(startX, startY)
+  context.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY)
+  context.stroke()
+}
+
+const drawTempConnection = () => {
+  if (!ctx.value || !connectionManager.tempConnection.value) return
+  
+  const context = ctx.value
+  const temp = connectionManager.tempConnection.value
+  
+  const startX = (temp.x1 + offset.value.x) * scale.value
+  const startY = (temp.y1 + offset.value.y) * scale.value
+  const endX = (temp.x2 + offset.value.x) * scale.value
+  const endY = (temp.y2 + offset.value.y) * scale.value
+  
+  const controlOffset = Math.abs(endX - startX) * 0.5
+  const cp1x = startX + controlOffset
+  const cp1y = startY
+  const cp2x = endX - controlOffset
+  const cp2y = endY
+  
+  context.strokeStyle = '#2196f3'
+  context.lineWidth = CONNECTION_WIDTH * scale.value
+  context.setLineDash([5, 5])
+  context.beginPath()
+  context.moveTo(startX, startY)
+  context.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY)
+  context.stroke()
+  context.setLineDash([])
+  
+  console.log('绘制临时连接线:', temp)
+}
 
 // 方法
 const addNode = (template: NodeTemplate) => {
@@ -550,7 +687,7 @@ class ConnectionManager {
   
   // 完成连接
   completeConnection(targetNodeId: string, targetPort: string, targetType: 'input' | 'output') {
-    if (!this.isConnecting.value || !this.connectionStart.value) return false
+    if (!this.isConnecting.value || !this.connectionStart.value) return false;
     
     const start = this.connectionStart.value
     
@@ -629,7 +766,7 @@ class ConnectionManager {
       currentWorkflow.connections = [...connections.value]
       
       // 如果删除的是选中的连接，清除选中状态
-      if (this.selectedConnection.value?.id === connectionId) {
+      if (this.selectedConnection && this.selectedConnection.value?.id === connectionId) {
         this.selectedConnection.value = null
       }
     }
@@ -696,7 +833,9 @@ class ConnectionManager {
   
   // 清除选中状态
   clearSelection() {
-    this.selectedConnection.value = null
+    if (this.selectedConnection) {
+      this.selectedConnection.value = null
+    }
   }
   
   // 重置连接状态
@@ -883,6 +1022,149 @@ const getConnectionMidpoint = (connection: Connection) => {
 // 从中点删除连接
 
 
+// Canvas 鼠标事件处理
+const getCanvasPosition = (event: MouseEvent) => {
+  if (!canvasRef.value) return { x: 0, y: 0 }
+  
+  const rect = canvasRef.value.getBoundingClientRect()
+  return {
+    x: (event.clientX - rect.left) / scale.value - offset.value.x,
+    y: (event.clientY - rect.top) / scale.value - offset.value.y
+  }
+}
+
+const getNodeAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (x >= node.x && x <= node.x + NODE_WIDTH &&
+        y >= node.y && y <= node.y + NODE_HEIGHT) {
+      return node
+    }
+  }
+  return null
+}
+
+const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, port: string, type: 'input' | 'output' } | null => {
+  for (const node of workflowNodes.value) {
+    // 检查输入端口
+    for (let i = 0; i < node.inputs.length; i++) {
+      // 使用与 drawPort 相同的位置计算逻辑
+      const nodeX = (node.x + offset.value.x) * scale.value
+      const nodeY = (node.y + offset.value.y) * scale.value
+      const portX = nodeX - PORT_RADIUS * scale.value
+      const portY = nodeY + (20 + i * 20) * scale.value
+      
+      // 将鼠标坐标转换为屏幕坐标进行比较
+      const mouseScreenX = (x + offset.value.x) * scale.value
+      const mouseScreenY = (y + offset.value.y) * scale.value
+      
+      const distance = Math.sqrt((mouseScreenX - portX) ** 2 + (mouseScreenY - portY) ** 2)
+      if (distance <= PORT_RADIUS * scale.value * 2) {
+        return { node, port: node.inputs[i].name || node.inputs[i], type: 'input' }
+      }
+    }
+    
+    // 检查输出端口
+    for (let i = 0; i < node.outputs.length; i++) {
+      // 使用与 drawPort 相同的位置计算逻辑
+      const nodeX = (node.x + offset.value.x) * scale.value
+      const nodeY = (node.y + offset.value.y) * scale.value
+      const nodeWidth = NODE_WIDTH * scale.value
+      const portX = nodeX + nodeWidth + PORT_RADIUS * scale.value
+      const portY = nodeY + (20 + i * 20) * scale.value
+      
+      // 将鼠标坐标转换为屏幕坐标进行比较
+      const mouseScreenX = (x + offset.value.x) * scale.value
+      const mouseScreenY = (y + offset.value.y) * scale.value
+      
+      const distance = Math.sqrt((mouseScreenX - portX) ** 2 + (mouseScreenY - portY) ** 2)
+      if (distance <= PORT_RADIUS * scale.value * 2) {
+        return { node, port: node.outputs[i].name || node.outputs[i], type: 'output' }
+      }
+    }
+  }
+  return null
+}
+
+const onCanvasMouseDown = (event: MouseEvent) => {
+  event.preventDefault()
+  event.stopPropagation()
+  
+  const pos = getCanvasPosition(event)
+  const clickedNode = getNodeAtPosition(pos.x, pos.y)
+  const clickedPort = getPortAtCanvasPosition(pos.x, pos.y)
+  
+  if (clickedPort) {
+    console.log('检测到端口点击:', clickedPort.type, clickedPort.port, '节点:', clickedPort.node.name)
+    if (clickedPort.type === 'output') {
+      // 开始连接
+      console.log('开始从输出端口创建连接')
+      connectionManager.startConnection(clickedPort.node.id, clickedPort.port, 'output')
+    }
+  } else if (clickedNode) {
+    // 选择节点并开始拖拽
+    selectedNode.value = clickedNode
+    draggedNode.value = clickedNode
+    isDragging.value = true
+    dragStart.value = { x: pos.x - clickedNode.x, y: pos.y - clickedNode.y }
+    console.log('开始拖拽节点:', clickedNode.name, 'isDragging:', isDragging.value)
+  } else {
+    // 点击空白区域
+    selectedNode.value = null
+    connectionManager.selectedConnection = null
+    
+    // 如果没有进行连接操作，删除最新连接
+    if (!connectionManager.tempConnection) {
+      connectionManager.deleteLatestConnection()
+    }
+  }
+}
+
+const onCanvasMouseMoveCanvas = (event: MouseEvent) => {
+  event.preventDefault()
+  
+  const pos = getCanvasPosition(event)
+  
+  if (isDragging.value && draggedNode.value) {
+    // 拖拽节点
+    const newX = pos.x - dragStart.value.x
+    const newY = pos.y - dragStart.value.y
+    updateNode(draggedNode.value.id, { x: newX, y: newY })
+    console.log('拖拽节点到:', newX, newY)
+  } else if (connectionManager.tempConnection.value) {
+    // 更新临时连接线
+    connectionManager.updateTempConnection(pos.x, pos.y)
+    console.log('更新临时连接线到:', pos.x, pos.y)
+  }
+}
+
+const onCanvasMouseUpCanvas = (event: MouseEvent) => {
+  event.preventDefault()
+  
+  const pos = getCanvasPosition(event)
+  
+  if (connectionManager.tempConnection.value) {
+    const targetPort = getPortAtCanvasPosition(pos.x, pos.y)
+    if (targetPort && targetPort.type === 'input') {
+      connectionManager.completeConnection(targetPort.node.id, targetPort.port)
+    } else {
+      connectionManager.cancelConnection()
+    }
+  }
+  
+  if (isDragging.value) {
+    console.log('结束拖拽')
+  }
+  
+  isDragging.value = false
+  draggedNode.value = null
+}
+
+const onCanvasWheelCanvas = (event: WheelEvent) => {
+  event.preventDefault()
+  const delta = event.deltaY > 0 ? 0.9 : 1.1
+  scale.value = Math.max(0.1, Math.min(3, scale.value * delta))
+}
+
 const selectNode = (nodeId: string) => {
   const node = workflowNodes.value.find(n => n.id === nodeId)
   selectedNode.value = node || null
@@ -901,25 +1183,24 @@ const onDrop = (event: DragEvent) => {
   if (nodeType) {
     const template = [...inputNodes, ...processNodes, ...outputNodes].find(n => n.type === nodeType)
     if (template) {
-      const rect = canvasRef.value?.getBoundingClientRect()
-      if (rect) {
-        const newNode: WorkflowNode = {
-          id: `node_${Date.now()}`,
-          type: template.type,
-          name: template.name,
-          x: event.clientX - rect.left - 100,
-          y: event.clientY - rect.top - 40,
-          config: {},
-          inputs: template.category === 'input' ? [] : ['input'],
-          outputs: template.category === 'output' ? [] : ['output']
-        }
-        workflowNodes.value.push(newNode)
-        selectedNode.value = newNode
-        
-        // 同步到当前工作流
-        currentWorkflow.nodes = [...workflowNodes.value]
-        console.log('拖拽添加节点:', newNode)
+      // 使用Canvas坐标转换函数
+      const pos = getCanvasPosition(event)
+      const newNode: WorkflowNode = {
+        id: `node_${Date.now()}`,
+        type: template.type,
+        name: template.name,
+        x: pos.x - NODE_WIDTH / 2, // 居中放置
+        y: pos.y - NODE_HEIGHT / 2,
+        config: {},
+        inputs: template.category === 'input' ? [] : ['input'],
+        outputs: template.category === 'output' ? [] : ['output']
       }
+      workflowNodes.value.push(newNode)
+      selectedNode.value = newNode
+      
+      // 同步到当前工作流
+      currentWorkflow.nodes = [...workflowNodes.value]
+      console.log('拖拽添加节点:', newNode)
     }
   }
 }
@@ -1241,42 +1522,63 @@ const deployWorkflow = () => {
 
 // 生命周期
 onMounted(() => {
-  // 添加全局鼠标事件监听，确保连接线能在整个窗口范围内移动
+  // 初始化Canvas
+  initCanvas()
+  
+  // 添加全局鼠标事件监听，确保连接线和拖拽能在整个窗口范围内移动
   const handleGlobalMouseMove = (event: MouseEvent) => {
-    if (!isConnecting.value || !tempConnection.value || !canvasRef.value) return
+    if (!canvasRef.value) return
     
     const rect = canvasRef.value.getBoundingClientRect()
-    const mouseX = event.clientX - rect.left
-    const mouseY = event.clientY - rect.top
+    const mouseX = (event.clientX - rect.left) / scale.value - offset.value.x
+    const mouseY = (event.clientY - rect.top) / scale.value - offset.value.y
     
-    // 如果鼠标在画布范围内，使用画布的鼠标移动逻辑
-    if (mouseX >= 0 && mouseY >= 0 && mouseX <= rect.width && mouseY <= rect.height) {
-      return // 让画布的鼠标移动事件处理
+    // 处理节点拖拽
+    if (isDragging.value && draggedNode.value) {
+      const newX = mouseX - dragStart.value.x
+      const newY = mouseY - dragStart.value.y
+      updateNode(draggedNode.value.id, { x: newX, y: newY })
+      console.log('全局拖拽节点到:', newX, newY)
+      return
     }
     
-    // 鼠标在画布外，直接跟随鼠标位置
-    connectionManager.updateTempConnection(mouseX, mouseY, false)
+    // 处理连接线
+    if (connectionManager.tempConnection) {
+      // 如果鼠标在画布范围内，使用画布的鼠标移动逻辑
+      if (event.clientX >= rect.left && event.clientY >= rect.top && 
+          event.clientX <= rect.right && event.clientY <= rect.bottom) {
+        return // 让画布的鼠标移动事件处理
+      }
+      
+      // 鼠标在画布外，直接跟随鼠标位置
+      connectionManager.updateTempConnection(mouseX, mouseY)
+    }
   }
   
   const handleGlobalMouseUp = () => {
-    if (isConnecting.value) {
+    if (connectionManager.tempConnection) {
       // 在画布外释放鼠标，取消连接
       connectionManager.cancelConnection()
     }
+    
+    if (isDragging.value) {
+      console.log('全局结束拖拽')
+    }
+    
+    isDragging.value = false
+    draggedNode.value = null
   }
   
   document.addEventListener('mousemove', handleGlobalMouseMove)
   document.addEventListener('mouseup', handleGlobalMouseUp)
   
-  // 键盘事件处理已移至ConnectionManager中
-  
   // 清理事件监听器和动画帧
   onUnmounted(() => {
     document.removeEventListener('mousemove', handleGlobalMouseMove)
     document.removeEventListener('mouseup', handleGlobalMouseUp)
-    if (updateAnimationFrame) {
-      cancelAnimationFrame(updateAnimationFrame)
-      updateAnimationFrame = null
+    if (animationFrameId.value) {
+      cancelAnimationFrame(animationFrameId.value)
+      animationFrameId.value = null
     }
   })
 })
