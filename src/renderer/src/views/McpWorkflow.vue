@@ -457,6 +457,23 @@ const drawNode = (node: WorkflowNode) => {
   context.font = `${12 * scale.value}px Arial`
   context.fillText(node.type, x + width / 2, y + 45 * scale.value)
   
+  // 绘制编辑图标
+  const iconSize = 16 * scale.value
+  const iconX = x + width - iconSize - 8 * scale.value
+  const iconY = y + 8 * scale.value
+  
+  // 绘制编辑图标背景
+  context.fillStyle = '#f0f0f0'
+  context.beginPath()
+  context.roundRect(iconX - 2 * scale.value, iconY - 2 * scale.value, iconSize + 4 * scale.value, iconSize + 4 * scale.value, 4 * scale.value)
+  context.fill()
+  
+  // 绘制编辑图标（简单的齿轮图标）
+  context.fillStyle = '#666666'
+  context.font = `${12 * scale.value}px Arial`
+  context.textAlign = 'center'
+  context.fillText('⚙', iconX + iconSize / 2, iconY + iconSize * 0.7)
+  
   // 绘制输入端口
   node.inputs.forEach((input, index) => {
     const portY = y + (20 + index * 20) * scale.value
@@ -588,7 +605,8 @@ const addNode = (template: NodeTemplate) => {
   }
   
   workflowNodes.value.push(newNode)
-  selectedNode.value = newNode
+  // 移除自动选中节点，不显示编辑菜单
+  // selectedNode.value = newNode
   
   // 同步到当前工作流
   currentWorkflow.nodes = [...workflowNodes.value]
@@ -1082,6 +1100,20 @@ const getNodeAtPosition = (x: number, y: number): WorkflowNode | null => {
   return null
 }
 
+const getEditIconAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    const iconSize = 16
+    const iconX = node.x + NODE_WIDTH - iconSize - 8
+    const iconY = node.y + 8
+    
+    if (x >= iconX - 2 && x <= iconX + iconSize + 2 &&
+        y >= iconY - 2 && y <= iconY + iconSize + 2) {
+      return node
+    }
+  }
+  return null
+}
+
 const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, port: string, type: 'input' | 'output' } | null => {
   for (const node of workflowNodes.value) {
     // 检查输入端口
@@ -1116,6 +1148,7 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   event.stopPropagation()
   
   const pos = getCanvasPosition(event)
+  const clickedEditIcon = getEditIconAtPosition(pos.x, pos.y)
   const clickedNode = getNodeAtPosition(pos.x, pos.y)
   const clickedPort = getPortAtCanvasPosition(pos.x, pos.y)
   
@@ -1130,9 +1163,12 @@ const onCanvasMouseDown = (event: MouseEvent) => {
       console.log('开始从输入端口创建连接')
       connectionManager.startConnection(clickedPort.node.id, clickedPort.port, 'input')
     }
+  } else if (clickedEditIcon) {
+    // 点击编辑图标，显示编辑栏
+    selectedNode.value = clickedEditIcon
+    console.log('点击编辑图标，选中节点:', clickedEditIcon.name)
   } else if (clickedNode) {
-    // 选择节点并开始拖拽
-    selectedNode.value = clickedNode
+    // 点击节点但不是编辑图标，只开始拖拽，不显示编辑栏
     draggedNode.value = clickedNode
     isDragging.value = true
     dragStart.value = { x: pos.x - clickedNode.x, y: pos.y - clickedNode.y }
@@ -1274,7 +1310,8 @@ const onDrop = (event: DragEvent) => {
         outputs: template.category === 'output' ? [] : ['output']
       }
       workflowNodes.value.push(newNode)
-      selectedNode.value = newNode
+      // 移除自动选中节点，不显示编辑菜单
+      // selectedNode.value = newNode
       
       // 同步到当前工作流
       currentWorkflow.nodes = [...workflowNodes.value]
