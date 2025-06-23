@@ -717,8 +717,8 @@ class ConnectionManager {
   // 开始连接
   startConnection(nodeId: string, port: string, type: 'input' | 'output') {
     if (!this.isConnecting.value) {
-      // 只有output端口才自动断开现有连接
-      if (type === 'output') {
+      // 只有input端口才自动断开现有连接
+      if (type === 'input') {
         this.disconnectPortConnections(nodeId, port, type)
       }
       
@@ -833,28 +833,27 @@ class ConnectionManager {
   startConnectionDrag(connection: Connection, endpoint: 'from' | 'to', event: MouseEvent) {
     event.stopPropagation()
     
-    // 删除原连接
-    this.deleteConnection(connection.id)
-    
-    // 设置拖拽状态
-    this.isDraggingConnection.value = true
-    this.draggingConnectionEnd.value = endpoint
-    
     // 根据拖拽的端点确定连接起始信息
     if (endpoint === 'from') {
-      this.connectionStart.value = {
-        nodeId: connection.to,
-        port: connection.toPort,
-        type: 'input'
-      }
-    } else {
+      // 拖拽output端口（from端），不删除原连接
       this.connectionStart.value = {
         nodeId: connection.from,
         port: connection.fromPort,
         type: 'output'
       }
+    } else {
+      // 拖拽input端口（to端），删除原连接
+      this.deleteConnection(connection.id)
+      this.connectionStart.value = {
+        nodeId: connection.to,
+        port: connection.toPort,
+        type: 'input'
+      }
     }
     
+    // 设置拖拽状态
+    this.isDraggingConnection.value = true
+    this.draggingConnectionEnd.value = endpoint
     this.isConnecting.value = true
     
     // 设置临时连接线起始位置
