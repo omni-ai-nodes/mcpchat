@@ -26,17 +26,17 @@
                 <!-- file-input 节点特殊显示 -->
                 <div v-if="node.type === 'file-input'" class="flex flex-col gap-2">
                   <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                      <Icon icon="lucide:upload" class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <div class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                      <Icon icon="lucide:upload" class="w-4 h-4 text-gray-600 dark:text-gray-400" />
                     </div>
                     <div class="flex-1">
-                      <div class="text-sm font-medium">文件上传</div>
-                      <div class="text-xs text-muted-foreground">点击或拖拽上传文件</div>
+                      <div class="text-sm font-medium">加载图像</div>
+                      <div class="text-xs text-muted-foreground">上传图片文件</div>
                     </div>
                   </div>
-                  <div class="w-full h-8 border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg flex items-center justify-center bg-blue-50 dark:bg-blue-900/20">
-                    <Icon icon="lucide:file-plus" class="w-4 h-4 text-blue-500" />
-                    <span class="text-xs text-blue-600 dark:text-blue-400 ml-1">选择文件</span>
+                  <div class="w-full h-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900/20 hover:bg-gray-100 dark:hover:bg-gray-800/30 transition-colors cursor-pointer">
+                    <Icon icon="lucide:image" class="w-6 h-6 text-gray-400 mb-1" />
+                    <span class="text-xs text-gray-500 dark:text-gray-400">upload</span>
                   </div>
                 </div>
                 
@@ -185,7 +185,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -218,6 +218,7 @@ interface WorkflowNode {
     width: number
     height: number
   }
+  cachedImage?: HTMLImageElement
 }
 
 interface Connection {
@@ -385,15 +386,19 @@ const initCanvas = () => {
   window.addEventListener('resize', resizeCanvas)
 }
 
+const redraw = () => {
+  if (ctx.value && canvasRef.value) {
+    clearCanvas()
+    drawGrid()
+    drawConnections()
+    drawNodes()
+    drawTempConnection()
+  }
+}
+
 const startRenderLoop = () => {
   const render = () => {
-    if (ctx.value && canvasRef.value) {
-      clearCanvas()
-      drawGrid()
-      drawConnections()
-      drawNodes()
-      drawTempConnection()
-    }
+    redraw()
     animationFrameId.value = requestAnimationFrame(render)
   }
   render()
@@ -601,6 +606,128 @@ const drawNode = (node: WorkflowNode) => {
     const portY = y + headerHeight / 2
     drawPort(x + width + PORT_RADIUS * scale.value, portY, 'output')
   })
+  
+  // 如果是文件输入节点，在下部绘制上传区域或图片预览
+  if (node.type === 'file-input') {
+    const uploadAreaWidth = width - 16 * scale.value
+    const uploadAreaHeight = 70 * scale.value
+    const uploadAreaX = x + 8 * scale.value
+    const uploadAreaY = y + height - uploadAreaHeight - 8 * scale.value
+    
+    // 检查是否有上传的图片
+    const hasImage = node.config?.imageData && typeof node.config.imageData === 'string'
+    
+    if (hasImage) {
+      // 绘制图片预览背景
+      context.fillStyle = '#f8fafc'
+      context.beginPath()
+      context.roundRect(uploadAreaX, uploadAreaY, uploadAreaWidth, uploadAreaHeight, 6 * scale.value)
+      context.fill()
+      
+      // 绘制边框
+      context.strokeStyle = '#e2e8f0'
+      context.lineWidth = 1 * scale.value
+      context.setLineDash([])
+      context.stroke()
+      
+      // 如果图片已缓存，直接绘制
+      if (node.cachedImage) {
+        const img = node.cachedImage
+        // 计算图片显示尺寸，保持宽高比
+        const maxWidth = uploadAreaWidth - 12 * scale.value
+        const maxHeight = uploadAreaHeight - 24 * scale.value
+        let imgWidth = img.width
+        let imgHeight = img.height
+        
+        const aspectRatio = imgWidth / imgHeight
+        if (imgWidth > maxWidth) {
+          imgWidth = maxWidth
+          imgHeight = imgWidth / aspectRatio
+        }
+        if (imgHeight > maxHeight) {
+          imgHeight = maxHeight
+          imgWidth = imgHeight * aspectRatio
+        }
+        
+        const imgX = uploadAreaX + (uploadAreaWidth - imgWidth) / 2
+        const imgY = uploadAreaY + 6 * scale.value
+        
+        // 绘制图片
+        context.drawImage(img, imgX, imgY, imgWidth, imgHeight)
+        
+        // 绘制文件名
+        if (node.config?.fileName && typeof node.config.fileName === 'string') {
+          context.fillStyle = '#475569'
+          context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+          context.textAlign = 'center'
+          context.textBaseline = 'bottom'
+          const fileName = node.config.fileName.length > 18 ? node.config.fileName.substring(0, 15) + '...' : node.config.fileName
+          context.fillText(fileName, uploadAreaX + uploadAreaWidth / 2, uploadAreaY + uploadAreaHeight - 3 * scale.value)
+        }
+      } else {
+        // 异步加载图片
+        const img = new Image()
+        img.onload = () => {
+          node.cachedImage = img
+          // 重新绘制整个画布
+          nextTick(() => {
+            redraw()
+          })
+        }
+        img.src = node.config.imageData as string
+        
+        // 显示加载状态
+        context.fillStyle = '#94a3b8'
+        context.font = `${12 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+        context.textAlign = 'center'
+        context.textBaseline = 'middle'
+        context.fillText('加载中...', uploadAreaX + uploadAreaWidth / 2, uploadAreaY + uploadAreaHeight / 2)
+      }
+    } else {
+      // 显示上传区域
+      context.fillStyle = 'rgba(148, 163, 184, 0.08)'
+      context.beginPath()
+      context.roundRect(uploadAreaX, uploadAreaY, uploadAreaWidth, uploadAreaHeight, 6 * scale.value)
+      context.fill()
+      
+      // 绘制虚线边框
+      context.strokeStyle = '#94a3b8'
+      context.lineWidth = 1.5 * scale.value
+      context.setLineDash([4 * scale.value, 4 * scale.value])
+      context.stroke()
+      context.setLineDash([])
+      
+      // 绘制图标和文字
+      const iconY = uploadAreaY + uploadAreaHeight / 2 - 8 * scale.value
+      
+      context.fillStyle = '#64748b'
+      context.font = `${18 * scale.value}px Arial`
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText('🖼️', uploadAreaX + uploadAreaWidth / 2, iconY)
+      
+      context.fillStyle = '#64748b'
+      context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText('点击上传图片', uploadAreaX + uploadAreaWidth / 2, iconY + 20 * scale.value)
+    }
+    
+    // 存储上传区域位置信息，用于点击检测
+    if (!node.uploadButton) {
+      node.uploadButton = {
+        x: uploadAreaX,
+        y: uploadAreaY,
+        width: uploadAreaWidth,
+        height: uploadAreaHeight
+      }
+    } else {
+      node.uploadButton.x = uploadAreaX
+      node.uploadButton.y = uploadAreaY
+      node.uploadButton.width = uploadAreaWidth
+      node.uploadButton.height = uploadAreaHeight
+    }
+  }
   
   // 如果是文本输入节点，在下部绘制上传按钮
   if (node.type === 'text-input') {
@@ -1129,105 +1256,12 @@ class ConnectionManager {
 // 创建连接管理器实例
 const connectionManager = new ConnectionManager()
 
-// 导出响应式状态供模板使用
-const tempConnection = connectionManager.tempConnection
-const selectedConnection = connectionManager.selectedConnection
-
 const updateSelectedNode = (updates: Partial<WorkflowNode>) => {
   if (selectedNode.value) {
     updateNode(selectedNode.value.id, updates)
     selectedNode.value = { ...selectedNode.value, ...updates }
   }
 }
-
-const getConnectionPath = (connection: Connection) => {
-  // 连接线路径计算
-  const fromNode = workflowNodes.value.find(n => n.id === connection.from)
-  const toNode = workflowNodes.value.find(n => n.id === connection.to)
-  
-  if (!fromNode || !toNode) return ''
-  
-  // 计算输出端口圆点的中心位置
-  // 根据用户测试的正确配置调整位置
-  const fromX = fromNode.x + 220 - 30    // 节点宽度220px - 30px偏移
-  const fromY = fromNode.y + 20          // 头部位置 + 20px偏移
-  // 计算输入端口圆点的中心位置
-  // 对应调整输入端口位置
-  const toX = toNode.x + 30              // 节点左边缘 + 30px偏移
-  const toY = toNode.y + 20              // 头部位置 + 20px偏移
-  
-  // 验证坐标值是否有效
-  if (!isFinite(fromX) || !isFinite(fromY) || !isFinite(toX) || !isFinite(toY)) {
-    return ''
-  }
-  
-  // 创建更自然的贝塞尔曲线
-  const deltaX = toX - fromX
-  const deltaY = toY - fromY
-  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
-  
-  // 防止除零错误
-  if (distance === 0) {
-    return `M ${fromX} ${fromY} L ${toX} ${toY}`
-  }
-  
-  // 根据距离和方向动态调整控制点
-  const baseOffset = Math.min(distance * 0.4, 120)
-  const verticalInfluence = Math.abs(deltaY) / distance
-  const controlOffset = baseOffset * (1 + verticalInfluence * 0.2)
-  
-  // 处理反向连接的情况
-  const isReverse = deltaX < 0
-  const cp1X = fromX + (isReverse ? Math.min(controlOffset, 80) : controlOffset)
-  const cp1Y = fromY + deltaY * 0.05
-  const cp2X = toX - (isReverse ? Math.min(controlOffset, 80) : controlOffset)
-  const cp2Y = toY - deltaY * 0.05
-  
-  return `M ${fromX} ${fromY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${toX} ${toY}`
-}
-
-// 获取连接线中点位置
-const getConnectionMidpoint = (connection: Connection) => {
-  const fromNode = workflowNodes.value.find(n => n.id === connection.from)
-  const toNode = workflowNodes.value.find(n => n.id === connection.to)
-  
-  if (!fromNode || !toNode) return { x: 0, y: 0 }
-  
-  // 使用与getConnectionPath相同的端口位置计算
-  const fromX = fromNode.x + 220 - 30    // 输出端口圆点中心位置
-  const fromY = fromNode.y + 20          // 输出端口圆点中心位置
-  const toX = toNode.x + 30              // 输入端口圆点中心位置
-  const toY = toNode.y + 20              // 输入端口圆点中心位置
-  
-  // 计算贝塞尔曲线的中点（t=0.5时的位置）
-  const deltaX = toX - fromX
-  const deltaY = toY - fromY
-  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
-  
-  if (distance === 0) {
-    return { x: fromX, y: fromY }
-  }
-  
-  const baseOffset = Math.min(distance * 0.4, 120)
-  const verticalInfluence = Math.abs(deltaY) / distance
-  const controlOffset = baseOffset * (1 + verticalInfluence * 0.2)
-  
-  const isReverse = deltaX < 0
-  const cp1X = fromX + (isReverse ? Math.min(controlOffset, 80) : controlOffset)
-  const cp1Y = fromY + deltaY * 0.05
-  const cp2X = toX - (isReverse ? Math.min(controlOffset, 80) : controlOffset)
-  const cp2Y = toY - deltaY * 0.05
-  
-  // 贝塞尔曲线在t=0.5时的位置公式
-  const t = 0.5
-  const x = Math.pow(1-t, 3) * fromX + 3 * Math.pow(1-t, 2) * t * cp1X + 3 * (1-t) * Math.pow(t, 2) * cp2X + Math.pow(t, 3) * toX
-  const y = Math.pow(1-t, 3) * fromY + 3 * Math.pow(1-t, 2) * t * cp1Y + 3 * (1-t) * Math.pow(t, 2) * cp2Y + Math.pow(t, 3) * toY
-  
-  return { x, y }
-}
-
-// 从中点删除连接
-
 
 // Canvas 鼠标事件处理
 const getCanvasPosition = (event: MouseEvent) => {
@@ -1266,7 +1300,7 @@ const getEditIconAtPosition = (x: number, y: number): WorkflowNode | null => {
 
 const getUploadButtonAtPosition = (x: number, y: number): WorkflowNode | null => {
   for (const node of workflowNodes.value) {
-    if (node.type === 'text-input' && node.uploadButton) {
+    if ((node.type === 'text-input' || node.type === 'file-input') && node.uploadButton) {
       const button = node.uploadButton
       if (x >= button.x && x <= button.x + button.width && 
           y >= button.y && y <= button.y + button.height) {
@@ -1283,27 +1317,52 @@ const handleUploadButtonClick = (node: WorkflowNode) => {
   // 创建文件输入元素
   const fileInput = document.createElement('input')
   fileInput.type = 'file'
-  fileInput.accept = '.txt,.md,.json,.csv,.xml'
+  
+  // 根据节点类型设置不同的文件类型过滤
+  if (node.type === 'file-input') {
+    fileInput.accept = 'image/*,.png,.jpg,.jpeg,.gif,.bmp,.webp'
+  } else {
+    fileInput.accept = '.txt,.md,.json,.csv,.xml'
+  }
+  
   fileInput.style.display = 'none'
   
   fileInput.onchange = (event) => {
     const target = event.target as HTMLInputElement
     const file = target.files?.[0]
     if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const content = e.target?.result as string
-        // 更新节点配置中的文本内容
-        updateNode(node.id, {
-          config: {
-            ...node.config,
-            defaultText: content,
-            fileName: file.name
-          }
-        })
-        console.log('文件上传成功:', file.name, '内容长度:', content.length)
+      if (node.type === 'file-input' && file.type.startsWith('image/')) {
+        // 处理图片文件
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const dataUrl = e.target?.result as string
+          updateNode(node.id, {
+            config: {
+              ...node.config,
+              imageData: dataUrl,
+              fileName: file.name,
+              fileSize: file.size
+            }
+          })
+          console.log('图片上传成功:', file.name, '大小:', file.size)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        // 处理文本文件
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const content = e.target?.result as string
+          updateNode(node.id, {
+            config: {
+              ...node.config,
+              defaultText: content,
+              fileName: file.name
+            }
+          })
+          console.log('文件上传成功:', file.name, '内容长度:', content.length)
+        }
+        reader.readAsText(file)
       }
-      reader.readAsText(file)
     }
     // 清理临时元素
     document.body.removeChild(fileInput)
@@ -1324,7 +1383,8 @@ const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, po
       
       const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
       if (distance <= PORT_RADIUS * 2) {
-        return { node, port: typeof node.inputs[i] === 'string' ? node.inputs[i] : node.inputs[i].name, type: 'input' }
+        const portName = typeof node.inputs[i] === 'string' ? node.inputs[i] as string : (node.inputs[i] as { name: string }).name
+        return { node, port: portName, type: 'input' }
       }
     }
     
@@ -1336,7 +1396,8 @@ const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, po
       
       const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
       if (distance <= PORT_RADIUS * 2) {
-        return { node, port: typeof node.outputs[i] === 'string' ? node.outputs[i] : node.outputs[i].name, type: 'output' }
+        const portName = typeof node.outputs[i] === 'string' ? node.outputs[i] as string : (node.outputs[i] as { name: string }).name
+        return { node, port: portName, type: 'output' }
       }
     }
   }
@@ -1520,62 +1581,6 @@ const onDrop = (event: DragEvent) => {
     }
   }
 }
-
-
-
-// 检测节点边界
-const getNodeBoundary = (x: number, y: number) => {
-  for (const node of workflowNodes.value) {
-    const nodeLeft = node.x
-    const nodeRight = node.x + NODE_WIDTH
-    const nodeTop = node.y
-    const nodeBottom = node.y + NODE_HEIGHT
-    
-    // 检查是否在节点边界附近（扩展检测区域）
-    const margin = 15 // 边界感知距离
-    if (x >= nodeLeft - margin && x <= nodeRight + margin &&
-        y >= nodeTop - margin && y <= nodeBottom + margin) {
-      
-      // 确定最近的边和对应的端口类型
-      const distToLeft = Math.abs(x - nodeLeft)
-      const distToRight = Math.abs(x - nodeRight)
-      const distToTop = Math.abs(y - nodeTop)
-      const distToBottom = Math.abs(y - nodeBottom)
-      
-      const minDist = Math.min(distToLeft, distToRight, distToTop, distToBottom)
-      
-      // 根据最近的边确定端口类型和位置
-      if (minDist === distToLeft && node.inputs.length > 0) {
-        // 左边界 - 输入端口
-        const portIndex = Math.min(Math.floor((y - nodeTop) / 20), node.inputs.length - 1)
-        const portY = nodeTop + (20 + portIndex * 20)
-        return {
-          nodeId: node.id,
-          port: typeof node.inputs[portIndex] === 'string' ? node.inputs[portIndex] : node.inputs[portIndex].name,
-          type: 'input' as const,
-          snapX: nodeLeft - PORT_RADIUS,
-          snapY: portY,
-          isBoundary: true
-        }
-      } else if (minDist === distToRight && node.outputs.length > 0) {
-        // 右边界 - 输出端口
-        const portIndex = Math.min(Math.floor((y - nodeTop) / 20), node.outputs.length - 1)
-        const portY = nodeTop + (20 + portIndex * 20)
-        return {
-          nodeId: node.id,
-          port: typeof node.outputs[portIndex] === 'string' ? node.outputs[portIndex] : node.outputs[portIndex].name,
-          type: 'output' as const,
-          snapX: nodeRight + PORT_RADIUS,
-          snapY: portY,
-          isBoundary: true
-        }
-      }
-    }
-  }
-  return null
-}
-
-
 
 const onDragOver = (event: DragEvent) => {
   event.preventDefault()
