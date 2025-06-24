@@ -54,8 +54,47 @@
 
     <!-- 节点内容 -->
     <div class="node-content">
-      <div class="node-type">{{ getNodeTypeLabel(node.type) }}</div>
-      <div class="node-description">{{ node.description || '暂无描述' }}</div>
+      <!-- 非文件输入节点显示通用文字区域 -->
+      <template v-if="node.type !== 'file-input'">
+        <div class="node-type">{{ getNodeTypeLabel(node.type) }}</div>
+        <div class="node-description">{{ node.description || '暂无描述' }}</div>
+      </template>
+      
+      <!-- 文件输入节点特殊内容 -->
+      <div v-if="node.type === 'file-input'" class="file-input-content">
+        <!-- 文件输入节点不显示通用的文字区域，直接显示上传按钮 -->
+        <input 
+          ref="fileInputRef"
+          type="file" 
+          class="hidden-file-input"
+          @change="handleFileUpload"
+          accept="*/*"
+        />
+        <button 
+          class="upload-button"
+          @click="triggerFileUpload"
+          @mousedown.stop
+          @click.stop
+        >
+          📁 选择文件
+        </button>
+        
+        <!-- 已上传文件信息 -->
+        <div v-if="uploadedFile" class="uploaded-file-info">
+          <div class="file-name">{{ uploadedFile.name }}</div>
+          
+          <!-- 图片预览 -->
+          <div v-if="isImageFile(uploadedFile.name)" class="image-preview">
+            <img :src="uploadedFile.localPath" alt="预览图" class="preview-image" />
+          </div>
+          
+          <!-- 文件信息 -->
+          <div class="file-details">
+            <span class="file-size">{{ formatFileSize(uploadedFile.size) }}</span>
+            <span class="file-type">{{ getFileExtension(uploadedFile.name) }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -97,6 +136,17 @@ const nodeStart = ref({ x: 0, y: 0 })
 // 节点拖拽更新节流控制
 let lastDragUpdate = 0
 const DRAG_UPDATE_THROTTLE = 16 // 约60fps的更新频率
+
+// 文件上传相关
+const fileInputRef = ref<HTMLInputElement>()
+const uploadedFile = ref<{
+  name: string
+  size: number
+  localPath: string
+  originalPath: string
+} | null>(props.node.config?.uploadedFile || null)
+
+// 移除调试日志
 
 const getNodeIcon = (type: string) => {
   const iconMap: Record<string, string> = {
@@ -195,6 +245,90 @@ const getPortPosition = (index: number, type: 'input' | 'output') => {
   // 端口现在在头部，返回头部中心位置
   const headerHeight = 32 // 节点头部高度
   return headerHeight / 2
+}
+
+// 文件上传相关函数
+const triggerFileUpload = () => {
+  fileInputRef.value?.click()
+}
+
+const handleFileUpload = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  try {
+    // 获取文件的本地路径（如果可用）
+    let localPath = ''
+    if (window.api?.getPathForFile) {
+      localPath = window.api.getPathForFile(file)
+    }
+
+    // 创建文件的本地URL用于预览
+    const fileUrl = URL.createObjectURL(file)
+
+    // 通过IPC发送文件保存请求到主进程
+    const timestamp = Date.now()
+    const fileName = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+    
+    // 读取文件内容
+    const arrayBuffer = await file.arrayBuffer()
+    
+    // 发送文件保存请求到主进程
+    const savedPath = await window.electron.ipcRenderer.invoke('save-uploaded-file', {
+      fileName,
+      fileData: Array.from(new Uint8Array(arrayBuffer)),
+      originalName: file.name
+    })
+
+    // 更新上传文件信息
+    uploadedFile.value = {
+      name: file.name,
+      size: file.size,
+      localPath: isImageFile(file.name) ? fileUrl : savedPath,
+      originalPath: savedPath || localPath
+    }
+
+    // 更新节点配置
+    emit('update', props.node.id, {
+      config: {
+        ...props.node.config,
+        uploadedFile: uploadedFile.value
+      }
+    })
+
+  } catch (error) {
+    console.error('文件上传失败:', error)
+    // 如果保存失败，至少创建一个临时预览
+    const fileUrl = URL.createObjectURL(file)
+    uploadedFile.value = {
+      name: file.name,
+      size: file.size,
+      localPath: fileUrl,
+      originalPath: ''
+    }
+  }
+}
+
+// 工具函数
+const isImageFile = (fileName: string): boolean => {
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
+  const extension = getFileExtension(fileName)
+  return imageExtensions.includes('.' + extension)
+}
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+const getFileExtension = (fileName: string): string => {
+  const lastDotIndex = fileName.lastIndexOf('.')
+  if (lastDotIndex === -1) return 'unknown'
+  return fileName.substring(lastDotIndex + 1).toLowerCase()
 }
 
 // 组件卸载时清理
@@ -373,5 +507,86 @@ onUnmounted(() => {
     box-shadow: 0 0 12px rgba(245, 158, 11, 0.9);
     transform: scale(1.15);
   }
+}
+
+/* 文件上传相关样式 */
+.file-input-content {
+  /* 移除默认的 margin 和 border，让按钮占满整个内容区域 */
+  min-height: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.upload-button {
+  width: 100%;
+  padding: 6px 12px;
+  background: #404040;
+  border: 1px solid #555;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.upload-button:hover {
+  background: #4a4a4a;
+  border-color: #60a5fa;
+}
+
+.uploaded-file-info {
+  margin-top: 8px;
+  padding: 8px;
+  background: #333;
+  border-radius: 6px;
+  border: 1px solid #404040;
+}
+
+.file-name {
+  font-size: 11px;
+  color: #fff;
+  font-weight: 500;
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.image-preview {
+  margin: 6px 0;
+  text-align: center;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 80px;
+  border-radius: 4px;
+  border: 1px solid #555;
+  object-fit: cover;
+}
+
+.file-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: #888;
+}
+
+.file-size {
+  color: #aaa;
+}
+
+.file-type {
+  color: #60a5fa;
+  text-transform: uppercase;
+  font-weight: 500;
 }
 </style>

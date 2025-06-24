@@ -23,7 +23,25 @@
                 @click="addNode(node)"
                 @dragstart="onDragStart(node, $event)"
               >
-                <div class="flex items-center gap-3">
+                <!-- file-input 节点特殊显示 -->
+                <div v-if="node.type === 'file-input'" class="flex flex-col gap-2">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                      <Icon icon="lucide:upload" class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div class="flex-1">
+                      <div class="text-sm font-medium">文件上传</div>
+                      <div class="text-xs text-muted-foreground">点击或拖拽上传文件</div>
+                    </div>
+                  </div>
+                  <div class="w-full h-8 border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg flex items-center justify-center bg-blue-50 dark:bg-blue-900/20">
+                    <Icon icon="lucide:file-plus" class="w-4 h-4 text-blue-500" />
+                    <span class="text-xs text-blue-600 dark:text-blue-400 ml-1">选择文件</span>
+                  </div>
+                </div>
+                
+                <!-- 其他节点正常显示 -->
+                <div v-else class="flex items-center gap-3">
                   <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
                     <Icon :icon="node.icon" class="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   </div>
@@ -139,15 +157,27 @@
       </div>
     </div>
 
-    <!-- 右侧属性面板 -->
-    <div class="w-80 border-l bg-card flex flex-col" v-if="selectedNode">
-      <div class="p-4 border-b">
+    <!-- 右侧属性面板 - 弹出层 -->
+    <div 
+      v-if="selectedNode" 
+      class="fixed top-0 right-0 w-80 h-full bg-card border-l shadow-lg flex flex-col"
+      style="z-index: 50;"
+    >
+      <div class="p-4 border-b flex items-center justify-between">
         <h2 class="text-lg font-semibold">{{ t('common.mcp.workflow.properties') }}</h2>
+        <button 
+          @click="selectedNode = null"
+          class="p-1 hover:bg-accent rounded transition-colors"
+          title="关闭属性面板"
+        >
+          <Icon icon="lucide:x" class="w-4 h-4" />
+        </button>
       </div>
       <div class="flex-1 overflow-y-auto p-4">
         <NodeProperties 
           :node="selectedNode"
           @update="updateSelectedNode"
+          @delete="deleteNode"
         />
       </div>
     </div>

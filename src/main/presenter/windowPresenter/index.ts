@@ -41,6 +41,34 @@ export class WindowPresenter implements IWindowPresenter {
       event.returnValue = event.sender.id
     })
 
+    // 处理文件上传保存
+    ipcMain.handle('save-uploaded-file', async (event, { fileName, fileData, originalName }) => {
+      try {
+        const fs = require('fs')
+        const path = require('path')
+        const os = require('os')
+        
+        // 创建inputs目录在应用安装目录下
+        const appPath = app.getAppPath()
+        const inputsDir = path.join(appPath, 'inputs')
+        
+        if (!fs.existsSync(inputsDir)) {
+          fs.mkdirSync(inputsDir, { recursive: true })
+        }
+        
+        // 保存文件
+        const filePath = path.join(inputsDir, fileName)
+        const buffer = Buffer.from(fileData)
+        fs.writeFileSync(filePath, buffer)
+        
+        console.log(`File saved: ${originalName} -> ${filePath}`)
+        return filePath
+      } catch (error) {
+        console.error('Failed to save uploaded file:', error)
+        throw error
+      }
+    })
+
     // 监听应用即将退出的事件，设置退出标志，避免窗口关闭时触发隐藏逻辑
     app.on('before-quit', () => {
       console.log('App is quitting, setting isQuitting flag.')

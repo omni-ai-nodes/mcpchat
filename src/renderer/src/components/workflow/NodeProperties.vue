@@ -183,11 +183,24 @@
         </div>
       </div>
     </div>
+
+    <!-- 删除节点按钮 -->
+    <div class="property-group">
+      <button 
+        class="delete-button"
+        @click="deleteNode"
+        title="删除此节点"
+      >
+        <Icon icon="mdi:delete" class="delete-icon" />
+        删除节点
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, reactive } from 'vue'
+import { Icon } from '@iconify/vue'
 
 interface WorkflowNode {
   id: string
@@ -206,6 +219,7 @@ interface Props {
 
 interface Emits {
   update: [updates: Partial<WorkflowNode>]
+  delete: [nodeId: string]
 }
 
 const props = defineProps<Props>()
@@ -244,6 +258,12 @@ const updateProperty = (key: string, value: any) => {
 const updateConfig = (key: string, value: any) => {
   const newConfig = { ...localNode.config, [key]: value }
   emit('update', { config: newConfig })
+}
+
+const deleteNode = () => {
+  if (confirm('确定要删除这个节点吗？此操作无法撤销。')) {
+    emit('delete', props.node.id)
+  }
 }
 </script>
 
@@ -336,5 +356,38 @@ select.property-input {
 select.property-input option {
   background: #333333;
   color: #ffffff;
+}
+
+.delete-button {
+  width: 100%;
+  padding: 10px 16px;
+  background: #dc2626;
+  border: 1px solid #b91c1c;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.delete-button:hover {
+  background: #b91c1c;
+  border-color: #991b1b;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+.delete-button:active {
+  background: #991b1b;
+  transform: translateY(1px);
+}
+
+.delete-icon {
+  width: 16px;
+  height: 16px;
 }
 </style>
