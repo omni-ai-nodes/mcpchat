@@ -210,8 +210,14 @@ interface WorkflowNode {
   x: number
   y: number
   config: Record<string, unknown>
-  inputs: string[]
-  outputs: string[]
+  inputs: (string | { name: string })[]
+  outputs: (string | { name: string })[]
+  uploadButton?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 }
 
 interface Connection {
@@ -377,9 +383,6 @@ const initCanvas = () => {
   
   resizeCanvas()
   window.addEventListener('resize', resizeCanvas)
-  
-  // 开始渲染循环
-  startRenderLoop()
 }
 
 const startRenderLoop = () => {
@@ -588,21 +591,60 @@ const drawNode = (node: WorkflowNode) => {
   context.stroke()
   
   // 绘制输入端口
-  node.inputs.forEach((input) => {
+  node.inputs.forEach(() => {
     const portY = y + headerHeight / 2
-    const portName = input
-    drawPort(x - PORT_RADIUS * scale.value, portY, 'input', node.id, portName)
+    drawPort(x - PORT_RADIUS * scale.value, portY, 'input')
   })
   
   // 绘制输出端口
-  node.outputs.forEach((output) => {
+  node.outputs.forEach(() => {
     const portY = y + headerHeight / 2
-    const portName = output
-    drawPort(x + width + PORT_RADIUS * scale.value, portY, 'output', node.id, portName)
+    drawPort(x + width + PORT_RADIUS * scale.value, portY, 'output')
   })
+  
+  // 如果是文本输入节点，在下部绘制上传按钮
+  if (node.type === 'text-input') {
+    const buttonWidth = 80 * scale.value
+    const buttonHeight = 24 * scale.value
+    const buttonX = x + (width - buttonWidth) / 2
+    const buttonY = y + height - buttonHeight - 8 * scale.value
+    
+    // 绘制按钮背景
+    context.fillStyle = '#4f46e5'
+    context.beginPath()
+    context.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 4 * scale.value)
+    context.fill()
+    
+    // 绘制按钮边框
+    context.strokeStyle = '#6366f1'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制按钮文字
+    context.fillStyle = '#ffffff'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'center'
+    context.textBaseline = 'middle'
+    context.fillText('📎 上传', buttonX + buttonWidth / 2, buttonY + buttonHeight / 2)
+    
+    // 存储按钮位置信息，用于点击检测
+    if (!node.uploadButton) {
+      node.uploadButton = {
+        x: buttonX,
+        y: buttonY,
+        width: buttonWidth,
+        height: buttonHeight
+      }
+    } else {
+      node.uploadButton.x = buttonX
+      node.uploadButton.y = buttonY
+      node.uploadButton.width = buttonWidth
+      node.uploadButton.height = buttonHeight
+    }
+  }
 }
 
-const drawPort = (x: number, y: number, type: 'input' | 'output', _nodeId: string, _portName: string) => {
+const drawPort = (x: number, y: number, type: 'input' | 'output') => {
   if (!ctx.value) return
   
   const context = ctx.value
@@ -756,26 +798,10 @@ const updateNode = (nodeId: string, updates: Partial<WorkflowNode>) => {
     // 同步到当前工作流
     currentWorkflow.nodes = [...workflowNodes.value]
     
-    // 如果是位置更新，立即更新节点缓存以确保连接线实时响应
+    // 如果是位置更新，重新绘制画布
     if (updates.x !== undefined || updates.y !== undefined) {
-      // 立即更新缓存中的节点边界信息
-      const updatedNode = workflowNodes.value[nodeIndex]
-      const cacheIndex = cachedNodeBounds.findIndex(cache => cache.id === nodeId)
-      if (cacheIndex !== -1) {
-        cachedNodeBounds[cacheIndex].bounds = {
-          left: updatedNode.x - 30,
-          right: updatedNode.x + 250,
-          top: updatedNode.y,
-          bottom: updatedNode.y + 40
-        }
-      }
-      
-      // 对于位置更新，使用节流控制的高频更新
-      const now = Date.now()
-      if (now - lastConnectionUpdate >= CONNECTION_UPDATE_THROTTLE) {
-        connections.value = [...connections.value]
-        lastConnectionUpdate = now
-      }
+      // 对于位置更新，重新绘制画布
+      connections.value = [...connections.value]
     } else {
       // 对于非位置更新，使用 requestAnimationFrame 优化
       if (updateAnimationFrame) {
@@ -1104,16 +1130,8 @@ class ConnectionManager {
 const connectionManager = new ConnectionManager()
 
 // 导出响应式状态供模板使用
-const isConnecting = connectionManager.isConnecting
-const connectionStart = connectionManager.connectionStart
 const tempConnection = connectionManager.tempConnection
 const selectedConnection = connectionManager.selectedConnection
-const isDraggingConnection = connectionManager.isDraggingConnection
-const draggingConnectionEnd = connectionManager.draggingConnectionEnd
-
-const startConnection = (nodeId: string, port: string, type: 'input' | 'output') => {
-  connectionManager.startConnection(nodeId, port, type)
-}
 
 const updateSelectedNode = (updates: Partial<WorkflowNode>) => {
   if (selectedNode.value) {
@@ -1246,6 +1264,56 @@ const getEditIconAtPosition = (x: number, y: number): WorkflowNode | null => {
   return null
 }
 
+const getUploadButtonAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'text-input' && node.uploadButton) {
+      const button = node.uploadButton
+      if (x >= button.x && x <= button.x + button.width && 
+          y >= button.y && y <= button.y + button.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+const handleUploadButtonClick = (node: WorkflowNode) => {
+  console.log('点击上传按钮，节点:', node.name)
+  
+  // 创建文件输入元素
+  const fileInput = document.createElement('input')
+  fileInput.type = 'file'
+  fileInput.accept = '.txt,.md,.json,.csv,.xml'
+  fileInput.style.display = 'none'
+  
+  fileInput.onchange = (event) => {
+    const target = event.target as HTMLInputElement
+    const file = target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const content = e.target?.result as string
+        // 更新节点配置中的文本内容
+        updateNode(node.id, {
+          config: {
+            ...node.config,
+            defaultText: content,
+            fileName: file.name
+          }
+        })
+        console.log('文件上传成功:', file.name, '内容长度:', content.length)
+      }
+      reader.readAsText(file)
+    }
+    // 清理临时元素
+    document.body.removeChild(fileInput)
+  }
+  
+  // 添加到DOM并触发点击
+  document.body.appendChild(fileInput)
+  fileInput.click()
+}
+
 const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, port: string, type: 'input' | 'output' } | null => {
   for (const node of workflowNodes.value) {
     // 检查输入端口
@@ -1283,8 +1351,12 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedEditIcon = getEditIconAtPosition(pos.x, pos.y)
   const clickedNode = getNodeAtPosition(pos.x, pos.y)
   const clickedPort = getPortAtCanvasPosition(pos.x, pos.y)
+  const clickedUploadButton = getUploadButtonAtPosition(pos.x, pos.y)
   
-  if (clickedPort) {
+  if (clickedUploadButton) {
+    // 处理上传按钮点击
+    handleUploadButtonClick(clickedUploadButton)
+  } else if (clickedPort) {
     console.log('检测到端口点击:', clickedPort.type, clickedPort.port, '节点:', clickedPort.node.name)
     if (clickedPort.type === 'output') {
       // 开始连接
@@ -1411,10 +1483,7 @@ const onCanvasWheelCanvas = (event: WheelEvent) => {
   scale.value = Math.max(0.1, Math.min(3, scale.value * delta))
 }
 
-const selectNode = (nodeId: string) => {
-  const node = workflowNodes.value.find(n => n.id === nodeId)
-  selectedNode.value = node || null
-}
+
 
 const onDragStart = (template: NodeTemplate, event: DragEvent) => {
   if (event.dataTransfer) {
@@ -1452,60 +1521,7 @@ const onDrop = (event: DragEvent) => {
   }
 }
 
-// 节流变量
-let lastMouseMoveTime = 0
-let cachedCanvasRect: DOMRect | null = null
-let lastHoveredPort: any = null
 
-// 缓存端口DOM元素查询结果
-const portElementCache = new Map<string, HTMLElement | null>()
-let lastPortCacheClean = 0
-
-
-
-
-
-
-const getTempConnectionPath = () => {
-  if (!tempConnection.value) return ''
-  const { x1, y1, x2, y2 } = tempConnection.value
-  
-  // 验证坐标值是否有效
-  if (!isFinite(x1) || !isFinite(y1) || !isFinite(x2) || !isFinite(y2)) {
-    return ''
-  }
-  
-  // 创建更自然的贝塞尔曲线，根据距离和方向调整控制点
-  const deltaX = x2 - x1
-  const deltaY = y2 - y1
-  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
-  
-  // 防止除零错误
-  if (distance === 0) {
-    return `M ${x1} ${y1} L ${x2} ${y2}`
-  }
-  
-  // 动态调整控制点偏移量
-  const baseOffset = Math.min(distance * 0.4, 120)
-  const verticalInfluence = Math.abs(deltaY) / distance
-  const controlOffset = baseOffset * (1 + verticalInfluence * 0.3)
-  
-  // 根据连接方向调整控制点
-  const cp1X = x1 + controlOffset
-  const cp1Y = y1 + deltaY * 0.1 // 轻微跟随垂直方向
-  const cp2X = x2 - controlOffset
-  const cp2Y = y2 - deltaY * 0.1
-  
-  return `M ${x1} ${y1} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${x2} ${y2}`
-}
-
-// 缓存节点边界信息，提高检测效率
-let cachedNodeBounds: Array<{id: string, bounds: {left: number, right: number, top: number, bottom: number}, hasInputs: boolean, hasOutputs: boolean}> = []
-let lastNodeCacheUpdate = 0
-
-// 连接线更新节流控制
-let lastConnectionUpdate = 0
-const CONNECTION_UPDATE_THROTTLE = 16 // 约60fps的更新频率
 
 // 检测节点边界
 const getNodeBoundary = (x: number, y: number) => {
@@ -1535,7 +1551,7 @@ const getNodeBoundary = (x: number, y: number) => {
         const portY = nodeTop + (20 + portIndex * 20)
         return {
           nodeId: node.id,
-          port: node.inputs[portIndex].name || node.inputs[portIndex],
+          port: typeof node.inputs[portIndex] === 'string' ? node.inputs[portIndex] : node.inputs[portIndex].name,
           type: 'input' as const,
           snapX: nodeLeft - PORT_RADIUS,
           snapY: portY,
@@ -1547,7 +1563,7 @@ const getNodeBoundary = (x: number, y: number) => {
         const portY = nodeTop + (20 + portIndex * 20)
         return {
           nodeId: node.id,
-          port: node.outputs[portIndex].name || node.outputs[portIndex],
+          port: typeof node.outputs[portIndex] === 'string' ? node.outputs[portIndex] : node.outputs[portIndex].name,
           type: 'output' as const,
           snapX: nodeRight + PORT_RADIUS,
           snapY: portY,
@@ -1559,71 +1575,7 @@ const getNodeBoundary = (x: number, y: number) => {
   return null
 }
 
-const getPortAtPosition = (x: number, y: number) => {
-  // 首先检查精确的端口位置
-  for (const node of workflowNodes.value) {
-    // 检查输入端口
-    for (let i = 0; i < node.inputs.length; i++) {
-      const portX = node.x - PORT_RADIUS
-      const portY = node.y + (20 + i * 20)
-      
-      const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
-      if (distance <= PORT_RADIUS * 2) {
-        return { 
-          nodeId: node.id, 
-          port: typeof node.inputs[i] === 'string' ? node.inputs[i] : node.inputs[i].name, 
-          type: 'input' as const,
-          snapX: portX,
-          snapY: portY,
-          isBoundary: false
-        }
-      }
-    }
-    
-    // 检查输出端口
-    for (let i = 0; i < node.outputs.length; i++) {
-      const portX = node.x + NODE_WIDTH + PORT_RADIUS
-      const portY = node.y + (20 + i * 20)
-      
-      const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
-      if (distance <= PORT_RADIUS * 2) {
-        return { 
-          nodeId: node.id, 
-          port: typeof node.outputs[i] === 'string' ? node.outputs[i] : node.outputs[i].name, 
-          type: 'output' as const,
-          snapX: portX,
-          snapY: portY,
-          isBoundary: false
-        }
-      }
-    }
-  }
-  
-  // 如果没有精确命中端口，检查节点边界
-  return getNodeBoundary(x, y)
-}
 
-const selectConnection = (connection: Connection, event: MouseEvent) => {
-  connectionManager.selectConnection(connection, event)
-}
-
-const deleteConnection = (connectionId: string) => {
-  connectionManager.deleteConnection(connectionId)
-}
-
-const deleteSelectedConnection = () => {
-  if (selectedConnection.value) {
-    connectionManager.deleteConnection(selectedConnection.value.id)
-  }
-}
-
-const startConnectionDrag = (connection: Connection, end: 'from' | 'to', event: MouseEvent) => {
-  connectionManager.startConnectionDrag(connection, end, event)
-}
-
-const getConnectionEndpoint = (connection: Connection, end: 'from' | 'to') => {
-  return connectionManager.getConnectionEndpoint(connection, end)
-}
 
 const onDragOver = (event: DragEvent) => {
   event.preventDefault()
@@ -1685,6 +1637,9 @@ const deployWorkflow = () => {
 onMounted(() => {
   // 初始化Canvas
   initCanvas()
+  
+  // 开始渲染循环
+  startRenderLoop()
   
   // 添加全局鼠标事件监听，确保连接线和拖拽能在整个窗口范围内移动
   const handleGlobalMouseMove = (event: MouseEvent) => {
