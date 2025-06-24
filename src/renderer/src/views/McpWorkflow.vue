@@ -377,25 +377,28 @@ const drawGrid = () => {
   const canvas = canvasRef.value
   const context = ctx.value
   
-  context.strokeStyle = '#f0f0f0'
+  context.strokeStyle = '#888888'
   context.lineWidth = 1
-  
+  context.setLineDash([10, 10]) // 设置虚线样式
+
   const startX = (-offset.value.x % GRID_SIZE) * scale.value
   const startY = (-offset.value.y % GRID_SIZE) * scale.value
-  
+
   for (let x = startX; x < canvas.width; x += GRID_SIZE * scale.value) {
     context.beginPath()
     context.moveTo(x, 0)
     context.lineTo(x, canvas.height)
     context.stroke()
   }
-  
+
   for (let y = startY; y < canvas.height; y += GRID_SIZE * scale.value) {
     context.beginPath()
     context.moveTo(0, y)
     context.lineTo(canvas.width, y)
     context.stroke()
   }
+  
+  context.setLineDash([]) // 重置为实线，避免影响其他绘制
 }
 
 const drawNodes = () => {
