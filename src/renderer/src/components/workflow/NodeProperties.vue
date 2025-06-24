@@ -208,9 +208,9 @@ interface WorkflowNode {
   name: string
   x: number
   y: number
-  config: Record<string, any>
-  inputs: string[]
-  outputs: string[]
+  config: Record<string, unknown>
+  inputs: (string | { name: string })[]
+  outputs: (string | { name: string })[]
 }
 
 interface Props {

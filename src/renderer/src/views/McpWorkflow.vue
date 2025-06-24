@@ -185,7 +185,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -209,7 +209,7 @@ interface WorkflowNode {
   name: string
   x: number
   y: number
-  config: Record<string, any>
+  config: Record<string, unknown>
   inputs: string[]
   outputs: string[]
 }
@@ -453,14 +453,20 @@ const drawNodes = () => {
 const drawNode = (node: WorkflowNode) => {
   if (!ctx.value) return
   
-   const context = ctx.value
+  const context = ctx.value
   const x = (node.x + offset.value.x) * scale.value
   const y = (node.y + offset.value.y) * scale.value
   const width = NODE_WIDTH * scale.value
   const height = NODE_HEIGHT * scale.value
   
+  // 绘制节点阴影
+  context.shadowColor = 'rgba(0, 0, 0, 0.15)'
+  context.shadowBlur = 8 * scale.value
+  context.shadowOffsetX = 0
+  context.shadowOffsetY = 2 * scale.value
+  
   // 绘制节点背景（使用路径绘制圆角矩形）
-  const radius = 8 * scale.value
+  const radius = 12 * scale.value
   context.beginPath()
   context.moveTo(x + radius, y)
   context.lineTo(x + width - radius, y)
@@ -473,65 +479,159 @@ const drawNode = (node: WorkflowNode) => {
   context.quadraticCurveTo(x, y, x + radius, y)
   context.closePath()
   
-  context.fillStyle = selectedNode.value?.id === node.id ? '#e3f2fd' : '#ffffff'
+  // 根据节点类型设置不同的背景色
+  let bgColor = '#2d2d2d'  // 默认深色背景
+  let borderColor = '#404040'
+  
+  if (selectedNode.value?.id === node.id) {
+    bgColor = '#3d3d3d'
+    borderColor = '#0ea5e9'  // 蓝色边框表示选中
+  }
+  
+  // 根据节点类型调整颜色
+  if (node.type.includes('input')) {
+    borderColor = selectedNode.value?.id === node.id ? '#0ea5e9' : '#10b981'  // 绿色
+  } else if (node.type.includes('output')) {
+    borderColor = selectedNode.value?.id === node.id ? '#0ea5e9' : '#8b5cf6'  // 紫色
+  } else {
+    borderColor = selectedNode.value?.id === node.id ? '#0ea5e9' : '#f59e0b'  // 橙色
+  }
+  
+  context.fillStyle = bgColor
   context.fill()
-  context.strokeStyle = '#d0d0d0'
-  context.lineWidth = 2
+  
+  // 清除阴影设置
+  context.shadowColor = 'transparent'
+  context.shadowBlur = 0
+  context.shadowOffsetX = 0
+  context.shadowOffsetY = 0
+  
+  // 绘制边框
+  context.strokeStyle = borderColor
+  context.lineWidth = 2 * scale.value
   context.stroke()
   
-  // 绘制节点标题
-  context.fillStyle = '#333333'
-  context.font = `${14 * scale.value}px Arial`
-  context.textAlign = 'center'
-  context.fillText(node.name, x + width / 2, y + 25 * scale.value)
-  
-  // 绘制节点类型
-  context.fillStyle = '#666666'
-  context.font = `${12 * scale.value}px Arial`
-  context.fillText(node.type, x + width / 2, y + 45 * scale.value)
-  
-  // 绘制编辑图标
-  const iconSize = 16 * scale.value
-  const iconX = x + width - iconSize - 8 * scale.value
-  const iconY = y + 8 * scale.value
-  
-  // 绘制编辑图标背景
-  context.fillStyle = '#f0f0f0'
+  // 绘制节点头部区域
+  const headerHeight = 40 * scale.value
   context.beginPath()
-  context.roundRect(iconX - 2 * scale.value, iconY - 2 * scale.value, iconSize + 4 * scale.value, iconSize + 4 * scale.value, 4 * scale.value)
+  context.moveTo(x + radius, y)
+  context.lineTo(x + width - radius, y)
+  context.quadraticCurveTo(x + width, y, x + width, y + radius)
+  context.lineTo(x + width, y + headerHeight)
+  context.lineTo(x, y + headerHeight)
+  context.lineTo(x, y + radius)
+  context.quadraticCurveTo(x, y, x + radius, y)
+  context.closePath()
+  
+  // 头部渐变背景
+  const gradient = context.createLinearGradient(x, y, x, y + headerHeight)
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)')
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0.05)')
+  context.fillStyle = gradient
   context.fill()
   
-  // 绘制编辑图标（简单的齿轮图标）
-  context.fillStyle = '#666666'
+  // 绘制节点图标（左侧）
+  const iconSize = 20 * scale.value
+  const iconX = x + 12 * scale.value
+  const iconY = y + (headerHeight - iconSize) / 2
+  
+  // 绘制图标背景圆圈
+  context.fillStyle = borderColor
+  context.beginPath()
+  context.arc(iconX + iconSize / 2, iconY + iconSize / 2, iconSize / 2, 0, Math.PI * 2)
+  context.fill()
+  
+  // 绘制图标（简化的图标）
+  context.fillStyle = '#ffffff'
   context.font = `${12 * scale.value}px Arial`
   context.textAlign = 'center'
-  context.fillText('⚙', iconX + iconSize / 2, iconY + iconSize * 0.7)
+  context.textBaseline = 'middle'
+  
+  let iconText = '📄'  // 默认图标
+  if (node.type.includes('input')) {
+    iconText = '📥'
+  } else if (node.type.includes('output')) {
+    iconText = '📤'
+  } else if (node.type.includes('process')) {
+    iconText = '⚙️'
+  }
+  
+  context.fillText(iconText, iconX + iconSize / 2, iconY + iconSize / 2)
+  
+  // 绘制节点标题
+  context.fillStyle = '#ffffff'
+  context.font = `bold ${13 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+  context.textAlign = 'left'
+  context.textBaseline = 'middle'
+  
+  // 限制文本长度
+  let displayName = node.name
+  if (displayName.length > 15) {
+    displayName = displayName.substring(0, 12) + '...'
+  }
+  
+  context.fillText(displayName, iconX + iconSize + 8 * scale.value, y + headerHeight / 2)
+  
+  // 绘制节点类型标签（右上角）
+  const typeText = node.type.toUpperCase()
+  context.fillStyle = 'rgba(255, 255, 255, 0.6)'
+  context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+  context.textAlign = 'right'
+  context.fillText(typeText, x + width - 8 * scale.value, y + 15 * scale.value)
+  
+  // 绘制分隔线
+  context.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+  context.lineWidth = 1 * scale.value
+  context.beginPath()
+  context.moveTo(x + 8 * scale.value, y + headerHeight)
+  context.lineTo(x + width - 8 * scale.value, y + headerHeight)
+  context.stroke()
   
   // 绘制输入端口
-  node.inputs.forEach((input, index) => {
-    const portY = y + (20 + index * 20) * scale.value
-    const portName = typeof input === 'string' ? input : input.name
+  node.inputs.forEach((input) => {
+    const portY = y + headerHeight / 2
+    const portName = input
     drawPort(x - PORT_RADIUS * scale.value, portY, 'input', node.id, portName)
   })
   
   // 绘制输出端口
-  node.outputs.forEach((output, index) => {
-    const portY = y + (20 + index * 20) * scale.value
-    const portName = typeof output === 'string' ? output : output.name
+  node.outputs.forEach((output) => {
+    const portY = y + headerHeight / 2
+    const portName = output
     drawPort(x + width + PORT_RADIUS * scale.value, portY, 'output', node.id, portName)
   })
 }
 
-const drawPort = (x: number, y: number, type: 'input' | 'output', nodeId: string, portName: string) => {
+const drawPort = (x: number, y: number, type: 'input' | 'output', _nodeId: string, _portName: string) => {
   if (!ctx.value) return
   
   const context = ctx.value
   const radius = PORT_RADIUS * scale.value
   
-  context.fillStyle = type === 'input' ? '#4caf50' : '#2196f3'
+  // 绘制端口外圈（白色边框）
+  context.fillStyle = '#ffffff'
+  context.beginPath()
+  context.arc(x, y, radius + 1 * scale.value, 0, Math.PI * 2)
+  context.fill()
+  
+  // 绘制端口内圈
+  context.fillStyle = type === 'input' ? '#10b981' : '#3b82f6'  // 输入绿色，输出蓝色
   context.beginPath()
   context.arc(x, y, radius, 0, Math.PI * 2)
   context.fill()
+  
+  // 如果是连接状态，添加发光效果
+  if (connectionManager.isConnecting.value) {
+    context.shadowColor = type === 'input' ? '#10b981' : '#3b82f6'
+    context.shadowBlur = 8 * scale.value
+    context.beginPath()
+    context.arc(x, y, radius, 0, Math.PI * 2)
+    context.fill()
+    
+    // 清除阴影
+    context.shadowColor = 'transparent'
+    context.shadowBlur = 0
+  }
 }
 
 const drawConnections = () => {
@@ -707,7 +807,7 @@ class ConnectionManager {
   // 连接状态
   isConnecting = ref(false)
   connectionStart = ref<{ nodeId: string, port: string, type: 'input' | 'output' } | null>(null)
-  tempConnection = ref<{ x1: number, y1: number, x2: number, y2: number, isHoveringPort?: boolean } | null>(null)
+  tempConnection = ref<{ x1: number, y1: number, x2: number, y2: number, isHoveringPort?: boolean, isValidConnection?: boolean, isBoundarySnap?: boolean } | null>(null)
   selectedConnection = ref<Connection | null>(null)
   isDraggingConnection = ref(false)
   draggingConnectionEnd = ref<'from' | 'to' | null>(null)
@@ -784,7 +884,7 @@ class ConnectionManager {
     }
     
     // 创建新连接
-    const newConnection = this.createConnection(start, targetNodeId, targetPort, targetType)
+    const newConnection = this.createConnection(start, targetNodeId, targetPort)
     if (newConnection) {
       connections.value.push(newConnection)
       currentWorkflow.connections = [...connections.value]
@@ -804,7 +904,7 @@ class ConnectionManager {
   }
   
   // 验证连接规则
-  validateConnection(start: any, target: any): boolean {
+  validateConnection(start: { nodeId: string, port: string, type: 'input' | 'output' }, target: { nodeId: string, port: string, type: 'input' | 'output' }): boolean {
     // 不能连接到自己
     if (start.nodeId === target.nodeId) return false
     
@@ -824,7 +924,7 @@ class ConnectionManager {
   }
   
   // 创建连接
-  createConnection(start: any, targetNodeId: string, targetPort: string, targetType: 'input' | 'output'): Connection | null {
+  createConnection(start: { nodeId: string, port: string, type: 'input' | 'output' }, targetNodeId: string, targetPort: string): Connection | null {
     const fromNode = start.type === 'output' ? start.nodeId : targetNodeId
     const toNode = start.type === 'output' ? targetNodeId : start.nodeId
     const fromPort = start.type === 'output' ? start.port : targetPort
@@ -937,7 +1037,7 @@ class ConnectionManager {
   }
   
   // 获取端口位置
-  getPortPosition(nodeId: string, port: string, type: 'input' | 'output') {
+  getPortPosition(nodeId: string, port: string, type: 'input' | 'output'): { x: number, y: number } | null {
     const node = workflowNodes.value.find(n => n.id === nodeId)
     if (!node) return null
     
@@ -1156,7 +1256,7 @@ const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, po
       
       const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
       if (distance <= PORT_RADIUS * 2) {
-        return { node, port: node.inputs[i].name || node.inputs[i], type: 'input' }
+        return { node, port: typeof node.inputs[i] === 'string' ? node.inputs[i] : node.inputs[i].name, type: 'input' }
       }
     }
     
@@ -1168,7 +1268,7 @@ const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, po
       
       const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
       if (distance <= PORT_RADIUS * 2) {
-        return { node, port: node.outputs[i].name || node.outputs[i], type: 'output' }
+        return { node, port: typeof node.outputs[i] === 'string' ? node.outputs[i] : node.outputs[i].name, type: 'output' }
       }
     }
   }
@@ -1361,151 +1461,10 @@ let lastHoveredPort: any = null
 const portElementCache = new Map<string, HTMLElement | null>()
 let lastPortCacheClean = 0
 
-const onCanvasMouseMove = (event: MouseEvent) => {
-  if (!isConnecting.value || !tempConnection.value || !canvasRef.value) return
-  
-  // 节流处理，提高性能
-  const now = Date.now()
-  if (now - lastMouseMoveTime < 7) return // 限制为144fps
-  lastMouseMoveTime = now
-  
-  // 缓存画布边界矩形，减少重复计算
-  if (!cachedCanvasRect) {
-    cachedCanvasRect = canvasRef.value.getBoundingClientRect()
-  }
-  
-  // 清理端口元素缓存（每2秒清理一次）
-  if (now - lastPortCacheClean > 2000) {
-    portElementCache.clear()
-    lastPortCacheClean = now
-  }
-  
-  const mouseX = (event.clientX - cachedCanvasRect.left) / scale.value + offset.value.x
-  const mouseY = (event.clientY - cachedCanvasRect.top) / scale.value + offset.value.y
-  
-  // 检测端口或节点边界
-  const hoveredTarget = getPortAtPosition(mouseX, mouseY)
-    
-  if (hoveredTarget) {
-    const currentTargetKey = `${hoveredTarget.nodeId}-${hoveredTarget.type}-${hoveredTarget.isBoundary ? 'boundary' : 'port'}`
-    const lastTargetKey = lastHoveredPort ? `${lastHoveredPort.nodeId}-${lastHoveredPort.type}-${lastHoveredPort.isBoundary ? 'boundary' : 'port'}` : null
-    
-    // 检查是否悬停在同一个目标，避免重复计算
-    if (currentTargetKey !== lastTargetKey) {
-      lastHoveredPort = { 
-        nodeId: hoveredTarget.nodeId, 
-        type: hoveredTarget.type, 
-        isBoundary: hoveredTarget.isBoundary,
-        element: null 
-      }
-      
-      const { nodeId, port, type, snapX, snapY, isBoundary } = hoveredTarget
-      if (connectionStart.value && connectionStart.value.nodeId !== nodeId && connectionStart.value.type !== type) {
-        // 有效连接目标，吸附到端口或边界位置
-        tempConnection.value.x2 = snapX || mouseX
-        tempConnection.value.y2 = snapY || mouseY
-        tempConnection.value.isHoveringPort = true
-        tempConnection.value.isValidConnection = true
-        tempConnection.value.isBoundarySnap = isBoundary
-        
-        // 添加视觉反馈
-        if (isBoundary) {
-          console.log(`边界感知: 连接线吸附到${type === 'input' ? '输入' : '输出'}端口`, { nodeId, port })
-        }
-      } else {
-        // 无效连接，跟随鼠标
-        tempConnection.value.x2 = mouseX
-        tempConnection.value.y2 = mouseY
-        tempConnection.value.isHoveringPort = false
-        tempConnection.value.isValidConnection = false
-        tempConnection.value.isBoundarySnap = false
-      }
-    }
-  } else {
-    // 没有悬停在端口或边界上，跟随鼠标
-    lastHoveredPort = null
-    tempConnection.value.x2 = mouseX
-    tempConnection.value.y2 = mouseY
-    tempConnection.value.isHoveringPort = false
-    tempConnection.value.isValidConnection = false
-    tempConnection.value.isBoundarySnap = false
-  }
-}
-const onCanvasMouseUp = (event: MouseEvent) => {
-  if (isConnecting.value && connectionStart.value && canvasRef.value) {
-    const rect = canvasRef.value.getBoundingClientRect()
-    const x = (event.clientX - rect.left) / scale.value + offset.value.x
-    const y = (event.clientY - rect.top) / scale.value + offset.value.y
-    
-    // 使用边界感知的端口检测
-    const hoveredTarget = getPortAtPosition(x, y)
-    if (hoveredTarget && connectionStart.value.nodeId !== hoveredTarget.nodeId && connectionStart.value.type !== hoveredTarget.type) {
-      // 检查是否已存在完全相同的连接（相同的起始节点、目标节点和端口）
-      const fromNode = connectionStart.value.type === 'output' ? connectionStart.value.nodeId : hoveredTarget.nodeId
-      const toNode = connectionStart.value.type === 'output' ? hoveredTarget.nodeId : connectionStart.value.nodeId
-      const fromPort = connectionStart.value.type === 'output' ? connectionStart.value.port : hoveredTarget.port
-      const toPort = connectionStart.value.type === 'output' ? hoveredTarget.port : connectionStart.value.port
-      
-      // 添加边界感知的日志
-      if (hoveredTarget.isBoundary) {
-        console.log(`边界感知连接: 从${connectionStart.value.type}端口连接到${hoveredTarget.type}端口`, {
-          from: fromNode,
-          to: toNode,
-          fromPort,
-          toPort
-        })
-      }
-      
-      const existingConnection = connections.value.find(conn => 
-        conn.from === fromNode && conn.to === toNode && conn.fromPort === fromPort && conn.toPort === toPort
-      )
-      
-      if (!existingConnection) {
-          // 建立新连接
-          const newConnection: Connection = {
-            id: `conn_${Date.now()}`,
-            from: fromNode,
-            to: toNode,
-            fromPort: fromPort,
-            toPort: toPort
-          }
-          connections.value.push(newConnection)
-          
-          // 立即同步到当前工作流，避免延迟
-          currentWorkflow.connections = [...connections.value]
-          console.log('连接已建立:', newConnection)
-          
-          // 如果是拖拽重连，选中新连接
-          if (isDraggingConnection.value) {
-            selectedConnection.value = newConnection
-          }
-          
-          // 立即触发连接线重绘，确保视觉反馈即时
-          nextTick(() => {
-            connections.value = [...connections.value]
-          })
-        }
-    }
-    
-    // 重置连接状态
-    isConnecting.value = false
-    connectionStart.value = null
-    tempConnection.value = null
-    
-    // 重置拖拽状态
-    isDraggingConnection.value = false
-    draggingConnectionEnd.value = null
-  }
-}
 
-const onCanvasClick = (event: MouseEvent) => {
-  if (isConnecting.value) {
-    connectionManager.cancelConnection()
-  }
-  // 点击空白区域取消选中
-  selectedNode.value = null
-  connectionManager.clearSelection()
-}
+
+
+
 
 const getTempConnectionPath = () => {
   if (!tempConnection.value) return ''
@@ -1612,7 +1571,7 @@ const getPortAtPosition = (x: number, y: number) => {
       if (distance <= PORT_RADIUS * 2) {
         return { 
           nodeId: node.id, 
-          port: node.inputs[i].name || node.inputs[i], 
+          port: typeof node.inputs[i] === 'string' ? node.inputs[i] : node.inputs[i].name, 
           type: 'input' as const,
           snapX: portX,
           snapY: portY,
@@ -1630,7 +1589,7 @@ const getPortAtPosition = (x: number, y: number) => {
       if (distance <= PORT_RADIUS * 2) {
         return { 
           nodeId: node.id, 
-          port: node.outputs[i].name || node.outputs[i], 
+          port: typeof node.outputs[i] === 'string' ? node.outputs[i] : node.outputs[i].name, 
           type: 'output' as const,
           snapX: portX,
           snapY: portY,
