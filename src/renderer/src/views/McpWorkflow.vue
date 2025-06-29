@@ -221,6 +221,18 @@ interface WorkflowNode {
   }
   cachedImage?: HTMLImageElement
   imageLoadError?: boolean
+  textArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  editButton?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 }
 
 interface Connection {
@@ -839,44 +851,111 @@ const drawNode = (node: WorkflowNode) => {
     }
   }
   
-  // 如果是文本输入节点，在下部绘制上传按钮
+  // 如果是文本输入节点，绘制文本输入区域
   if (node.type === 'text-input') {
-    const buttonWidth = 80 * scale.value
-    const buttonHeight = 24 * scale.value
-    const buttonX = x + (width - buttonWidth) / 2
-    const buttonY = y + height - buttonHeight - 8 * scale.value
+    const inputAreaWidth = width - 16 * scale.value
+    const inputAreaHeight = 120 * scale.value
+    const inputAreaX = x + 8 * scale.value
+    const inputAreaY = y + headerHeight + 8 * scale.value
     
-    // 绘制按钮背景
+    // 绘制整体背景
+    context.fillStyle = '#374151'  // 深灰色背景
+    context.beginPath()
+    context.roundRect(inputAreaX, inputAreaY, inputAreaWidth, inputAreaHeight, 8 * scale.value)
+    context.fill()
+    
+    // 绘制边框
+    context.strokeStyle = '#4b5563'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+    
+    // 绘制文本输入区域
+    const textAreaHeight = 80 * scale.value
+    const textAreaY = inputAreaY + 8 * scale.value
+    const textAreaX = inputAreaX + 8 * scale.value
+    const textAreaWidth = inputAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#1f2937'  // 更深的背景
+    context.beginPath()
+    context.roundRect(textAreaX, textAreaY, textAreaWidth, textAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    // 绘制文本输入边框
+    context.strokeStyle = '#374151'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制文本内容或占位符
+    const textContent = (node.config?.textContent as string) || ''
+    const placeholder = '请输入文本内容...'
+    const displayText = textContent || placeholder
+    
+    context.fillStyle = textContent ? '#d1d5db' : '#6b7280'  // 有内容时浅色，占位符时更暗
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    
+    // 文本换行处理
+    const maxWidth = textAreaWidth - 16 * scale.value
+    const lineHeight = 14 * scale.value
+    const lines = wrapText(context, displayText, maxWidth)
+    
+    lines.slice(0, 4).forEach((line, index) => {
+      context.fillText(line, textAreaX + 8 * scale.value, textAreaY + 8 * scale.value + index * lineHeight)
+    })
+    
+    // 存储文本区域位置信息，用于点击检测
+    if (!node.textArea) {
+      node.textArea = {
+        x: textAreaX,
+        y: textAreaY,
+        width: textAreaWidth,
+        height: textAreaHeight
+      }
+    } else {
+      node.textArea.x = textAreaX
+      node.textArea.y = textAreaY
+      node.textArea.width = textAreaWidth
+      node.textArea.height = textAreaHeight
+    }
+    
+    // 绘制编辑按钮
+    const buttonWidth = 60 * scale.value
+    const buttonHeight = 20 * scale.value
+    const buttonX = inputAreaX + inputAreaWidth - buttonWidth - 8 * scale.value
+    const buttonY = textAreaY + textAreaHeight + 4 * scale.value
+    
     context.fillStyle = '#4f46e5'
     context.beginPath()
     context.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 4 * scale.value)
     context.fill()
     
-    // 绘制按钮边框
+    // 按钮边框
     context.strokeStyle = '#6366f1'
     context.lineWidth = 1 * scale.value
     context.stroke()
     
-    // 绘制按钮文字
+    // 按钮文字
     context.fillStyle = '#ffffff'
     context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
     context.textAlign = 'center'
     context.textBaseline = 'middle'
-    context.fillText('📎 上传', buttonX + buttonWidth / 2, buttonY + buttonHeight / 2)
+    context.fillText('✏️ 编辑', buttonX + buttonWidth / 2, buttonY + buttonHeight / 2)
     
     // 存储按钮位置信息，用于点击检测
-    if (!node.uploadButton) {
-      node.uploadButton = {
+    if (!node.editButton) {
+      node.editButton = {
         x: buttonX,
         y: buttonY,
         width: buttonWidth,
         height: buttonHeight
       }
     } else {
-      node.uploadButton.x = buttonX
-      node.uploadButton.y = buttonY
-      node.uploadButton.width = buttonWidth
-      node.uploadButton.height = buttonHeight
+      node.editButton.x = buttonX
+      node.editButton.y = buttonY
+      node.editButton.width = buttonWidth
+      node.editButton.height = buttonHeight
     }
   }
 }
@@ -1434,6 +1513,34 @@ const getFileNameAreaAtPosition = (x: number, y: number): WorkflowNode | null =>
   return null
 }
 
+// 获取文本区域点击位置
+const getTextAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'text-input' && node.textArea) {
+      const area = node.textArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取编辑按钮点击位置
+const getEditButtonAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'text-input' && node.editButton) {
+      const button = node.editButton
+      if (x >= button.x && x <= button.x + button.width && 
+          y >= button.y && y <= button.y + button.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
 interface UploadedFile {
   name: string
   path: string
@@ -1873,6 +1980,158 @@ const handleUploadButtonClick = (node: WorkflowNode) => {
   fileInput.click()
 }
 
+// 处理文本区域点击
+const handleTextAreaClick = (node: WorkflowNode) => {
+  console.log('点击文本区域，节点:', node.name)
+  // 可以在这里添加文本区域的特殊处理逻辑
+}
+
+// 处理文本编辑按钮点击
+const handleTextEditButtonClick = (node: WorkflowNode) => {
+  console.log('点击编辑按钮，节点:', node.name)
+  
+  // 创建文本编辑对话框
+  const currentText = (node.config?.textContent as string) || ''
+  
+  // 创建对话框容器
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  `
+  
+  // 计算与文本输入节点下方区域对齐的尺寸
+  // 文本区域: 180 * scale, 编辑按钮区域: 60 * scale 高度, 加上间距
+  const nodeScale = scale.value || 1
+  const alignedWidth = Math.max(400, 180 * nodeScale + 48) // 最小400px，或与节点宽度对齐
+  const alignedHeight = Math.max(300, 60 * nodeScale * 4 + 100) // 约4倍文本区域高度加上按钮空间
+  
+  // 创建对话框内容
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 24px;
+    width: ${alignedWidth}px;
+    height: ${alignedHeight}px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow: auto;
+    border: 1px solid #404040;
+    display: flex;
+    flex-direction: column;
+  `
+  
+  // 创建标题
+  const title = document.createElement('h3')
+  title.textContent = '编辑文本内容'
+  title.style.cssText = `
+    margin: 0 0 16px 0;
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 600;
+  `
+  
+  // 创建文本区域
+  const textarea = document.createElement('textarea')
+  textarea.value = currentText
+  const textareaHeight = alignedHeight - 120 // 减去标题、按钮和间距的高度
+  textarea.style.cssText = `
+    width: 100%;
+    height: ${textareaHeight}px;
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 4px;
+    padding: 12px;
+    color: #d1d5db;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+    flex: 1;
+  `
+  textarea.placeholder = '请输入文本内容...'
+  
+  // 创建按钮容器
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 16px;
+    flex-shrink: 0;
+  `
+  
+  // 创建取消按钮
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 8px 16px;
+    background: #374151;
+    border: 1px solid #4b5563;
+    border-radius: 4px;
+    color: #d1d5db;
+    cursor: pointer;
+    font-size: 14px;
+  `
+  
+  // 创建确认按钮
+  const confirmButton = document.createElement('button')
+  confirmButton.textContent = '确认'
+  confirmButton.style.cssText = `
+    padding: 8px 16px;
+    background: #4f46e5;
+    border: 1px solid #6366f1;
+    border-radius: 4px;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 14px;
+  `
+  
+  // 添加事件监听
+  cancelButton.onclick = () => {
+    document.body.removeChild(dialog)
+  }
+  
+  confirmButton.onclick = () => {
+    const newText = textarea.value
+    updateNode(node.id, {
+      config: {
+        ...node.config,
+        textContent: newText
+      }
+    })
+    console.log('文本内容已更新:', newText)
+    document.body.removeChild(dialog)
+  }
+  
+  // 组装对话框
+  buttonContainer.appendChild(cancelButton)
+  buttonContainer.appendChild(confirmButton)
+  dialogContent.appendChild(title)
+  dialogContent.appendChild(textarea)
+  dialogContent.appendChild(buttonContainer)
+  dialog.appendChild(dialogContent)
+  
+  // 添加到页面
+  document.body.appendChild(dialog)
+  
+  // 聚焦到文本区域
+  setTimeout(() => {
+    textarea.focus()
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+  }, 100)
+}
+
 const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, port: string, type: 'input' | 'output' } | null => {
   for (const node of workflowNodes.value) {
     // 检查输入端口
@@ -1914,6 +2173,8 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedPort = getPortAtCanvasPosition(pos.x, pos.y)
   const clickedUploadButton = getUploadButtonAtPosition(pos.x, pos.y)
   const clickedFileNameArea = getFileNameAreaAtPosition(pos.x, pos.y)
+  const clickedTextArea = getTextAreaAtPosition(pos.x, pos.y)
+  const clickedEditButton = getEditButtonAtPosition(pos.x, pos.y)
   
   if (clickedUploadButton) {
     // 处理上传按钮点击
@@ -1921,6 +2182,12 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedFileNameArea) {
     // 处理文件名区域点击
     handleFileNameAreaClick(clickedFileNameArea)
+  } else if (clickedEditButton) {
+    // 处理编辑按钮点击
+    handleTextEditButtonClick(clickedEditButton)
+  } else if (clickedTextArea) {
+    // 处理文本区域点击
+    handleTextAreaClick(clickedTextArea)
   } else if (clickedPort) {
     console.log('检测到端口点击:', clickedPort.type, clickedPort.port, '节点:', clickedPort.node.name)
     if (clickedPort.type === 'output') {
@@ -2140,6 +2407,31 @@ const deployWorkflow = () => {
   
   // TODO: 实现工作流部署逻辑
   alert(`工作流部署成功！\n名称: ${currentWorkflow.name || '未命名工作流'}\n节点数量: ${workflowNodes.value.length}\n连接数量: ${connections.value.length}`)
+}
+
+// 文本换行处理函数
+const wrapText = (context: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
+  const words = text.split(' ')
+  const lines: string[] = []
+  let currentLine = ''
+  
+  for (const word of words) {
+    const testLine = currentLine + (currentLine ? ' ' : '') + word
+    const metrics = context.measureText(testLine)
+    
+    if (metrics.width > maxWidth && currentLine) {
+      lines.push(currentLine)
+      currentLine = word
+    } else {
+      currentLine = testLine
+    }
+  }
+  
+  if (currentLine) {
+    lines.push(currentLine)
+  }
+  
+  return lines
 }
 
 // 生命周期
