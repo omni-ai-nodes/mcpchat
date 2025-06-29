@@ -652,7 +652,7 @@ const drawNode = (node: WorkflowNode) => {
     context.fill()
     
     // 绘制文件名或占位符
-    const fileName = (node.config?.fileName as string) || 'CCDE5AF4C77B19D229A7D319...'
+    const fileName = (node.config?.fileName as string) || '点击选择图片...'
     const displayFileName = fileName.length > 25 ? fileName.substring(0, 22) + '...' : fileName
     
     context.fillStyle = '#d1d5db'  // 浅灰色文字
@@ -1428,7 +1428,7 @@ const getUploadButtonAtPosition = (x: number, y: number): WorkflowNode | null =>
 
 const getFileNameAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
   for (const node of workflowNodes.value) {
-    if (node.type === 'file-input' && node.config?.fileName && node.fileNameArea) {
+    if (node.type === 'file-input' && node.fileNameArea) {
       const area = node.fileNameArea
       if (x >= area.x && x <= area.x + area.width && 
           y >= area.y && y <= area.y + area.height) {
