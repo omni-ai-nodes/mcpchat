@@ -30,7 +30,14 @@ const api = {
     }
     cachedWebContentsId = ipcRenderer.sendSync('get-web-contents-id')
     return cachedWebContentsId
-  }
+  },
+  saveUploadedFile: (fileName: string, fileData: string) => {
+    return ipcRenderer.invoke('save-uploaded-file', fileName, fileData)
+  },
+  getUploadedFiles: () => {
+    return ipcRenderer.invoke('get-uploaded-files')
+  },
+  readUploadedFile: (filePath: string) => ipcRenderer.invoke('read-uploaded-file', filePath)
 }
 exposeElectronAPI()
 

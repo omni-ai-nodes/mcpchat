@@ -1,6 +1,8 @@
 // src\main\presenter\windowPresenter\index.ts
 import { BrowserWindow, shell, app, nativeImage, ipcMain } from 'electron'
 import { join } from 'path'
+import * as fs from 'fs'
+import * as path from 'path'
 import icon from '../../../../resources/icon.png?asset' // 应用图标 (macOS/Linux)
 import iconWin from '../../../../resources/icon.ico?asset' // 应用图标 (Windows)
 import { is } from '@electron-toolkit/utils' // Electron 工具库
@@ -41,33 +43,99 @@ export class WindowPresenter implements IWindowPresenter {
       event.returnValue = event.sender.id
     })
 
-    // 处理文件上传保存
-    ipcMain.handle('save-uploaded-file', async (event, { fileName, fileData, originalName }) => {
+    // 保存上传的文件
+    ipcMain.handle('save-uploaded-file', async (_event, fileName: string, fileData: string) => {
+      if (!fileData) {
+        console.error('文件数据为空')
+        throw new Error('文件数据为空')
+      }
+      
+      if (typeof fileData !== 'string') {
+        console.error('文件数据类型错误，期望string，实际:', typeof fileData)
+        throw new Error('文件数据类型错误')
+      }
+      
       try {
-        const fs = require('fs')
-        const path = require('path')
-        const os = require('os')
-        
-        // 创建inputs目录在应用安装目录下
-        const appPath = app.getAppPath()
-        const inputsDir = path.join(appPath, 'inputs')
+        // 创建用户数据目录下的 APP/inputs 目录
+        const userDataPath = app.getPath('userData')
+        const inputsDir = path.join(userDataPath, 'APP', 'inputs')
         
         if (!fs.existsSync(inputsDir)) {
           fs.mkdirSync(inputsDir, { recursive: true })
         }
         
-        // 保存文件
-        const filePath = path.join(inputsDir, fileName)
-        const buffer = Buffer.from(fileData)
-        fs.writeFileSync(filePath, buffer)
+        // 生成唯一文件名（添加时间戳前缀）
+        const timestamp = Date.now()
+        const uniqueFileName = `${timestamp}_${fileName}`
+        const filePath = path.join(inputsDir, uniqueFileName)
         
-        console.log(`File saved: ${originalName} -> ${filePath}`)
-        return filePath
+        // 解析 base64 数据并保存文件
+        const base64Data = fileData.replace(/^data:image\/\w+;base64,/, '')
+        const buffer = Buffer.from(base64Data, 'base64')
+        
+        fs.writeFileSync(filePath, buffer)
+        return { success: true, filePath, fileName: uniqueFileName }
       } catch (error) {
-        console.error('Failed to save uploaded file:', error)
+        console.error('保存文件失败:', error)
         throw error
       }
     })
+
+    // 获取已上传的文件列表
+    ipcMain.handle('get-uploaded-files', async () => {
+      try {
+        const userDataPath = app.getPath('userData')
+        const inputsDir = path.join(userDataPath, 'APP', 'inputs')
+        
+        console.log('检查上传文件目录:', inputsDir)
+        
+        if (!fs.existsSync(inputsDir)) {
+          console.log('上传文件目录不存在')
+          return []
+        }
+        
+        const files = fs.readdirSync(inputsDir)
+        console.log('目录中的所有文件:', files)
+        
+        const imageFiles = files.filter((file: string) => {
+          const ext = path.extname(file).toLowerCase()
+          return ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'].includes(ext)
+        })
+        
+        console.log('筛选出的图片文件:', imageFiles)
+        
+        return imageFiles.map((file: string) => {
+          const filePath = path.join(inputsDir, file)
+          const stats = fs.statSync(filePath)
+          return {
+            name: file,
+            path: filePath,
+            size: stats.size,
+            modified: stats.mtime
+          }
+        })
+      } catch (error) {
+        console.error('Failed to get uploaded files:', error)
+        return []
+      }
+    })
+
+    // 读取已上传的文件
+     ipcMain.handle('read-uploaded-file', async (_event, filePath: string) => {
+       try {
+         const fileBuffer = fs.readFileSync(filePath)
+         const base64 = fileBuffer.toString('base64')
+         const ext = path.extname(filePath).toLowerCase()
+         const mimeType = ext === '.png' ? 'image/png' : 
+                         ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' :
+                         ext === '.gif' ? 'image/gif' :
+                         ext === '.webp' ? 'image/webp' : 'image/png'
+         return `data:${mimeType};base64,${base64}`
+       } catch (error) {
+         console.error('读取文件失败:', error)
+         throw error
+       }
+     })
 
     // 监听应用即将退出的事件，设置退出标志，避免窗口关闭时触发隐藏逻辑
     app.on('before-quit', () => {

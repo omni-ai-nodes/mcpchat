@@ -218,6 +218,12 @@ interface WorkflowNode {
     width: number
     height: number
   }
+  fileNameArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
   cachedImage?: HTMLImageElement
   imageLoadError?: boolean
 }
@@ -637,10 +643,12 @@ const drawNode = (node: WorkflowNode) => {
     // 绘制文件名显示区域（顶部）
     const fileNameAreaHeight = 24 * scale.value
     const fileNameAreaY = uploadAreaY + 8 * scale.value
+    const fileNameAreaX = uploadAreaX + 8 * scale.value
+    const fileNameAreaWidth = uploadAreaWidth - 16 * scale.value
     
     context.fillStyle = '#1f2937'  // 更深的背景
     context.beginPath()
-    context.roundRect(uploadAreaX + 8 * scale.value, fileNameAreaY, uploadAreaWidth - 16 * scale.value, fileNameAreaHeight, 4 * scale.value)
+    context.roundRect(fileNameAreaX, fileNameAreaY, fileNameAreaWidth, fileNameAreaHeight, 4 * scale.value)
     context.fill()
     
     // 绘制文件名或占位符
@@ -652,6 +660,21 @@ const drawNode = (node: WorkflowNode) => {
     context.textAlign = 'left'
     context.textBaseline = 'middle'
     context.fillText(displayFileName, uploadAreaX + 16 * scale.value, fileNameAreaY + fileNameAreaHeight / 2)
+    
+    // 存储文件名区域位置信息，用于点击检测
+    if (!node.fileNameArea) {
+      node.fileNameArea = {
+        x: fileNameAreaX,
+        y: fileNameAreaY,
+        width: fileNameAreaWidth,
+        height: fileNameAreaHeight
+      }
+    } else {
+      node.fileNameArea.x = fileNameAreaX
+      node.fileNameArea.y = fileNameAreaY
+      node.fileNameArea.width = fileNameAreaWidth
+      node.fileNameArea.height = fileNameAreaHeight
+    }
     
     // 绘制upload按钮
     const buttonWidth = uploadAreaWidth - 16 * scale.value
@@ -805,19 +828,19 @@ const drawNode = (node: WorkflowNode) => {
       context.fillText('点击上传图片或文件', uploadAreaX + uploadAreaWidth / 2, previewAreaY + previewAreaHeight / 2 + 12 * scale.value)
     }
     
-    // 存储上传区域位置信息，用于点击检测
+    // 存储上传按钮位置信息，用于点击检测（只有按钮区域可点击）
     if (!node.uploadButton) {
       node.uploadButton = {
-        x: uploadAreaX,
-        y: uploadAreaY,
-        width: uploadAreaWidth,
-        height: uploadAreaHeight
+        x: buttonX,
+        y: buttonY,
+        width: buttonWidth,
+        height: buttonHeight
       }
     } else {
-      node.uploadButton.x = uploadAreaX
-      node.uploadButton.y = uploadAreaY
-      node.uploadButton.width = uploadAreaWidth
-      node.uploadButton.height = uploadAreaHeight
+      node.uploadButton.x = buttonX
+      node.uploadButton.y = buttonY
+      node.uploadButton.width = buttonWidth
+      node.uploadButton.height = buttonHeight
     }
   }
   
@@ -993,7 +1016,7 @@ const addNode = (template: NodeTemplate) => {
     name: template.name,
     x: Math.random() * 400 + 200,
     y: Math.random() * 300 + 150,
-    config: {},
+    config: template.type === 'file-input' ? { fileName: '' } : {},
     inputs: template.category === 'input' ? [] : ['input'],
     outputs: template.category === 'output' ? [] : ['output']
   }
@@ -1403,6 +1426,365 @@ const getUploadButtonAtPosition = (x: number, y: number): WorkflowNode | null =>
   return null
 }
 
+const getFileNameAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'file-input' && node.config?.fileName && node.fileNameArea) {
+      const area = node.fileNameArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+interface UploadedFile {
+  name: string
+  path: string
+  size: number
+  createdAt: Date
+}
+
+interface WindowAPI {
+  getUploadedFiles: () => Promise<UploadedFile[]>
+  readUploadedFile: (filePath: string) => Promise<string>
+  saveUploadedFile: (fileName: string, fileData: string) => Promise<{ success: boolean; filePath: string; fileName: string }>
+}
+
+declare global {
+  interface Window {
+    api: WindowAPI
+  }
+}
+
+const handleFileNameAreaClick = async (node: WorkflowNode) => {
+  console.log('点击文件名区域，节点:', node.name)
+  
+  try {
+    // 获取已上传的文件列表
+    const uploadedFiles: UploadedFile[] = await window.api.getUploadedFiles()
+    console.log('获取到的上传文件列表:', uploadedFiles)
+    
+    // 总是显示文件选择对话框，即使没有文件也显示上传按钮
+    
+    // 创建文件选择对话框
+    const dialog = document.createElement('div')
+    dialog.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      backdrop-filter: blur(4px);
+    `
+    
+    const content = document.createElement('div')
+    content.style.cssText = `
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 800px;
+      width: 90vw;
+      max-height: 700px;
+      overflow-y: auto;
+      color: white;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      border: 1px solid #374151;
+    `
+    
+    const title = document.createElement('h3')
+    title.textContent = '选择已上传的图片'
+    title.style.cssText = `
+      margin: 0 0 20px 0;
+      color: #f9fafb;
+      font-size: 18px;
+      font-weight: 600;
+      text-align: center;
+      border-bottom: 1px solid #374151;
+      padding-bottom: 12px;
+    `
+    content.appendChild(title)
+    
+    const fileList = document.createElement('div')
+    fileList.style.cssText = `
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+      max-height: 480px;
+      overflow-y: auto;
+      padding: 8px;
+    `
+    
+    // 如果没有文件，显示提示信息
+    if (uploadedFiles.length === 0) {
+      const emptyState = document.createElement('div')
+      emptyState.style.cssText = `
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 40px 20px;
+        color: #9ca3af;
+        font-size: 14px;
+      `
+      
+      const emptyIcon = document.createElement('div')
+      emptyIcon.innerHTML = '📁'
+      emptyIcon.style.cssText = 'font-size: 48px; margin-bottom: 16px;'
+      
+      const emptyText = document.createElement('div')
+      emptyText.textContent = '暂无已上传的图片'
+      emptyText.style.cssText = 'margin-bottom: 8px; font-weight: 500; color: #d1d5db;'
+      
+      const emptyDesc = document.createElement('div')
+      emptyDesc.textContent = '请点击下方的上传按钮添加图片文件'
+      
+      emptyState.appendChild(emptyIcon)
+      emptyState.appendChild(emptyText)
+      emptyState.appendChild(emptyDesc)
+      fileList.appendChild(emptyState)
+    } else {
+      uploadedFiles.forEach((file: UploadedFile) => {
+      const fileItem = document.createElement('div')
+      fileItem.style.cssText = `
+        border: 1px solid #374151;
+        border-radius: 8px;
+        padding: 0;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.2s ease;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        background: #111827;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      `
+      
+      // 创建图片预览区域
+      const imagePreview = document.createElement('div')
+      imagePreview.style.cssText = `
+        height: 120px;
+        background: #0f172a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        position: relative;
+      `
+      
+      // 异步加载图片预览
+      const loadImagePreview = async () => {
+        try {
+          const imageData = await window.api.readUploadedFile(file.path)
+          const img = document.createElement('img')
+          img.src = imageData
+          img.style.cssText = `
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+          `
+          imagePreview.innerHTML = ''
+          imagePreview.appendChild(img)
+        } catch (error) {
+          console.error('加载图片预览失败:', error)
+          imagePreview.innerHTML = '<div style="color: #9ca3af; font-size: 12px;">预览失败</div>'
+        }
+      }
+      
+      // 显示加载中状态
+      imagePreview.innerHTML = '<div style="color: #9ca3af; font-size: 12px;">加载中...</div>'
+      loadImagePreview()
+      
+      // 文件信息区域
+      const fileInfo = document.createElement('div')
+      fileInfo.style.cssText = `
+        padding: 10px;
+        background: #1f2937;
+      `
+      
+      const fileName = document.createElement('div')
+      fileName.textContent = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name
+      fileName.style.cssText = 'font-size: 13px; color: #e5e7eb; margin-bottom: 5px; font-weight: 500;'
+      
+      const fileSize = document.createElement('div')
+      fileSize.textContent = `${(file.size / 1024).toFixed(1)} KB`
+      fileSize.style.cssText = 'font-size: 11px; color: #9ca3af;'
+      
+      fileItem.addEventListener('mouseenter', () => {
+        fileItem.style.transform = 'translateY(-2px)'
+        fileItem.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+        fileItem.style.borderColor = '#60a5fa'
+      })
+      
+      fileItem.addEventListener('mouseleave', () => {
+        fileItem.style.transform = 'translateY(0)'
+        fileItem.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+        fileItem.style.borderColor = '#374151'
+      })
+      
+      fileInfo.appendChild(fileName)
+       fileInfo.appendChild(fileSize)
+       
+       fileItem.appendChild(imagePreview)
+       fileItem.appendChild(fileInfo)
+      
+      fileItem.addEventListener('click', async () => {
+         try {
+           // 通过主进程API读取文件
+           const fileData = await window.api.readUploadedFile(file.path)
+           
+           // 更新节点配置
+           node.imageLoadError = false
+           node.cachedImage = undefined
+           updateNode(node.id, {
+             config: {
+               ...node.config,
+               imageData: fileData,
+               fileName: file.name.replace(/^\d+_/, ''), // 移除时间戳前缀
+               fileSize: file.size,
+               savedFileName: file.name
+             }
+           })
+           
+           console.log('选择已上传图片:', file.name)
+           document.body.removeChild(dialog)
+         } catch (error) {
+           console.error('读取文件失败:', error)
+           alert('读取文件失败')
+         }
+       })
+      
+      fileList.appendChild(fileItem)
+    })
+    }
+    
+    content.appendChild(fileList)
+    
+    const buttonContainer = document.createElement('div')
+    buttonContainer.style.cssText = `
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #374151;
+    `
+    
+    // 添加所有图片按钮
+    const addAllButton = document.createElement('button')
+    addAllButton.textContent = '添加所有图片'
+    addAllButton.style.cssText = `
+      padding: 10px 24px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      min-width: 120px;
+    `
+    
+    addAllButton.addEventListener('mouseenter', () => {
+      addAllButton.style.background = '#2563eb'
+      addAllButton.style.transform = 'translateY(-1px)'
+    })
+    
+    addAllButton.addEventListener('mouseleave', () => {
+      addAllButton.style.background = '#3b82f6'
+      addAllButton.style.transform = 'translateY(0)'
+    })
+    
+    addAllButton.addEventListener('click', async () => {
+      try {
+        // 为每个图片文件创建一个新的file-input节点
+        for (let i = 0; i < uploadedFiles.length; i++) {
+          const file = uploadedFiles[i]
+          const fileData = await window.api.readUploadedFile(file.path)
+          
+          const newNode: WorkflowNode = {
+            id: `node_${Date.now()}_${i}`,
+            type: 'file-input',
+            name: '文件输入',
+            x: Math.random() * 400 + 200,
+            y: Math.random() * 300 + 150,
+            config: {
+              imageData: fileData,
+              fileName: file.name.replace(/^\d+_/, ''), // 移除时间戳前缀
+              fileSize: file.size,
+              savedFileName: file.name
+            },
+            inputs: [],
+            outputs: ['output']
+          }
+          
+          workflowNodes.value.push(newNode)
+        }
+        
+        // 同步到当前工作流
+        currentWorkflow.nodes = [...workflowNodes.value]
+        console.log(`已添加 ${uploadedFiles.length} 个图片节点`)
+        document.body.removeChild(dialog)
+      } catch (error) {
+        console.error('添加所有图片失败:', error)
+        alert('添加所有图片失败')
+      }
+    })
+    
+    const closeButton = document.createElement('button')
+    closeButton.textContent = '关闭'
+    closeButton.style.cssText = `
+      padding: 10px 24px;
+      background: #374151;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      min-width: 80px;
+    `
+    
+    closeButton.addEventListener('mouseenter', () => {
+      closeButton.style.background = '#4b5563'
+      closeButton.style.transform = 'translateY(-1px)'
+    })
+    
+    closeButton.addEventListener('mouseleave', () => {
+      closeButton.style.background = '#374151'
+      closeButton.style.transform = 'translateY(0)'
+    })
+    
+    closeButton.addEventListener('click', () => {
+      document.body.removeChild(dialog)
+    })
+    
+    buttonContainer.appendChild(addAllButton)
+    buttonContainer.appendChild(closeButton)
+    content.appendChild(buttonContainer)
+    dialog.appendChild(content)
+    
+    // 点击背景关闭对话框
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        document.body.removeChild(dialog)
+      }
+    })
+    
+    document.body.appendChild(dialog)
+  } catch (error) {
+    console.error('获取已上传文件失败:', error)
+    alert('获取已上传文件失败')
+  }
+}
+
 const handleUploadButtonClick = (node: WorkflowNode) => {
   console.log('点击上传按钮，节点:', node.name)
   
@@ -1422,24 +1804,50 @@ const handleUploadButtonClick = (node: WorkflowNode) => {
   fileInput.onchange = (event) => {
     const target = event.target as HTMLInputElement
     const file = target.files?.[0]
+    
     if (file) {
       if (node.type === 'file-input' && file.type.startsWith('image/')) {
         // 处理图片文件
         const reader = new FileReader()
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           const dataUrl = e.target?.result as string
-          // 清除之前的错误状态和缓存图片
-          node.imageLoadError = false
-          node.cachedImage = undefined
-          updateNode(node.id, {
-            config: {
-              ...node.config,
-              imageData: dataUrl,
-              fileName: file.name,
-              fileSize: file.size
-            }
-          })
-          console.log('图片上传成功:', file.name, '大小:', file.size)
+          
+          if (!dataUrl) {
+            console.error('文件读取失败：无法获取文件数据')
+            return
+          }
+          
+          try {
+            // 保存文件到 APP/inputs 目录
+            const saveResult = await window.api.saveUploadedFile(file.name, dataUrl)
+            
+            // 清除之前的错误状态和缓存图片
+            node.imageLoadError = false
+            node.cachedImage = undefined
+            updateNode(node.id, {
+              config: {
+                ...node.config,
+                imageData: dataUrl,
+                fileName: file.name,
+                fileSize: file.size,
+                savedFileName: saveResult.fileName // 保存实际文件名
+              }
+            })
+            console.log('图片上传并保存成功:', file.name, '保存为:', saveResult.fileName)
+          } catch (error) {
+            console.error('保存图片失败:', error)
+            // 即使保存失败，也显示图片预览
+            node.imageLoadError = false
+            node.cachedImage = undefined
+            updateNode(node.id, {
+              config: {
+                ...node.config,
+                imageData: dataUrl,
+                fileName: file.name,
+                fileSize: file.size
+              }
+            })
+          }
         }
         reader.readAsDataURL(file)
       } else {
@@ -1510,10 +1918,14 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedNode = getNodeAtPosition(pos.x, pos.y)
   const clickedPort = getPortAtCanvasPosition(pos.x, pos.y)
   const clickedUploadButton = getUploadButtonAtPosition(pos.x, pos.y)
+  const clickedFileNameArea = getFileNameAreaAtPosition(pos.x, pos.y)
   
   if (clickedUploadButton) {
     // 处理上传按钮点击
     handleUploadButtonClick(clickedUploadButton)
+  } else if (clickedFileNameArea) {
+    // 处理文件名区域点击
+    handleFileNameAreaClick(clickedFileNameArea)
   } else if (clickedPort) {
     console.log('检测到端口点击:', clickedPort.type, clickedPort.port, '节点:', clickedPort.node.name)
     if (clickedPort.type === 'output') {
