@@ -479,9 +479,11 @@ const drawNode = (node: WorkflowNode) => {
   const x = (node.x + offset.value.x) * scale.value
   const y = (node.y + offset.value.y) * scale.value
   const width = NODE_WIDTH * scale.value
-  // 为file-input节点动态计算高度
+  // 为file-input和text-input节点动态计算高度
   const height = node.type === 'file-input' 
     ? (NODE_HEIGHT + 226 ) * scale.value  // 基础高度 + 上传区域高度 + 间距
+    : node.type === 'text-input'
+    ? (NODE_HEIGHT + 100 ) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
     : NODE_HEIGHT * scale.value
   
   // 绘制节点阴影
