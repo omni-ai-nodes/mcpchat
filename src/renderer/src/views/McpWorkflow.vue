@@ -219,6 +219,7 @@ interface WorkflowNode {
     height: number
   }
   cachedImage?: HTMLImageElement
+  imageLoadError?: boolean
 }
 
 interface Connection {
@@ -610,60 +611,105 @@ const drawNode = (node: WorkflowNode) => {
   // 如果是文件输入节点，在下部绘制上传区域或图片预览
   if (node.type === 'file-input') {
     const uploadAreaWidth = width - 16 * scale.value
-    const uploadAreaHeight = 70 * scale.value
+    const uploadAreaHeight = 120 * scale.value  // 增加高度以容纳更多内容
     const uploadAreaX = x + 8 * scale.value
     const uploadAreaY = y + height - uploadAreaHeight - 8 * scale.value
     
-    // 检查是否有上传的图片
+    // 检查是否有上传的图片或文件
     const hasImage = node.config?.imageData && typeof node.config.imageData === 'string'
+    const hasFile = node.config?.fileName && typeof node.config.fileName === 'string' && !hasImage
+    
+    // 绘制整体背景（深色主题）
+    context.fillStyle = '#374151'  // 深灰色背景
+    context.beginPath()
+    context.roundRect(uploadAreaX, uploadAreaY, uploadAreaWidth, uploadAreaHeight, 8 * scale.value)
+    context.fill()
+    
+    // 绘制边框
+    context.strokeStyle = '#4b5563'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+    
+    // 绘制文件名显示区域（顶部）
+    const fileNameAreaHeight = 24 * scale.value
+    const fileNameAreaY = uploadAreaY + 8 * scale.value
+    
+    context.fillStyle = '#1f2937'  // 更深的背景
+    context.beginPath()
+    context.roundRect(uploadAreaX + 8 * scale.value, fileNameAreaY, uploadAreaWidth - 16 * scale.value, fileNameAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    // 绘制文件名或占位符
+    const fileName = (node.config?.fileName as string) || 'CCDE5AF4C77B19D229A7D319...'
+    const displayFileName = fileName.length > 25 ? fileName.substring(0, 22) + '...' : fileName
+    
+    context.fillStyle = '#d1d5db'  // 浅灰色文字
+    context.font = `${10 * scale.value}px 'SF Mono', Monaco, 'Cascadia Code', monospace`
+    context.textAlign = 'left'
+    context.textBaseline = 'middle'
+    context.fillText(displayFileName, uploadAreaX + 16 * scale.value, fileNameAreaY + fileNameAreaHeight / 2)
+    
+    // 绘制upload按钮
+    const buttonWidth = uploadAreaWidth - 16 * scale.value
+    const buttonHeight = 20 * scale.value
+    const buttonX = uploadAreaX + 8 * scale.value
+    const buttonY = fileNameAreaY + fileNameAreaHeight + 8 * scale.value
+    
+    context.fillStyle = '#111827'  // 深色按钮背景
+    context.beginPath()
+    context.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 4 * scale.value)
+    context.fill()
+    
+    // 按钮边框
+    context.strokeStyle = '#374151'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 按钮文字
+    context.fillStyle = '#9ca3af'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'center'
+    context.textBaseline = 'middle'
+    context.fillText('upload', buttonX + buttonWidth / 2, buttonY + buttonHeight / 2)
     
     if (hasImage) {
-      // 绘制图片预览背景
-      context.fillStyle = '#f8fafc'
-      context.beginPath()
-      context.roundRect(uploadAreaX, uploadAreaY, uploadAreaWidth, uploadAreaHeight, 6 * scale.value)
-      context.fill()
-      
-      // 绘制边框
-      context.strokeStyle = '#e2e8f0'
-      context.lineWidth = 1 * scale.value
-      context.setLineDash([])
-      context.stroke()
+      // 图片预览区域
+      const previewAreaY = buttonY + buttonHeight + 8 * scale.value
+      const previewAreaHeight = uploadAreaHeight - (previewAreaY - uploadAreaY) - 16 * scale.value
       
       // 如果图片已缓存，直接绘制
-      if (node.cachedImage) {
-        const img = node.cachedImage
-        // 计算图片显示尺寸，保持宽高比
-        const maxWidth = uploadAreaWidth - 12 * scale.value
-        const maxHeight = uploadAreaHeight - 24 * scale.value
-        let imgWidth = img.width
-        let imgHeight = img.height
-        
-        const aspectRatio = imgWidth / imgHeight
-        if (imgWidth > maxWidth) {
-          imgWidth = maxWidth
-          imgHeight = imgWidth / aspectRatio
-        }
-        if (imgHeight > maxHeight) {
-          imgHeight = maxHeight
-          imgWidth = imgHeight * aspectRatio
-        }
-        
-        const imgX = uploadAreaX + (uploadAreaWidth - imgWidth) / 2
-        const imgY = uploadAreaY + 6 * scale.value
-        
-        // 绘制图片
-        context.drawImage(img, imgX, imgY, imgWidth, imgHeight)
-        
-        // 绘制文件名
-        if (node.config?.fileName && typeof node.config.fileName === 'string') {
-          context.fillStyle = '#475569'
-          context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
-          context.textAlign = 'center'
-          context.textBaseline = 'bottom'
-          const fileName = node.config.fileName.length > 18 ? node.config.fileName.substring(0, 15) + '...' : node.config.fileName
-          context.fillText(fileName, uploadAreaX + uploadAreaWidth / 2, uploadAreaY + uploadAreaHeight - 3 * scale.value)
-        }
+       if (node.cachedImage) {
+         const img = node.cachedImage
+         // 计算图片显示尺寸，保持宽高比
+         const maxWidth = uploadAreaWidth - 16 * scale.value
+         const maxHeight = previewAreaHeight - 8 * scale.value
+         let imgWidth = img.width
+         let imgHeight = img.height
+         
+         const aspectRatio = imgWidth / imgHeight
+         if (imgWidth > maxWidth) {
+           imgWidth = maxWidth
+           imgHeight = imgWidth / aspectRatio
+         }
+         if (imgHeight > maxHeight) {
+           imgHeight = maxHeight
+           imgWidth = imgHeight * aspectRatio
+         }
+         
+         const imgX = uploadAreaX + (uploadAreaWidth - imgWidth) / 2
+         const imgY = previewAreaY + (previewAreaHeight - imgHeight) / 2
+         
+         // 绘制图片
+         context.drawImage(img, imgX, imgY, imgWidth, imgHeight)
+         
+         // 绘制图片尺寸信息（右下角）
+         const sizeText = `${img.width} × ${img.height}`
+         context.fillStyle = '#6b7280'
+         context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+         context.textAlign = 'right'
+         context.textBaseline = 'bottom'
+         context.fillText(sizeText, uploadAreaX + uploadAreaWidth - 12 * scale.value, uploadAreaY + uploadAreaHeight - 8 * scale.value)
       } else {
         // 异步加载图片
         const img = new Image()
@@ -674,43 +720,86 @@ const drawNode = (node: WorkflowNode) => {
             redraw()
           })
         }
+        img.onerror = () => {
+          console.error('图片加载失败:', node.config.imageData)
+          // 标记图片加载失败，重新绘制
+          node.imageLoadError = true
+          nextTick(() => {
+            redraw()
+          })
+        }
         img.src = node.config.imageData as string
         
-        // 显示加载状态
-        context.fillStyle = '#94a3b8'
-        context.font = `${12 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
-        context.textAlign = 'center'
-        context.textBaseline = 'middle'
-        context.fillText('加载中...', uploadAreaX + uploadAreaWidth / 2, uploadAreaY + uploadAreaHeight / 2)
+        // 显示加载状态或错误信息
+        if (node.imageLoadError) {
+          context.fillStyle = '#ef4444'
+          context.font = `${12 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+          context.textAlign = 'center'
+          context.textBaseline = 'middle'
+          context.fillText('图片加载失败', uploadAreaX + uploadAreaWidth / 2, previewAreaY + previewAreaHeight / 2)
+        } else {
+          context.fillStyle = '#9ca3af'
+          context.font = `${12 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+          context.textAlign = 'center'
+          context.textBaseline = 'middle'
+          context.fillText('加载中...', uploadAreaX + uploadAreaWidth / 2, previewAreaY + previewAreaHeight / 2)
+        }
       }
-    } else {
-      // 显示上传区域
-      context.fillStyle = 'rgba(148, 163, 184, 0.08)'
-      context.beginPath()
-      context.roundRect(uploadAreaX, uploadAreaY, uploadAreaWidth, uploadAreaHeight, 6 * scale.value)
-      context.fill()
+    } else if (hasFile) {
+      // 非图片文件显示区域
+      const previewAreaY = buttonY + buttonHeight + 8 * scale.value
+      const previewAreaHeight = uploadAreaHeight - (previewAreaY - uploadAreaY) - 16 * scale.value
       
-      // 绘制虚线边框
-      context.strokeStyle = '#94a3b8'
-      context.lineWidth = 1.5 * scale.value
+      // 绘制文件图标
+      context.fillStyle = '#9ca3af'
+      context.font = `${24 * scale.value}px Arial`
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText('📄', uploadAreaX + uploadAreaWidth / 2, previewAreaY + previewAreaHeight / 2 - 8 * scale.value)
+      
+      // 绘制文件类型
+      const fileType = node.config.fileType as string
+      const typeText = fileType || 'FILE'
+      context.fillStyle = '#6b7280'
+      context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText(typeText.toUpperCase(), uploadAreaX + uploadAreaWidth / 2, previewAreaY + previewAreaHeight / 2 + 12 * scale.value)
+      
+      // 绘制文件大小（右下角）
+      const fileSize = node.config.fileSize as number
+      const sizeText = fileSize ? `${(fileSize / 1024).toFixed(1)} KB` : '未知大小'
+      context.fillStyle = '#6b7280'
+      context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'right'
+      context.textBaseline = 'bottom'
+      context.fillText(sizeText, uploadAreaX + uploadAreaWidth - 12 * scale.value, uploadAreaY + uploadAreaHeight - 8 * scale.value)
+    } else {
+      // 空状态显示区域
+      const previewAreaY = buttonY + buttonHeight + 8 * scale.value
+      const previewAreaHeight = uploadAreaHeight - (previewAreaY - uploadAreaY) - 16 * scale.value
+      
+      // 绘制虚线边框（预览区域）
+      context.strokeStyle = '#4b5563'
+      context.lineWidth = 1 * scale.value
       context.setLineDash([4 * scale.value, 4 * scale.value])
+      context.beginPath()
+      context.roundRect(uploadAreaX + 8 * scale.value, previewAreaY, uploadAreaWidth - 16 * scale.value, previewAreaHeight, 4 * scale.value)
       context.stroke()
       context.setLineDash([])
       
       // 绘制图标和文字
-      const iconY = uploadAreaY + uploadAreaHeight / 2 - 8 * scale.value
-      
-      context.fillStyle = '#64748b'
-      context.font = `${18 * scale.value}px Arial`
+      context.fillStyle = '#6b7280'
+      context.font = `${20 * scale.value}px Arial`
       context.textAlign = 'center'
       context.textBaseline = 'middle'
-      context.fillText('🖼️', uploadAreaX + uploadAreaWidth / 2, iconY)
+      context.fillText('🖼️', uploadAreaX + uploadAreaWidth / 2, previewAreaY + previewAreaHeight / 2 - 8 * scale.value)
       
-      context.fillStyle = '#64748b'
+      context.fillStyle = '#6b7280'
       context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
       context.textAlign = 'center'
       context.textBaseline = 'middle'
-      context.fillText('点击上传图片', uploadAreaX + uploadAreaWidth / 2, iconY + 20 * scale.value)
+      context.fillText('点击上传图片或文件', uploadAreaX + uploadAreaWidth / 2, previewAreaY + previewAreaHeight / 2 + 12 * scale.value)
     }
     
     // 存储上传区域位置信息，用于点击检测
@@ -1336,6 +1425,9 @@ const handleUploadButtonClick = (node: WorkflowNode) => {
         const reader = new FileReader()
         reader.onload = (e) => {
           const dataUrl = e.target?.result as string
+          // 清除之前的错误状态和缓存图片
+          node.imageLoadError = false
+          node.cachedImage = undefined
           updateNode(node.id, {
             config: {
               ...node.config,
@@ -1356,10 +1448,12 @@ const handleUploadButtonClick = (node: WorkflowNode) => {
             config: {
               ...node.config,
               defaultText: content,
-              fileName: file.name
+              fileName: file.name,
+              fileSize: file.size,
+              fileType: file.type || 'text/plain'
             }
           })
-          console.log('文件上传成功:', file.name, '内容长度:', content.length)
+          console.log('文件上传成功:', file.name, '大小:', file.size, '内容长度:', content.length)
         }
         reader.readAsText(file)
       }
