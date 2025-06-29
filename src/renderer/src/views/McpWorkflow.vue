@@ -466,7 +466,10 @@ const drawNode = (node: WorkflowNode) => {
   const x = (node.x + offset.value.x) * scale.value
   const y = (node.y + offset.value.y) * scale.value
   const width = NODE_WIDTH * scale.value
-  const height = NODE_HEIGHT * scale.value
+  // 为file-input节点动态计算高度
+  const height = node.type === 'file-input' 
+    ? (NODE_HEIGHT + 226 ) * scale.value  // 基础高度 + 上传区域高度 + 间距
+    : NODE_HEIGHT * scale.value
   
   // 绘制节点阴影
   context.shadowColor = 'rgba(0, 0, 0, 0.15)'
@@ -608,12 +611,12 @@ const drawNode = (node: WorkflowNode) => {
     drawPort(x + width + PORT_RADIUS * scale.value, portY, 'output')
   })
   
-  // 如果是文件输入节点，在下部绘制上传区域或图片预览
+  // 如果是文件输入节点，在headers下面绘制上传区域或图片预览
   if (node.type === 'file-input') {
     const uploadAreaWidth = width - 16 * scale.value
-    const uploadAreaHeight = 120 * scale.value  // 增加高度以容纳更多内容
+    const uploadAreaHeight = 250 * scale.value  // 增加高度以容纳更多内容
     const uploadAreaX = x + 8 * scale.value
-    const uploadAreaY = y + height - uploadAreaHeight - 8 * scale.value
+    const uploadAreaY = y + headerHeight + 8 * scale.value  // 放在headers下面
     
     // 检查是否有上传的图片或文件
     const hasImage = node.config?.imageData && typeof node.config.imageData === 'string'
