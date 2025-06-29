@@ -31,12 +31,7 @@
                     </div>
                     <div class="flex-1">
                       <div class="text-sm font-medium">加载图像</div>
-                      <div class="text-xs text-muted-foreground">上传图片文件</div>
                     </div>
-                  </div>
-                  <div class="w-full h-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900/20 hover:bg-gray-100 dark:hover:bg-gray-800/30 transition-colors cursor-pointer">
-                    <Icon icon="lucide:image" class="w-6 h-6 text-gray-400 mb-1" />
-                    <span class="text-xs text-gray-500 dark:text-gray-400">upload</span>
                   </div>
                 </div>
                 
