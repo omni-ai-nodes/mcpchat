@@ -1341,17 +1341,32 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText('选择MCP服务:', serverSelectX + 8 * scale.value, serverSelectY + 8 * scale.value)
     
     // 绘制当前选择的服务器或占位符
-    const selectedServerName = (node.config?.selectedServerName as string) || '请选择MCP服务...'
-    const selectedServer = mcpStore.serverList.find(s => s.name === selectedServerName)
+    const selectedServers = getNodeMcpServers(node.id)
+    let displayText = '请选择MCP服务...'
+    let hasSelectedServers = false
     
-    context.fillStyle = selectedServerName === '请选择MCP服务...' ? '#64748b' : '#cbd5e1'
+    if (selectedServers.length > 0) {
+      hasSelectedServers = true
+      if (selectedServers.length === 1) {
+        displayText = selectedServers[0]
+      } else {
+        displayText = `已选择 ${selectedServers.length} 个服务`
+      }
+    }
+    
+    context.fillStyle = hasSelectedServers ? '#cbd5e1' : '#64748b'
     context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
-    context.fillText(selectedServerName, serverSelectX + 8 * scale.value, serverSelectY + 28 * scale.value)
+    context.fillText(displayText, serverSelectX + 8 * scale.value, serverSelectY + 28 * scale.value)
     
-    // 如果有选中的服务器，显示状态信息
-    if (selectedServer && selectedServerName !== '请选择MCP服务...') {
-      const statusText = selectedServer.isRunning ? '运行中' : '未运行'
-      const statusColor = selectedServer.isRunning ? '#10b981' : '#ef4444'
+    // 如果有选中的服务器，显示运行状态统计
+    if (hasSelectedServers) {
+      const runningCount = selectedServers.filter(serverName => {
+        const server = mcpStore.serverList.find(s => s.name === serverName)
+        return server?.isRunning
+      }).length
+      
+      const statusText = `${runningCount}/${selectedServers.length} 运行中`
+      const statusColor = runningCount === selectedServers.length ? '#10b981' : runningCount > 0 ? '#f59e0b' : '#ef4444'
       
       context.fillStyle = statusColor
       context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
