@@ -26,11 +26,11 @@
                 <!-- file-input 节点特殊显示 -->
                 <div v-if="node.type === 'file-input'" class="flex flex-col gap-2">
                   <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                      <Icon icon="lucide:upload" class="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                      <Icon icon="lucide:upload" class="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div class="flex-1">
-                      <div class="text-sm font-medium">加载图像</div>
+                      <div class="text-sm font-medium">文件输入</div>
                     </div>
                   </div>
                 </div>
