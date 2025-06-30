@@ -542,6 +542,10 @@ const offset = ref({ x: 0, y: 0 })
 const isDragging = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
 const draggedNode = ref<WorkflowNode | null>(null)
+// 画布拖拽相关状态
+const isCanvasDragging = ref(false)
+const canvasDragStart = ref({ x: 0, y: 0 })
+const canvasDragStartOffset = ref({ x: 0, y: 0 })
 const animationFrameId = ref<number | null>(null)
 
 // Canvas 渲染配置
@@ -3486,9 +3490,15 @@ const onCanvasMouseDown = (event: MouseEvent) => {
     dragStart.value = { x: pos.x - clickedNode.x, y: pos.y - clickedNode.y }
     console.log('开始拖拽节点:', clickedNode.name, 'isDragging:', isDragging.value)
   } else {
-    // 点击空白区域
+    // 点击空白区域，开始画布拖拽
     selectedNode.value = null
     connectionManager.selectedConnection.value = null
+    
+    // 启动画布拖拽
+    isCanvasDragging.value = true
+    canvasDragStart.value = { x: event.clientX, y: event.clientY }
+    canvasDragStartOffset.value = { x: offset.value.x, y: offset.value.y }
+    console.log('开始画布拖拽')
   }
 }
 
@@ -3497,7 +3507,16 @@ const onCanvasMouseMoveCanvas = (event: MouseEvent) => {
   
   const pos = getCanvasPosition(event)
   
-  if (isDragging.value && draggedNode.value) {
+  if (isCanvasDragging.value) {
+    // 画布拖拽
+    const deltaX = (event.clientX - canvasDragStart.value.x) / scale.value
+    const deltaY = (event.clientY - canvasDragStart.value.y) / scale.value
+    
+    offset.value.x = canvasDragStartOffset.value.x + deltaX
+    offset.value.y = canvasDragStartOffset.value.y + deltaY
+    
+    console.log('画布拖拽中:', offset.value.x, offset.value.y)
+  } else if (isDragging.value && draggedNode.value) {
     // 拖拽节点
     const newX = pos.x - dragStart.value.x
     const newY = pos.y - dragStart.value.y
@@ -3581,8 +3600,13 @@ const onCanvasMouseUpCanvas = (event: MouseEvent) => {
     console.log('结束拖拽')
   }
   
+  if (isCanvasDragging.value) {
+    console.log('结束画布拖拽')
+  }
+  
   isDragging.value = false
   draggedNode.value = null
+  isCanvasDragging.value = false
 }
 
 const onCanvasWheelCanvas = (event: WheelEvent) => {
@@ -3848,6 +3872,18 @@ onMounted(() => {
     const mouseX = (event.clientX - rect.left) / scale.value - offset.value.x
     const mouseY = (event.clientY - rect.top) / scale.value - offset.value.y
     
+    // 处理画布拖拽
+    if (isCanvasDragging.value) {
+      const deltaX = (event.clientX - canvasDragStart.value.x) / scale.value
+      const deltaY = (event.clientY - canvasDragStart.value.y) / scale.value
+      
+      offset.value.x = canvasDragStartOffset.value.x + deltaX
+      offset.value.y = canvasDragStartOffset.value.y + deltaY
+      
+      console.log('全局画布拖拽中:', offset.value.x, offset.value.y)
+      return
+    }
+    
     // 处理节点拖拽
     if (isDragging.value && draggedNode.value) {
       const newX = mouseX - dragStart.value.x
@@ -3880,8 +3916,13 @@ onMounted(() => {
       console.log('全局结束拖拽')
     }
     
+    if (isCanvasDragging.value) {
+      console.log('全局结束画布拖拽')
+    }
+    
     isDragging.value = false
     draggedNode.value = null
+    isCanvasDragging.value = false
   }
   
   document.addEventListener('mousemove', handleGlobalMouseMove)
