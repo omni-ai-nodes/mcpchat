@@ -2576,65 +2576,179 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.6);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease-out;
   `
   
-  // 计算与文本输入节点下方区域对齐的尺寸
-  // 文本区域: 180 * scale, 编辑按钮区域: 60 * scale 高度, 加上间距
+  // 优化对话框尺寸计算
   const nodeScale = scale.value || 1
-  const alignedWidth = Math.max(400, 180 * nodeScale + 48) // 最小400px，或与节点宽度对齐
-  const alignedHeight = Math.max(300, 60 * nodeScale * 4 + 100) // 约4倍文本区域高度加上按钮空间
+  const minWidth = 500
+  const maxWidth = Math.min(800, window.innerWidth * 0.9)
+  const alignedWidth = Math.max(minWidth, Math.min(maxWidth, 180 * nodeScale + 100))
+  const minHeight = 400
+  const maxHeight = Math.min(600, window.innerHeight * 0.8)
+  const alignedHeight = Math.max(minHeight, Math.min(maxHeight, 60 * nodeScale * 5 + 150))
   
   // 创建对话框内容
   const dialogContent = document.createElement('div')
   dialogContent.style.cssText = `
-    background: #2a2a2a;
-    border-radius: 8px;
-    padding: 24px;
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-radius: 12px;
+    padding: 28px;
     width: ${alignedWidth}px;
     height: ${alignedHeight}px;
     max-width: 90vw;
     max-height: 80vh;
-    overflow: auto;
-    border: 1px solid #404040;
+    border: 1px solid #374151;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
     display: flex;
     flex-direction: column;
+    animation: slideIn 0.3s ease-out;
   `
   
-  // 创建标题
+  // 创建标题区域
+  const titleContainer = document.createElement('div')
+  titleContainer.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #374151;
+  `
+  
   const title = document.createElement('h3')
   title.textContent = '编辑文本内容'
   title.style.cssText = `
-    margin: 0 0 16px 0;
-    color: #ffffff;
-    font-size: 18px;
+    margin: 0;
+    color: #f9fafb;
+    font-size: 20px;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  `
+  
+  // 添加图标
+  const titleIcon = document.createElement('span')
+  titleIcon.innerHTML = '📝'
+  titleIcon.style.cssText = `
+    font-size: 18px;
+  `
+  title.insertBefore(titleIcon, title.firstChild)
+  
+  // 创建关闭按钮
+  const closeButton = document.createElement('button')
+  closeButton.innerHTML = '✕'
+  closeButton.style.cssText = `
+    background: none;
+    border: none;
+    color: #9ca3af;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `
+  closeButton.onmouseover = () => {
+    closeButton.style.background = '#374151'
+    closeButton.style.color = '#ffffff'
+  }
+  closeButton.onmouseout = () => {
+    closeButton.style.background = 'none'
+    closeButton.style.color = '#9ca3af'
+  }
+  
+  titleContainer.appendChild(title)
+  titleContainer.appendChild(closeButton)
+  
+  // 创建文本区域容器
+  const textareaContainer = document.createElement('div')
+  textareaContainer.style.cssText = `
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+  `
+  
+  // 创建文本区域标签
+  const textareaLabel = document.createElement('label')
+  textareaLabel.textContent = '文本内容'
+  textareaLabel.style.cssText = `
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    display: block;
   `
   
   // 创建文本区域
   const textarea = document.createElement('textarea')
   textarea.value = currentText
-  const textareaHeight = alignedHeight - 120 // 减去标题、按钮和间距的高度
   textarea.style.cssText = `
     width: 100%;
-    height: ${textareaHeight}px;
-    background: #1f2937;
-    border: 1px solid #374151;
-    border-radius: 4px;
-    padding: 12px;
-    color: #d1d5db;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    flex: 1;
+    min-height: 200px;
+    background: #111827;
+    border: 2px solid #374151;
+    border-radius: 8px;
+    padding: 16px;
+    color: #f3f4f6;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
     font-size: 14px;
+    line-height: 1.5;
     resize: vertical;
     outline: none;
     box-sizing: border-box;
-    flex: 1;
+    transition: all 0.2s ease;
   `
   textarea.placeholder = '请输入文本内容...'
+  
+  // 添加焦点效果
+  textarea.onfocus = () => {
+    textarea.style.borderColor = '#6366f1'
+    textarea.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)'
+  }
+  textarea.onblur = () => {
+    textarea.style.borderColor = '#374151'
+    textarea.style.boxShadow = 'none'
+  }
+  
+  // 创建字符计数
+  const charCount = document.createElement('div')
+  charCount.style.cssText = `
+    color: #9ca3af;
+    font-size: 12px;
+    text-align: right;
+    margin-top: 8px;
+  `
+  
+  const updateCharCount = () => {
+    const count = textarea.value.length
+    charCount.textContent = `${count} 字符`
+    if (count > 1000) {
+      charCount.style.color = '#f59e0b'
+    } else {
+      charCount.style.color = '#9ca3af'
+    }
+  }
+  
+  textarea.oninput = updateCharCount
+  updateCharCount()
+  
+  textareaContainer.appendChild(textareaLabel)
+  textareaContainer.appendChild(textarea)
+  textareaContainer.appendChild(charCount)
   
   // 创建按钮容器
   const buttonContainer = document.createElement('div')
@@ -2642,7 +2756,8 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
     display: flex;
     gap: 12px;
     justify-content: flex-end;
-    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #374151;
     flex-shrink: 0;
   `
   
@@ -2650,35 +2765,70 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
   const cancelButton = document.createElement('button')
   cancelButton.textContent = '取消'
   cancelButton.style.cssText = `
-    padding: 8px 16px;
+    padding: 10px 20px;
     background: #374151;
     border: 1px solid #4b5563;
-    border-radius: 4px;
-    color: #d1d5db;
+    border-radius: 6px;
+    color: #e5e7eb;
     cursor: pointer;
     font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
   `
   
   // 创建确认按钮
   const confirmButton = document.createElement('button')
-  confirmButton.textContent = '确认'
+  confirmButton.textContent = '保存'
   confirmButton.style.cssText = `
-    padding: 8px 16px;
-    background: #4f46e5;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
     border: 1px solid #6366f1;
-    border-radius: 4px;
+    border-radius: 6px;
     color: #ffffff;
     cursor: pointer;
     font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
   `
   
-  // 添加事件监听
-  cancelButton.onclick = () => {
-    document.body.removeChild(dialog)
+  // 添加按钮悬停效果
+  cancelButton.onmouseover = () => {
+    cancelButton.style.background = '#4b5563'
+    cancelButton.style.transform = 'translateY(-1px)'
+  }
+  cancelButton.onmouseout = () => {
+    cancelButton.style.background = '#374151'
+    cancelButton.style.transform = 'translateY(0)'
   }
   
+  confirmButton.onmouseover = () => {
+    confirmButton.style.background = 'linear-gradient(135deg, #5b5bf6 0%, #4338ca 100%)'
+    confirmButton.style.transform = 'translateY(-1px)'
+    confirmButton.style.boxShadow = '0 4px 8px rgba(99, 102, 241, 0.3)'
+  }
+  confirmButton.onmouseout = () => {
+    confirmButton.style.background = 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'
+    confirmButton.style.transform = 'translateY(0)'
+    confirmButton.style.boxShadow = '0 2px 4px rgba(99, 102, 241, 0.2)'
+  }
+  
+  // 添加事件监听
+  const closeDialog = () => {
+    dialog.style.animation = 'fadeOut 0.2s ease-in'
+    dialogContent.style.animation = 'slideOut 0.2s ease-in'
+    setTimeout(() => {
+      document.body.removeChild(dialog)
+    }, 200)
+  }
+  
+  cancelButton.onclick = closeDialog
+  closeButton.onclick = closeDialog
+  
   confirmButton.onclick = () => {
-    const newText = textarea.value
+    const newText = textarea.value.trim()
     updateNode(node.id, {
       config: {
         ...node.config,
@@ -2686,14 +2836,66 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
       }
     })
     console.log('文本内容已更新:', newText)
-    document.body.removeChild(dialog)
+    closeDialog()
   }
+  
+  // 点击背景关闭
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      closeDialog()
+    }
+  }
+  
+  // ESC键关闭
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      closeDialog()
+      document.removeEventListener('keydown', handleKeyDown)
+    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      confirmButton.click()
+    }
+  }
+  document.addEventListener('keydown', handleKeyDown)
+  
+  // 添加CSS动画
+  const style = document.createElement('style')
+  style.textContent = `
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    @keyframes slideIn {
+      from { 
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+      }
+      to { 
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    @keyframes slideOut {
+      from { 
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      to { 
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+      }
+    }
+  `
+  document.head.appendChild(style)
   
   // 组装对话框
   buttonContainer.appendChild(cancelButton)
   buttonContainer.appendChild(confirmButton)
-  dialogContent.appendChild(title)
-  dialogContent.appendChild(textarea)
+  dialogContent.appendChild(titleContainer)
+  dialogContent.appendChild(textareaContainer)
   dialogContent.appendChild(buttonContainer)
   dialog.appendChild(dialogContent)
   
@@ -2704,7 +2906,7 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
   setTimeout(() => {
     textarea.focus()
     textarea.setSelectionRange(textarea.value.length, textarea.value.length)
-  }, 100)
+  }, 300)
 }
 
 // 处理MCP模型选择点击
