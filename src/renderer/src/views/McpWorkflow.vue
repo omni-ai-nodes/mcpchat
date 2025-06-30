@@ -952,18 +952,19 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText(displayFileName, uploadAreaX + 16 * scale.value, fileNameAreaY + fileNameAreaHeight / 2)
     
     // 存储文件名区域位置信息，用于点击检测
+    // 注意：存储未缩放的坐标，因为getCanvasPosition已经处理了缩放转换
     if (!node.fileNameArea) {
       node.fileNameArea = {
-        x: fileNameAreaX,
-        y: fileNameAreaY,
-        width: fileNameAreaWidth,
-        height: fileNameAreaHeight
+        x: fileNameAreaX / scale.value,
+        y: fileNameAreaY / scale.value,
+        width: fileNameAreaWidth / scale.value,
+        height: fileNameAreaHeight / scale.value
       }
     } else {
-      node.fileNameArea.x = fileNameAreaX
-      node.fileNameArea.y = fileNameAreaY
-      node.fileNameArea.width = fileNameAreaWidth
-      node.fileNameArea.height = fileNameAreaHeight
+      node.fileNameArea.x = fileNameAreaX / scale.value
+      node.fileNameArea.y = fileNameAreaY / scale.value
+      node.fileNameArea.width = fileNameAreaWidth / scale.value
+      node.fileNameArea.height = fileNameAreaHeight / scale.value
     }
     
     // 绘制upload按钮
@@ -1119,18 +1120,19 @@ const drawNode = (node: WorkflowNode) => {
     }
     
     // 存储上传按钮位置信息，用于点击检测（只有按钮区域可点击）
+    // 注意：存储未缩放的坐标，因为getCanvasPosition已经处理了缩放转换
     if (!node.uploadButton) {
       node.uploadButton = {
-        x: buttonX,
-        y: buttonY,
-        width: buttonWidth,
-        height: buttonHeight
+        x: buttonX / scale.value,
+        y: buttonY / scale.value,
+        width: buttonWidth / scale.value,
+        height: buttonHeight / scale.value
       }
     } else {
-      node.uploadButton.x = buttonX
-      node.uploadButton.y = buttonY
-      node.uploadButton.width = buttonWidth
-      node.uploadButton.height = buttonHeight
+      node.uploadButton.x = buttonX / scale.value
+      node.uploadButton.y = buttonY / scale.value
+      node.uploadButton.width = buttonWidth / scale.value
+      node.uploadButton.height = buttonHeight / scale.value
     }
   }
   
@@ -1189,18 +1191,19 @@ const drawNode = (node: WorkflowNode) => {
     })
     
     // 存储文本区域位置信息，用于点击检测
+    // 注意：存储未缩放的坐标，因为getCanvasPosition已经处理了缩放转换
     if (!node.textArea) {
       node.textArea = {
-        x: textAreaX,
-        y: textAreaY,
-        width: textAreaWidth,
-        height: textAreaHeight
+        x: textAreaX / scale.value,
+        y: textAreaY / scale.value,
+        width: textAreaWidth / scale.value,
+        height: textAreaHeight / scale.value
       }
     } else {
-      node.textArea.x = textAreaX
-      node.textArea.y = textAreaY
-      node.textArea.width = textAreaWidth
-      node.textArea.height = textAreaHeight
+      node.textArea.x = textAreaX / scale.value
+      node.textArea.y = textAreaY / scale.value
+      node.textArea.width = textAreaWidth / scale.value
+      node.textArea.height = textAreaHeight / scale.value
     }
     
     // 绘制编辑按钮
@@ -1227,18 +1230,19 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText('✏️ 编辑', buttonX + buttonWidth / 2, buttonY + buttonHeight / 2)
     
     // 存储按钮位置信息，用于点击检测
+    // 注意：存储未缩放的坐标，因为getCanvasPosition已经处理了缩放转换
     if (!node.editButton) {
       node.editButton = {
-        x: buttonX,
-        y: buttonY,
-        width: buttonWidth,
-        height: buttonHeight
+        x: buttonX / scale.value,
+        y: buttonY / scale.value,
+        width: buttonWidth / scale.value,
+        height: buttonHeight / scale.value
       }
     } else {
-      node.editButton.x = buttonX
-      node.editButton.y = buttonY
-      node.editButton.width = buttonWidth
-      node.editButton.height = buttonHeight
+      node.editButton.x = buttonX / scale.value
+      node.editButton.y = buttonY / scale.value
+      node.editButton.width = buttonWidth / scale.value
+      node.editButton.height = buttonHeight / scale.value
     }
   }
 
@@ -1306,18 +1310,19 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText('▼', modelSelectX + modelSelectWidth - 8 * scale.value, modelSelectY + 32 * scale.value)
     
     // 存储模型选择区域位置信息
+    // 注意：存储未缩放的坐标，因为getCanvasPosition已经处理了缩放转换
     if (!node.mcpModelSelect) {
       node.mcpModelSelect = {
-        x: modelSelectX,
-        y: modelSelectY,
-        width: modelSelectWidth,
-        height: modelSelectHeight
+        x: modelSelectX / scale.value,
+        y: modelSelectY / scale.value,
+        width: modelSelectWidth / scale.value,
+        height: modelSelectHeight / scale.value
       }
     } else {
-      node.mcpModelSelect.x = modelSelectX
-      node.mcpModelSelect.y = modelSelectY
-      node.mcpModelSelect.width = modelSelectWidth
-      node.mcpModelSelect.height = modelSelectHeight
+      node.mcpModelSelect.x = modelSelectX / scale.value
+      node.mcpModelSelect.y = modelSelectY / scale.value
+      node.mcpModelSelect.width = modelSelectWidth / scale.value
+      node.mcpModelSelect.height = modelSelectHeight / scale.value
     }
     
     // 绘制MCP服务器选择区域
@@ -1407,18 +1412,19 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText('▼', serverSelectX + serverSelectWidth - 8 * scale.value, serverSelectY + 32 * scale.value)
     
     // 存储服务器选择区域位置信息
+    // 注意：存储未缩放的坐标，因为getCanvasPosition已经处理了缩放转换
     if (!node.mcpServerSelect) {
       node.mcpServerSelect = {
-        x: serverSelectX,
-        y: serverSelectY,
-        width: serverSelectWidth,
-        height: serverSelectHeight
+        x: serverSelectX / scale.value,
+        y: serverSelectY / scale.value,
+        width: serverSelectWidth / scale.value,
+        height: serverSelectHeight / scale.value
       }
     } else {
-      node.mcpServerSelect.x = serverSelectX
-      node.mcpServerSelect.y = serverSelectY
-      node.mcpServerSelect.width = serverSelectWidth
-      node.mcpServerSelect.height = serverSelectHeight
+      node.mcpServerSelect.x = serverSelectX / scale.value
+      node.mcpServerSelect.y = serverSelectY / scale.value
+      node.mcpServerSelect.width = serverSelectWidth / scale.value
+      node.mcpServerSelect.height = serverSelectHeight / scale.value
     }
     
     // 存储整个服务区域位置信息
