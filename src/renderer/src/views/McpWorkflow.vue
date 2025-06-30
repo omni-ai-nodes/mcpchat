@@ -184,7 +184,7 @@
 
   <!-- MCP服务器选择弹窗 -->
   <div v-if="showServerSelectModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full mx-4">
       <div class="p-6">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold">选择MCP服务器（支持多选）</h3>
@@ -229,7 +229,7 @@
           </div>
         </div>
         
-        <div class="space-y-2 max-h-60 overflow-y-auto">
+        <div class="space-y-2 max-h-96 overflow-y-auto">
           <div 
              v-for="server in availableServers" 
              :key="server.id"
@@ -760,9 +760,9 @@ const drawNode = (node: WorkflowNode) => {
   const height = node.type === 'file-input' 
     ? (NODE_HEIGHT + 226 ) * scale.value  // 基础高度 + 上传区域高度 + 间距
     : node.type === 'text-input'
-    ? (NODE_HEIGHT + 100 ) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
+    ? (NODE_HEIGHT + 95 ) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
     : node.type === 'mcp-service'
-    ? (NODE_HEIGHT + 140 + 16) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
+    ? (NODE_HEIGHT + 115) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
     : NODE_HEIGHT * scale.value
   
   // 绘制节点阴影
