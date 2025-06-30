@@ -1560,9 +1560,15 @@ const addNode = (template: NodeTemplate) => {
   if (template.type === 'mcp-service') {
     // 初始化MCP节点的独立状态
     initializeMcpNodeState(newNode.id, newNode.config.instanceId as string)
+    
+    // 如果节点配置中已有selectedServers，同步到独立状态映射表
+    if (newNode.config.selectedServers && Array.isArray(newNode.config.selectedServers)) {
+      setNodeMcpServers(newNode.id, newNode.config.selectedServers as string[])
+    }
+    
     console.log(`MCP节点 ${newNode.id} 已创建，初始状态:`, {
-      selectedServers: [],
-      mcpEnabled: false,
+      selectedServers: getNodeMcpServers(newNode.id),
+      mcpEnabled: newNode.config.mcpEnabled || false,
       instanceId: newNode.config.instanceId
     })
   }
@@ -2997,9 +3003,13 @@ const handleMcpServerSelectClick = (node: WorkflowNode) => {
   }
   
   // 显示选择弹窗
-   showServerSelectModal.value = true
    currentSelectingNode.value = node
    availableServers.value = serverOptions
+   
+   // 确保状态同步后再显示弹窗
+   nextTick(() => {
+     showServerSelectModal.value = true
+   })
  }
  
  // 处理服务器选择
@@ -3566,17 +3576,19 @@ const restoreWorkflowMcpState = (loadedNodes: WorkflowNode[]) => {
         availableServerNames.includes(serverName)
       )
       
+      // 同步到独立状态映射表
+      setNodeMcpServers(node.id, validServers)
+      
       // 如果有无效的服务器，更新节点配置
       if (validServers.length !== servers.length) {
         console.warn(`节点 ${node.id} 包含无效的MCP服务器:`, 
           servers.filter(s => !availableServerNames.includes(s))
         )
-        setNodeMcpServers(node.id, validServers)
-      } else {
-        // 确保状态一致性
-        node.config.mcpEnabled = validServers.length > 0
-        node.config.lastUpdated = node.config.lastUpdated || Date.now()
       }
+      
+      // 确保状态一致性
+      node.config.mcpEnabled = validServers.length > 0
+      node.config.lastUpdated = node.config.lastUpdated || Date.now()
       
       console.log(`节点 ${node.id} MCP状态已恢复:`, {
         selectedServers: validServers,
