@@ -2009,6 +2009,24 @@ const getEditIconAtPosition = (x: number, y: number): WorkflowNode | null => {
   return null
 }
 
+const getTypeTagAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    const typeText = node.type.toUpperCase()
+    // 估算文本宽度（大约每个字符6-8像素）
+    const textWidth = typeText.length * 6
+    const tagX = node.x + NODE_WIDTH - 8 - textWidth
+    const tagY = node.y + 5
+    const tagWidth = textWidth + 8
+    const tagHeight = 20
+    
+    if (x >= tagX && x <= tagX + tagWidth &&
+        y >= tagY && y <= tagY + tagHeight) {
+      return node
+    }
+  }
+  return null
+}
+
 const getUploadButtonAtPosition = (x: number, y: number): WorkflowNode | null => {
   for (const node of workflowNodes.value) {
     if ((node.type === 'text-input' || node.type === 'file-input') && node.uploadButton) {
@@ -3441,6 +3459,7 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   
   const pos = getCanvasPosition(event)
   const clickedEditIcon = getEditIconAtPosition(pos.x, pos.y)
+  const clickedTypeTag = getTypeTagAtPosition(pos.x, pos.y)
   const clickedNode = getNodeAtPosition(pos.x, pos.y)
   const clickedPort = getPortAtCanvasPosition(pos.x, pos.y)
   const clickedUploadButton = getUploadButtonAtPosition(pos.x, pos.y)
@@ -3468,6 +3487,10 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedTextArea) {
     // 处理文本区域点击
     handleTextAreaClick(clickedTextArea)
+  } else if (clickedTypeTag) {
+    // 处理类型标签点击，显示属性面板
+    selectedNode.value = clickedTypeTag
+    console.log('点击类型标签，显示属性面板:', clickedTypeTag.name, clickedTypeTag.type)
   } else if (clickedPort) {
     console.log('检测到端口点击:', clickedPort.type, clickedPort.port, '节点:', clickedPort.node.name)
     if (clickedPort.type === 'output') {
