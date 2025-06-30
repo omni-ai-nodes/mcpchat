@@ -2602,6 +2602,8 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
     padding: 28px;
     width: ${alignedWidth}px;
     height: ${alignedHeight}px;
+    min-width: 400px;
+    min-height: 300px;
     max-width: 90vw;
     max-height: 80vh;
     border: 1px solid #374151;
@@ -2609,6 +2611,9 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
     display: flex;
     flex-direction: column;
     animation: slideIn 0.3s ease-out;
+    position: relative;
+    resize: both;
+    overflow: hidden;
   `
   
   // 创建标题区域
@@ -2746,19 +2751,268 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
   textarea.oninput = updateCharCount
   updateCharCount()
   
+  // 创建调整大小手柄
+  const resizeHandle = document.createElement('div')
+  resizeHandle.style.cssText = `
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(-45deg, transparent 0%, transparent 30%, #6b7280 30%, #6b7280 40%, transparent 40%, transparent 60%, #6b7280 60%, #6b7280 70%, transparent 70%);
+    cursor: se-resize;
+    border-bottom-right-radius: 12px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  `
+  
+  resizeHandle.onmouseover = () => {
+    resizeHandle.style.opacity = '1'
+  }
+  resizeHandle.onmouseout = () => {
+    resizeHandle.style.opacity = '0.6'
+  }
+  
+  // 添加拖拽调整大小功能
+  let isResizing = false
+  let startX = 0
+  let startY = 0
+  let startWidth = 0
+  let startHeight = 0
+  
+  resizeHandle.onmousedown = (e) => {
+    isResizing = true
+    startX = e.clientX
+    startY = e.clientY
+    startWidth = parseInt(window.getComputedStyle(dialogContent).width, 10)
+    startHeight = parseInt(window.getComputedStyle(dialogContent).height, 10)
+    e.preventDefault()
+    
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'se-resize'
+  }
+  
+  document.onmousemove = (e) => {
+    if (!isResizing) return
+    
+    const newWidth = Math.max(400, startWidth + e.clientX - startX)
+    const newHeight = Math.max(300, startHeight + e.clientY - startY)
+    
+    // 限制最大尺寸
+    const maxWidth = window.innerWidth * 0.9
+    const maxHeight = window.innerHeight * 0.8
+    
+    dialogContent.style.width = Math.min(newWidth, maxWidth) + 'px'
+    dialogContent.style.height = Math.min(newHeight, maxHeight) + 'px'
+  }
+  
+  document.onmouseup = () => {
+    if (isResizing) {
+      isResizing = false
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+    }
+  }
+  
   textareaContainer.appendChild(textareaLabel)
   textareaContainer.appendChild(textarea)
   textareaContainer.appendChild(charCount)
+  
+  // 创建输入内容区域
+  const inputContainer = document.createElement('div')
+  inputContainer.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+    border-top: 1px solid #374151;
+    padding-top: 16px;
+  `
+  
+  // 创建输入内容标签
+  const inputLabel = document.createElement('label')
+  inputLabel.textContent = '输入内容'
+  inputLabel.style.cssText = `
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    display: block;
+  `
+  
+  // 创建输入框
+  const inputField = document.createElement('input')
+  inputField.type = 'text'
+  inputField.style.cssText = `
+    width: 100%;
+    height: 40px;
+    background: #111827;
+    border: 2px solid #374151;
+    border-radius: 8px;
+    padding: 0 16px;
+    color: #f3f4f6;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+  `
+  inputField.placeholder = '请输入内容...'
+  
+  // 添加输入框焦点效果
+  inputField.onfocus = () => {
+    inputField.style.borderColor = '#6366f1'
+    inputField.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)'
+  }
+  inputField.onblur = () => {
+    inputField.style.borderColor = '#374151'
+    inputField.style.boxShadow = 'none'
+  }
+  
+  // 创建输入内容操作按钮
+  const inputActions = document.createElement('div')
+  inputActions.style.cssText = `
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    justify-content: flex-end;
+  `
+  
+  // 添加到文本区域按钮
+  const addToTextButton = document.createElement('button')
+  addToTextButton.textContent = '添加到文本'
+  addToTextButton.style.cssText = `
+    padding: 6px 12px;
+    background: #059669;
+    border: 1px solid #10b981;
+    border-radius: 4px;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  // 清空输入按钮
+  const clearInputButton = document.createElement('button')
+  clearInputButton.textContent = '清空'
+  clearInputButton.style.cssText = `
+    padding: 6px 12px;
+    background: #dc2626;
+    border: 1px solid #ef4444;
+    border-radius: 4px;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  // 添加按钮事件
+  addToTextButton.onclick = () => {
+    const inputValue = inputField.value.trim()
+    if (inputValue) {
+      const currentText = textarea.value
+      const newText = currentText ? currentText + '\n' + inputValue : inputValue
+      textarea.value = newText
+      inputField.value = ''
+      updateCharCount()
+      textarea.focus()
+    }
+  }
+  
+  clearInputButton.onclick = () => {
+    inputField.value = ''
+    inputField.focus()
+  }
+  
+  // 添加回车键快速添加
+  inputField.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      addToTextButton.click()
+    }
+  }
+  
+  // 添加按钮悬停效果
+  addToTextButton.onmouseover = () => {
+    addToTextButton.style.background = '#047857'
+    addToTextButton.style.transform = 'translateY(-1px)'
+  }
+  addToTextButton.onmouseout = () => {
+    addToTextButton.style.background = '#059669'
+    addToTextButton.style.transform = 'translateY(0)'
+  }
+  
+  clearInputButton.onmouseover = () => {
+    clearInputButton.style.background = '#b91c1c'
+    clearInputButton.style.transform = 'translateY(-1px)'
+  }
+  clearInputButton.onmouseout = () => {
+    clearInputButton.style.background = '#dc2626'
+    clearInputButton.style.transform = 'translateY(0)'
+  }
+  
+  inputActions.appendChild(addToTextButton)
+  inputActions.appendChild(clearInputButton)
+  
+  inputContainer.appendChild(inputLabel)
+  inputContainer.appendChild(inputField)
+  inputContainer.appendChild(inputActions)
   
   // 创建按钮容器
   const buttonContainer = document.createElement('div')
   buttonContainer.style.cssText = `
     display: flex;
+    justify-content: space-between;
     gap: 12px;
-    justify-content: flex-end;
     padding-top: 16px;
     border-top: 1px solid #374151;
     flex-shrink: 0;
+  `
+  
+  // 创建左侧按钮组
+  const leftButtonGroup = document.createElement('div')
+  leftButtonGroup.style.cssText = `
+    display: flex;
+    gap: 8px;
+  `
+  
+  // 创建右侧按钮组
+  const rightButtonGroup = document.createElement('div')
+  rightButtonGroup.style.cssText = `
+    display: flex;
+    gap: 12px;
+  `
+  
+  // 创建重置按钮
+  const resetButton = document.createElement('button')
+  resetButton.textContent = '重置'
+  resetButton.style.cssText = `
+    padding: 8px 16px;
+    background: #dc2626;
+    border: 1px solid #ef4444;
+    border-radius: 6px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    min-width: 70px;
+  `
+  
+  // 创建粘贴按钮
+  const pasteButton = document.createElement('button')
+  pasteButton.textContent = '粘贴'
+  pasteButton.style.cssText = `
+    padding: 8px 16px;
+    background: #059669;
+    border: 1px solid #10b981;
+    border-radius: 6px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    min-width: 70px;
   `
   
   // 创建取消按钮
@@ -2794,7 +3048,52 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
     box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
   `
   
+  // 添加重置按钮功能
+  resetButton.onclick = () => {
+    textarea.value = ''
+    updateCharCount()
+    textarea.focus()
+  }
+  
+  // 添加粘贴按钮功能
+  pasteButton.onclick = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) {
+        const currentText = textarea.value
+        const newText = currentText ? currentText + '\n' + text : text
+        textarea.value = newText
+        updateCharCount()
+        textarea.focus()
+      }
+    } catch (err) {
+      console.warn('无法访问剪贴板:', err)
+    }
+  }
+  
   // 添加按钮悬停效果
+  resetButton.onmouseover = () => {
+    resetButton.style.background = '#b91c1c'
+    resetButton.style.transform = 'translateY(-1px)'
+    resetButton.style.boxShadow = '0 4px 8px rgba(220, 38, 38, 0.3)'
+  }
+  resetButton.onmouseout = () => {
+    resetButton.style.background = '#dc2626'
+    resetButton.style.transform = 'translateY(0)'
+    resetButton.style.boxShadow = 'none'
+  }
+  
+  pasteButton.onmouseover = () => {
+    pasteButton.style.background = '#047857'
+    pasteButton.style.transform = 'translateY(-1px)'
+    pasteButton.style.boxShadow = '0 4px 8px rgba(5, 150, 105, 0.3)'
+  }
+  pasteButton.onmouseout = () => {
+    pasteButton.style.background = '#059669'
+    pasteButton.style.transform = 'translateY(0)'
+    pasteButton.style.boxShadow = 'none'
+  }
+  
   cancelButton.onmouseover = () => {
     cancelButton.style.background = '#4b5563'
     cancelButton.style.transform = 'translateY(-1px)'
@@ -2892,11 +3191,19 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
   document.head.appendChild(style)
   
   // 组装对话框
-  buttonContainer.appendChild(cancelButton)
-  buttonContainer.appendChild(confirmButton)
+  leftButtonGroup.appendChild(resetButton)
+  leftButtonGroup.appendChild(pasteButton)
+  
+  rightButtonGroup.appendChild(cancelButton)
+  rightButtonGroup.appendChild(confirmButton)
+  
+  buttonContainer.appendChild(leftButtonGroup)
+  buttonContainer.appendChild(rightButtonGroup)
+  
   dialogContent.appendChild(titleContainer)
   dialogContent.appendChild(textareaContainer)
   dialogContent.appendChild(buttonContainer)
+  dialogContent.appendChild(resizeHandle)
   dialog.appendChild(dialogContent)
   
   // 添加到页面
