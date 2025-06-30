@@ -1347,10 +1347,35 @@ const drawNode = (node: WorkflowNode) => {
     
     if (selectedServers.length > 0) {
       hasSelectedServers = true
+      // 动态显示服务名称列表
+      const maxWidth = serverSelectWidth - 40 * scale.value // 预留箭头和边距空间
+      context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      
       if (selectedServers.length === 1) {
         displayText = selectedServers[0]
       } else {
-        displayText = `已选择 ${selectedServers.length} 个服务`
+        // 尝试显示完整的服务名称列表
+        let fullText = selectedServers.join(', ')
+        const textWidth = context.measureText(fullText).width
+        
+        if (textWidth <= maxWidth) {
+          displayText = fullText
+        } else {
+          // 如果文本太长，逐个添加服务名称直到超出宽度
+          let truncatedText = selectedServers[0]
+          for (let i = 1; i < selectedServers.length; i++) {
+            const testText = truncatedText + ', ' + selectedServers[i]
+            const testWidth = context.measureText(testText + '...').width
+            if (testWidth > maxWidth) {
+              displayText = truncatedText + '...'
+              break
+            }
+            truncatedText = testText
+            if (i === selectedServers.length - 1) {
+              displayText = truncatedText
+            }
+          }
+        }
       }
     }
     
