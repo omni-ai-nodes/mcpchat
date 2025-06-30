@@ -634,6 +634,13 @@ const processNodes: NodeTemplate[] = [
 
 const outputNodes: NodeTemplate[] = [
   {
+    type: 'text-output',
+    name: '文本输出',
+    description: '输出文本内容',
+    icon: 'lucide:type',
+    category: 'output'
+  },
+  {
     type: 'file-output',
     name: '文件输出',
     description: '保存到文件',
@@ -1596,8 +1603,8 @@ const addNode = (template: NodeTemplate) => {
     x: Math.random() * 400 + 200,
     y: Math.random() * 300 + 150,
     config: initialConfig,
-    inputs: template.category === 'output' ? [] : (template.type === 'mcp-service' ? ['input'] : ['input']),
-    outputs: template.category === 'input' ? (template.type === 'mcp-service' ? ['output'] : ['output']) : ['output']
+    inputs: template.category === 'output' ? ['input'] : (template.type === 'mcp-service' ? ['input'] : ['input']),
+    outputs: template.category === 'output' ? [] : (template.type === 'mcp-service' ? ['output'] : ['output'])
   }
   
   workflowNodes.value.push(newNode)
