@@ -185,9 +185,11 @@ import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Icon } from '@iconify/vue'
+import { useSettingsStore } from '@/stores/settings'
 import NodeProperties from '@/components/workflow/NodeProperties.vue'
 
 const { t } = useI18n()
+const settingsStore = useSettingsStore()
 
 // 节点类型定义
 interface NodeTemplate {
@@ -1031,10 +1033,19 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText('选择模型:', modelSelectX + 8 * scale.value, modelSelectY + 8 * scale.value)
     
     // 绘制当前选择的模型或占位符
-    const selectedModel = (node.config?.selectedModel as string) || '请选择模型...'
-    context.fillStyle = selectedModel === '请选择模型...' ? '#64748b' : '#cbd5e1'
+    const selectedModelName = (node.config?.selectedModelName as string) || '请选择模型...'
+    const selectedModelProvider = (node.config?.selectedModelProvider as string)
+    
+    context.fillStyle = selectedModelName === '请选择模型...' ? '#64748b' : '#cbd5e1'
     context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
-    context.fillText(selectedModel, modelSelectX + 8 * scale.value, modelSelectY + 28 * scale.value)
+    context.fillText(selectedModelName, modelSelectX + 8 * scale.value, modelSelectY + 28 * scale.value)
+    
+    // 如果有提供商信息，显示在模型名称下方
+    if (selectedModelProvider && selectedModelName !== '请选择模型...') {
+      context.fillStyle = '#64748b'
+      context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.fillText(selectedModelProvider, modelSelectX + 8 * scale.value, modelSelectY + 42 * scale.value)
+    }
     
     // 绘制下拉箭头
     context.fillStyle = '#64748b'
@@ -2350,68 +2361,245 @@ const handleMcpModelSelectClick = (node: WorkflowNode) => {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
+    animation: fadeIn 0.2s ease-out;
   `
   
   const dialogContent = document.createElement('div')
   dialogContent.style.cssText = `
-    background: #2a2a2a;
-    border-radius: 8px;
-    padding: 24px;
-    width: 400px;
+    background: linear-gradient(145deg, #1f2937, #111827);
+    border-radius: 16px;
+    padding: 28px;
+    width: 480px;
     max-width: 90vw;
-    max-height: 80vh;
-    overflow: auto;
-    border: 1px solid #404040;
+    max-height: 85vh;
+    overflow: hidden;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    transform: scale(0.95);
+    animation: slideIn 0.2s ease-out forwards;
+    display: flex;
+    flex-direction: column;
   `
   
   const title = document.createElement('h3')
   title.textContent = '选择MCP模型'
   title.style.cssText = `
-    margin: 0 0 16px 0;
-    color: #ffffff;
-    font-size: 18px;
-    font-weight: 600;
+    margin: 0 0 20px 0;
+    color: #f8fafc;
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    flex-shrink: 0;
   `
   
-  // 模型列表
-  const models = ['gpt-4', 'gpt-3.5-turbo', 'claude-3', 'llama-2']
+  // 添加搜索框容器
+  const searchContainer = document.createElement('div')
+  searchContainer.style.cssText = `
+    position: relative;
+    margin-bottom: 16px;
+    flex-shrink: 0;
+  `
+  
+  // 添加搜索图标
+  const searchIcon = document.createElement('div')
+  searchIcon.innerHTML = '🔍'
+  searchIcon.style.cssText = `
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 1;
+  `
+  
+  // 添加搜索框
+  const searchInput = document.createElement('input')
+  searchInput.type = 'text'
+  searchInput.placeholder = '搜索模型名称、提供商...'
+  searchInput.style.cssText = `
+    width: 100%;
+    padding: 12px 16px 12px 40px;
+    background: rgba(55, 65, 81, 0.8);
+    border: 1px solid rgba(75, 85, 99, 0.6);
+    border-radius: 12px;
+    color: #ffffff;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+  `
+  
+  searchInput.onfocus = () => {
+    searchInput.style.borderColor = '#6366f1'
+    searchInput.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)'
+    searchInput.style.background = 'rgba(55, 65, 81, 0.95)'
+  }
+  
+  searchInput.onblur = () => {
+    searchInput.style.borderColor = 'rgba(75, 85, 99, 0.6)'
+    searchInput.style.boxShadow = 'none'
+    searchInput.style.background = 'rgba(55, 65, 81, 0.8)'
+  }
+  
+  searchContainer.appendChild(searchIcon)
+  searchContainer.appendChild(searchInput)
+  
+  // 获取可用模型列表
+  const getAvailableModels = () => {
+    // 从服务商设置中读取已启用的模型
+    const availableModels: { id: string; name: string; provider: string }[] = []
+    
+    // 遍历所有已启用的服务商和模型
+    settingsStore.enabledModels.forEach(providerData => {
+      const provider = settingsStore.providers.find(p => p.id === providerData.providerId)
+      const providerName = provider?.name || providerData.providerId
+      
+      providerData.models.forEach(model => {
+        availableModels.push({
+          id: model.id,
+          name: model.name || model.id,
+          provider: providerName
+        })
+      })
+    })
+    
+    // 如果没有启用的模型，返回空数组
+    return availableModels
+  }
+  
+  const allModels = getAvailableModels()
+  let filteredModels = allModels
+  
   const modelList = document.createElement('div')
   modelList.style.cssText = `
-    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    max-height: 12rem;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    border: 1px solid rgba(75, 85, 99, 0.3);
+    border-radius: 12px;
+    background: rgba(31, 41, 55, 0.6);
+    backdrop-filter: blur(8px);
+    flex: 1;
+    min-height: 0;
   `
   
-  models.forEach(model => {
+  // 自定义滚动条样式
+  const style = document.createElement('style')
+  style.textContent = `
+    .model-list-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    .model-list-container::-webkit-scrollbar-track {
+      background: rgba(55, 65, 81, 0.3);
+      border-radius: 3px;
+    }
+    .model-list-container::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.6);
+      border-radius: 3px;
+    }
+    .model-list-container::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.8);
+    }
+  `
+  document.head.appendChild(style)
+  modelList.className = 'model-list-container'
+  
+  // 渲染模型列表的函数
+  const renderModelList = (models) => {
+    modelList.innerHTML = ''
+    
+    if (models.length === 0) {
+      const noResults = document.createElement('div')
+      noResults.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 12px;">🔍</div>
+        <div style="font-weight: 500; margin-bottom: 4px;">未找到匹配的模型</div>
+        <div style="font-size: 13px; opacity: 0.7;">请尝试其他搜索关键词</div>
+      `
+      noResults.style.cssText = `
+        padding: 40px 20px;
+        text-align: center;
+        color: #9ca3af;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 200px;
+      `
+      modelList.appendChild(noResults)
+      return
+    }
+    
+    models.forEach((model, index) => {
     const modelOption = document.createElement('div')
-    modelOption.textContent = model
+    
+    const modelName = document.createElement('div')
+    modelName.textContent = model.name
+    modelName.style.cssText = `
+      font-weight: 500;
+      color: #f8fafc;
+      font-size: 14px;
+      flex: 1;
+    `
+    
+    // 创建选择指示器
+    const selectIndicator = document.createElement('div')
+    selectIndicator.innerHTML = '→'
+    selectIndicator.style.cssText = `
+      color: #6366f1;
+      font-weight: bold;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      margin-left: 8px;
+    `
+    
+    modelOption.appendChild(modelName)
+    modelOption.appendChild(selectIndicator)
+    
     modelOption.style.cssText = `
-      padding: 12px;
-      margin-bottom: 8px;
-      background: #374151;
-      border: 1px solid #4b5563;
-      border-radius: 4px;
-      color: #ffffff;
+      padding: 12px 16px;
+      ${index !== models.length - 1 ? 'border-bottom: 1px solid rgba(55, 65, 81, 0.3);' : ''}
+      background: transparent;
       cursor: pointer;
-      transition: background-color 0.2s;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      position: relative;
+      border-radius: ${index === 0 ? '12px 12px 0 0' : index === models.length - 1 ? '0 0 12px 12px' : '0'};
     `
     
     modelOption.onmouseover = () => {
-      modelOption.style.background = '#4b5563'
+      modelOption.style.background = 'rgba(99, 102, 241, 0.08)'
+      selectIndicator.style.opacity = '1'
     }
     
     modelOption.onmouseout = () => {
-      modelOption.style.background = '#374151'
+      modelOption.style.background = 'transparent'
+      selectIndicator.style.opacity = '0'
     }
     
     modelOption.onclick = () => {
       updateNode(node.id, {
         config: {
           ...node.config,
-          selectedModel: model
+          selectedModel: model.id,
+          selectedModelName: model.name,
+          selectedModelProvider: model.provider
         }
       })
       console.log('选择模型:', model)
@@ -2419,29 +2607,98 @@ const handleMcpModelSelectClick = (node: WorkflowNode) => {
     }
     
     modelList.appendChild(modelOption)
-  })
+    })
+  }
+  
+  // 搜索功能
+  searchInput.oninput = (e) => {
+    const searchTerm = (e.target as HTMLInputElement).value.toLowerCase()
+    filteredModels = allModels.filter(model => 
+      model.name.toLowerCase().includes(searchTerm) ||
+      model.provider.toLowerCase().includes(searchTerm) ||
+      model.id.toLowerCase().includes(searchTerm)
+    )
+    renderModelList(filteredModels)
+  }
+  
+  // 初始渲染
+  renderModelList(filteredModels)
   
   const cancelButton = document.createElement('button')
   cancelButton.textContent = '取消'
   cancelButton.style.cssText = `
-    padding: 8px 16px;
-    background: #6b7280;
-    border: 1px solid #9ca3af;
-    border-radius: 4px;
+    padding: 12px 24px;
+    background: rgba(107, 114, 128, 0.8);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+    border-radius: 10px;
     color: #ffffff;
     cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+    flex-shrink: 0;
     font-size: 14px;
   `
   
-  cancelButton.onclick = () => {
-    document.body.removeChild(dialog)
+  cancelButton.onmouseover = () => {
+    cancelButton.style.background = 'rgba(107, 114, 128, 1)'
+    cancelButton.style.transform = 'translateY(-1px)'
+    cancelButton.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)'
   }
   
+  cancelButton.onmouseout = () => {
+    cancelButton.style.background = 'rgba(107, 114, 128, 0.8)'
+    cancelButton.style.transform = 'translateY(0)'
+    cancelButton.style.boxShadow = 'none'
+  }
+  
+  cancelButton.onclick = () => {
+    dialog.style.animation = 'fadeOut 0.15s ease-in forwards'
+    setTimeout(() => {
+      document.body.removeChild(dialog)
+    }, 150)
+  }
+  
+  // 添加CSS动画
+  const animationStyle = document.createElement('style')
+  animationStyle.textContent = `
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideIn {
+      from { transform: scale(0.9) translateY(-10px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+  `
+  document.head.appendChild(animationStyle)
+  
   dialogContent.appendChild(title)
+  dialogContent.appendChild(searchContainer)
   dialogContent.appendChild(modelList)
   dialogContent.appendChild(cancelButton)
   dialog.appendChild(dialogContent)
   document.body.appendChild(dialog)
+  
+  // 点击背景关闭弹窗
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      dialog.style.animation = 'fadeOut 0.15s ease-in forwards'
+      setTimeout(() => {
+        document.body.removeChild(dialog)
+      }, 150)
+    }
+  }
+  
+  // 聚焦到搜索框
+  setTimeout(() => {
+    searchInput.focus()
+  }, 200)
 }
 
 // 处理MCP启用按钮点击
