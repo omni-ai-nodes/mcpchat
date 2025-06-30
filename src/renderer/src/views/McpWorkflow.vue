@@ -123,6 +123,10 @@
             <Icon icon="lucide:rocket" class="w-4 h-4 mr-2" />
             {{ t('common.mcp.workflow.deploy') }}
           </Button>
+          <Button variant="outline" size="sm" @click="showMcpStatusModal = true">
+            <Icon icon="lucide:settings" class="w-4 h-4 mr-2" />
+            MCP状态
+          </Button>
         </div>
       </div>
 
@@ -182,7 +186,13 @@
   <div v-if="showServerSelectModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
       <div class="p-6">
-        <h3 class="text-lg font-semibold mb-4">选择MCP服务器（支持多选）</h3>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold">选择MCP服务器（支持多选）</h3>
+          <Button variant="outline" size="sm" @click="mcpStore.updateAllServerStatuses()">
+            <Icon icon="lucide:refresh-cw" class="w-4 h-4 mr-2" />
+            刷新状态
+          </Button>
+        </div>
         
         <!-- 已选择的服务器显示 -->
         <div v-if="getSelectedServers().length > 0" class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
@@ -191,12 +201,26 @@
             <span 
               v-for="serverName in getSelectedServers()" 
               :key="serverName"
-              class="px-2 py-1 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded text-xs flex items-center gap-1"
+              class="px-2 py-1 rounded text-xs flex items-center gap-1"
+              :class="{
+                'bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200': mcpStore.serverList.find(s => s.name === serverName)?.isRunning,
+                'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300': !mcpStore.serverList.find(s => s.name === serverName)?.isRunning
+              }"
             >
+              <div 
+                class="w-2 h-2 rounded-full"
+                :class="{
+                  'bg-green-500': mcpStore.serverList.find(s => s.name === serverName)?.isRunning,
+                  'bg-gray-400': !mcpStore.serverList.find(s => s.name === serverName)?.isRunning
+                }"
+              ></div>
               {{ serverName }}
+              <span class="text-xs opacity-75">
+                ({{ mcpStore.serverList.find(s => s.name === serverName)?.isRunning ? '运行中' : '未运行' }})
+              </span>
               <button 
                 @click="removeSelectedServer(serverName)"
-                class="hover:bg-blue-200 dark:hover:bg-blue-700 rounded-full w-4 h-4 flex items-center justify-center"
+                class="hover:bg-blue-200 dark:hover:bg-blue-700 rounded-full w-4 h-4 flex items-center justify-center ml-1"
                 :disabled="serverSelectionLoading"
               >
                 ×
@@ -239,6 +263,111 @@
              {{ serverSelectionLoading ? '处理中...' : '取消' }}
            </Button>
          </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MCP状态管理弹窗 -->
+  <div v-if="showMcpStatusModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold">MCP状态管理</h3>
+          <button @click="showMcpStatusModal = false" class="text-gray-500 hover:text-gray-700">
+            <Icon icon="lucide:x" class="w-5 h-5" />
+          </button>
+        </div>
+        
+        <!-- 统计信息 -->
+        <div class="grid grid-cols-3 gap-4 mb-6">
+          <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+            <div class="text-2xl font-bold text-blue-600">{{ workflowNodes.length }}</div>
+            <div class="text-sm text-blue-800 dark:text-blue-200">总节点数</div>
+          </div>
+          <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+            <div class="text-2xl font-bold text-green-600">{{ getAllNodesMcpStatus().filter(n => n.mcpEnabled).length }}</div>
+            <div class="text-sm text-green-800 dark:text-green-200">MCP启用节点</div>
+          </div>
+          <div class="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
+            <div class="text-2xl font-bold text-orange-600">{{ getAllNodesMcpStatus().reduce((sum, n) => sum + n.selectedServers.length, 0) }}</div>
+            <div class="text-sm text-orange-800 dark:text-orange-200">总服务器选择</div>
+          </div>
+        </div>
+        
+        <!-- 批量操作 -->
+         <div class="flex gap-2 mb-4">
+           <Button variant="outline" size="sm" @click="mcpStore.updateAllServerStatuses()">
+             <Icon icon="lucide:refresh-cw" class="w-4 h-4 mr-2" />
+             刷新服务器状态
+           </Button>
+           <Button variant="outline" size="sm" @click="clearAllNodesMcpSelection">
+             <Icon icon="lucide:trash-2" class="w-4 h-4 mr-2" />
+             清除所有MCP选择
+           </Button>
+         </div>
+        
+        <!-- 节点列表 -->
+        <div class="space-y-3 max-h-96 overflow-y-auto">
+          <div 
+            v-for="nodeStatus in getAllNodesMcpStatus()" 
+            :key="nodeStatus.nodeId"
+            class="p-4 border rounded-lg"
+            :class="{
+              'border-green-500 bg-green-50 dark:bg-green-900/20': nodeStatus.mcpEnabled,
+              'border-gray-300 bg-gray-50 dark:bg-gray-800': !nodeStatus.mcpEnabled
+            }"
+          >
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-medium">{{ nodeStatus.nodeName }}</div>
+                <div class="text-sm text-gray-500">ID: {{ nodeStatus.nodeId }}</div>
+                <div v-if="nodeStatus.selectedServers.length > 0" class="flex flex-wrap gap-1 mt-2">
+                  <span 
+                    v-for="server in nodeStatus.selectedServers" 
+                    :key="server"
+                    class="px-2 py-1 rounded text-xs flex items-center gap-1"
+                    :class="{
+                      'bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200': mcpStore.serverList.find(s => s.name === server)?.isRunning,
+                      'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300': !mcpStore.serverList.find(s => s.name === server)?.isRunning
+                    }"
+                  >
+                    <div 
+                      class="w-2 h-2 rounded-full"
+                      :class="{
+                        'bg-green-500': mcpStore.serverList.find(s => s.name === server)?.isRunning,
+                        'bg-gray-400': !mcpStore.serverList.find(s => s.name === server)?.isRunning
+                      }"
+                    ></div>
+                    {{ server }}
+                    <span class="text-xs opacity-75">
+                      ({{ mcpStore.serverList.find(s => s.name === server)?.isRunning ? '运行中' : '未运行' }})
+                    </span>
+                  </span>
+                </div>
+                <div v-else class="text-sm text-gray-400 mt-2">未选择MCP服务器</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <Badge :variant="nodeStatus.mcpEnabled ? 'default' : 'secondary'">
+                  {{ nodeStatus.mcpEnabled ? '已启用' : '未启用' }}
+                </Badge>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  @click="setNodeMcpServers(nodeStatus.nodeId, [])"
+                  :disabled="nodeStatus.selectedServers.length === 0"
+                >
+                  清除
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="flex justify-end mt-6">
+          <Button @click="showMcpStatusModal = false">
+            关闭
+          </Button>
+        </div>
       </div>
     </div>
   </div>
@@ -353,7 +482,10 @@ const currentWorkflow = reactive<CurrentWorkflow>({
 // 服务器选择弹窗相关
 const showServerSelectModal = ref(false)
 const currentSelectingNode = ref<WorkflowNode | null>(null)
-const availableServers = ref<{ id: string; name: string; provider: string; disabled?: boolean; isRunning?: boolean }[]>([])
+const availableServers = ref<{ id: string; name: string; provider: string; disabled?: boolean; isRunning?: boolean }[]>([])  
+
+// MCP状态管理弹窗相关
+const showMcpStatusModal = ref(false)
 const serverSelectionLoading = ref(false)
 
 // Canvas 相关变量
@@ -2824,17 +2956,19 @@ const handleMcpServerSelectClick = (node: WorkflowNode) => {
      }
      
      // 更新节点配置 - 支持多选
-     const currentServers = (currentSelectingNode.value.config.selectedServers as string[]) || []
+     const currentServers = getNodeMcpServers(currentSelectingNode.value.id)
      const updatedServers = currentServers.includes(selectedServer.name) 
        ? currentServers // 如果已选择，保持不变
        : [...currentServers, selectedServer.name] // 添加新选择的服务器
      
+     // 使用新的状态管理函数
+     setNodeMcpServers(currentSelectingNode.value.id, updatedServers)
+     
+     // 额外更新兼容性字段
      updateNode(currentSelectingNode.value.id, {
        config: {
          ...currentSelectingNode.value.config,
-         selectedServers: updatedServers,
-         selectedServerName: selectedServer.name, // 保持兼容性
-         mcpEnabled: true // 选择服务器后自动启用MCP
+         selectedServerName: selectedServer.name // 保持兼容性
        }
      })
      
@@ -2842,17 +2976,19 @@ const handleMcpServerSelectClick = (node: WorkflowNode) => {
    } catch (error) {
      console.error('启动MCP服务器失败:', error)
      // 即使启动失败，也更新节点配置，但保持原有状态
-     const currentServers = (currentSelectingNode.value.config.selectedServers as string[]) || []
+     const currentServers = getNodeMcpServers(currentSelectingNode.value.id)
      const updatedServers = currentServers.includes(selectedServer.name) 
        ? currentServers
        : [...currentServers, selectedServer.name]
      
+     // 使用新的状态管理函数
+     setNodeMcpServers(currentSelectingNode.value.id, updatedServers)
+     
+     // 额外更新兼容性字段
      updateNode(currentSelectingNode.value.id, {
        config: {
          ...currentSelectingNode.value.config,
-         selectedServers: updatedServers,
-         selectedServerName: selectedServer.name,
-         mcpEnabled: true // 即使启动失败也启用MCP，让用户知道已选择了服务器
+         selectedServerName: selectedServer.name // 保持兼容性
        }
      })
    } finally {
@@ -2877,6 +3013,67 @@ const getSelectedServers = (): string[] => {
 const isServerSelected = (serverName: string): boolean => {
   return getSelectedServers().includes(serverName)
 }
+
+// 同步节点的MCP服务器选择状态到工作流数据
+const syncNodeMcpState = (nodeId: string) => {
+  const nodeIndex = workflowNodes.value.findIndex(n => n.id === nodeId)
+  if (nodeIndex !== -1) {
+    // 确保工作流数据与节点数据同步
+    currentWorkflow.nodes = [...workflowNodes.value]
+    
+    // 触发界面更新
+    nextTick(() => {
+      connections.value = [...connections.value]
+    })
+  }
+}
+
+// 获取节点的MCP服务器选择状态
+const getNodeMcpServers = (nodeId: string): string[] => {
+  const node = workflowNodes.value.find(n => n.id === nodeId)
+  return (node?.config.selectedServers as string[]) || []
+}
+
+// 设置节点的MCP服务器选择状态
+const setNodeMcpServers = (nodeId: string, servers: string[]) => {
+  const nodeIndex = workflowNodes.value.findIndex(n => n.id === nodeId)
+  if (nodeIndex !== -1) {
+    workflowNodes.value[nodeIndex].config = {
+      ...workflowNodes.value[nodeIndex].config,
+      selectedServers: [...servers],
+      mcpEnabled: servers.length > 0,
+      lastUpdated: Date.now()
+    }
+    
+    // 同步到工作流数据
+    syncNodeMcpState(nodeId)
+    
+    console.log(`节点 ${nodeId} MCP服务器状态已更新:`, servers)
+  }
+}
+
+// 全局MCP状态管理
+const getAllNodesMcpStatus = () => {
+  return workflowNodes.value.map(node => ({
+    nodeId: node.id,
+    nodeName: node.name,
+    selectedServers: getNodeMcpServers(node.id),
+    mcpEnabled: node.config.mcpEnabled || false,
+    lastUpdated: node.config.lastUpdated || null
+  }))
+}
+
+// 清除所有节点的MCP选择
+const clearAllNodesMcpSelection = () => {
+  workflowNodes.value.forEach(node => {
+    if (node.config.selectedServers) {
+      setNodeMcpServers(node.id, [])
+    }
+  })
+  console.log('已清除所有节点的MCP服务器选择')
+}
+
+
 
 // 移除选中的服务器
 const removeSelectedServer = async (serverName: string) => {
@@ -2904,14 +3101,8 @@ const removeSelectedServer = async (serverName: string) => {
        }
     }
     
-    // 更新节点配置
-    updateNode(currentSelectingNode.value.id, {
-      config: {
-        ...currentSelectingNode.value.config,
-        selectedServers: updatedServers,
-        mcpEnabled: updatedServers.length > 0
-      }
-    })
+    // 使用新的状态管理函数更新节点配置
+    setNodeMcpServers(currentSelectingNode.value.id, updatedServers)
     
     console.log('已移除MCP服务器:', serverName)
   } catch (error) {
@@ -3154,20 +3345,73 @@ const onDragOver = (event: DragEvent) => {
   event.preventDefault()
 }
 
+// 加载工作流时恢复MCP状态
+const restoreWorkflowMcpState = (loadedNodes: WorkflowNode[]) => {
+  loadedNodes.forEach(node => {
+    if (node.config.selectedServers) {
+      const servers = node.config.selectedServers as string[]
+      // 验证服务器是否仍然可用
+      const availableServerNames = mcpStore.serverList.map(s => s.name)
+      const validServers = servers.filter(serverName => 
+        availableServerNames.includes(serverName)
+      )
+      
+      // 如果有无效的服务器，更新节点配置
+      if (validServers.length !== servers.length) {
+        console.warn(`节点 ${node.id} 包含无效的MCP服务器:`, 
+          servers.filter(s => !availableServerNames.includes(s))
+        )
+        setNodeMcpServers(node.id, validServers)
+      } else {
+        // 确保状态一致性
+        node.config.mcpEnabled = validServers.length > 0
+        node.config.lastUpdated = node.config.lastUpdated || Date.now()
+      }
+      
+      console.log(`节点 ${node.id} MCP状态已恢复:`, {
+        selectedServers: validServers,
+        mcpEnabled: node.config.mcpEnabled
+      })
+    }
+  })
+}
+
 const saveWorkflow = () => {
+  // 验证和同步所有节点的MCP状态
+  workflowNodes.value.forEach(node => {
+    if (node.config.selectedServers) {
+      // 确保MCP状态一致性
+      const servers = node.config.selectedServers as string[]
+      node.config.mcpEnabled = servers.length > 0
+      node.config.lastUpdated = Date.now()
+      
+      console.log(`节点 ${node.id} MCP状态验证:`, {
+        selectedServers: servers,
+        mcpEnabled: node.config.mcpEnabled
+      })
+    }
+  })
+  
   // 更新当前工作流数据
   currentWorkflow.nodes = [...workflowNodes.value]
   currentWorkflow.connections = [...connections.value]
+  
+  // 统计MCP节点信息
+  const mcpEnabledNodes = workflowNodes.value.filter(node => 
+    node.config.mcpEnabled && 
+    (node.config.selectedServers as string[])?.length > 0
+  )
   
   console.log('保存工作流:', {
     name: currentWorkflow.name || '未命名工作流',
     nodes: currentWorkflow.nodes.length,
     connections: currentWorkflow.connections.length,
+    mcpEnabledNodes: mcpEnabledNodes.length,
     data: currentWorkflow
   })
   
   // TODO: 实现实际的保存逻辑（保存到本地存储或服务器）
-  alert(`工作流已保存！\n节点数量: ${currentWorkflow.nodes.length}\n连接数量: ${currentWorkflow.connections.length}`)
+  alert(`工作流已保存！\n节点数量: ${currentWorkflow.nodes.length}\n连接数量: ${currentWorkflow.connections.length}\nMCP启用节点: ${mcpEnabledNodes.length}`)
 }
 
 const runWorkflow = () => {
@@ -3239,6 +3483,33 @@ onMounted(() => {
   // 开始渲染循环
   startRenderLoop()
   
+  // 更新MCP服务器状态
+  mcpStore.updateAllServerStatuses()
+  
+  // 设置定期更新服务器状态（每30秒更新一次）
+  const statusUpdateInterval = setInterval(() => {
+    mcpStore.updateAllServerStatuses()
+  }, 30000)
+  
+  // 存储定时器ID以便清理
+  // 为window添加类型声明
+  interface CustomWindow extends Window {
+    mcpStatusUpdateInterval?: number
+  }
+  ;(window as CustomWindow).mcpStatusUpdateInterval = statusUpdateInterval
+  
+  // 初始化现有节点的MCP状态
+  nextTick(() => {
+    if (workflowNodes.value.length > 0) {
+      console.log('初始化现有节点的MCP状态...')
+      restoreWorkflowMcpState(workflowNodes.value)
+      
+      // 输出当前所有节点的MCP状态
+      const mcpStatus = getAllNodesMcpStatus()
+      console.log('当前工作流MCP状态:', mcpStatus)
+    }
+  })
+  
   // 添加全局鼠标事件监听，确保连接线和拖拽能在整个窗口范围内移动
   const handleGlobalMouseMove = (event: MouseEvent) => {
     if (!canvasRef.value) return
@@ -3293,6 +3564,15 @@ onMounted(() => {
     if (animationFrameId.value) {
       cancelAnimationFrame(animationFrameId.value)
       animationFrameId.value = null
+    }
+    // 清理MCP状态更新定时器
+    interface CustomWindow extends Window {
+      mcpStatusUpdateInterval?: number
+    }
+    const customWindow = window as CustomWindow
+    if (customWindow.mcpStatusUpdateInterval) {
+      clearInterval(customWindow.mcpStatusUpdateInterval)
+      customWindow.mcpStatusUpdateInterval = undefined
     }
   })
 })
