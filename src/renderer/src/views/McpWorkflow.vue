@@ -203,20 +203,20 @@
               :key="serverName"
               class="px-2 py-1 rounded text-xs flex items-center gap-1"
               :class="{
-                'bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200': mcpStore.serverList.find(s => s.name === serverName)?.isRunning,
-                'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300': !mcpStore.serverList.find(s => s.name === serverName)?.isRunning
+                'bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200': getNodeServerRunningState(currentSelectingNode?.id || '', serverName),
+                'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300': !getNodeServerRunningState(currentSelectingNode?.id || '', serverName)
               }"
             >
               <div 
                 class="w-2 h-2 rounded-full"
                 :class="{
-                  'bg-green-500': mcpStore.serverList.find(s => s.name === serverName)?.isRunning,
-                  'bg-gray-400': !mcpStore.serverList.find(s => s.name === serverName)?.isRunning
+                  'bg-green-500': getNodeServerRunningState(currentSelectingNode?.id || '', serverName),
+                  'bg-gray-400': !getNodeServerRunningState(currentSelectingNode?.id || '', serverName)
                 }"
               ></div>
               {{ serverName }}
               <span class="text-xs opacity-75">
-                ({{ mcpStore.serverList.find(s => s.name === serverName)?.isRunning ? '运行中' : '未运行' }})
+                ({{ getNodeServerRunningState(currentSelectingNode?.id || '', serverName) ? '运行中' : '未运行' }})
               </span>
               <button 
                 @click="removeSelectedServer(serverName)"
@@ -528,6 +528,8 @@ interface McpNodeState {
   selectedModel: string | null
   lastUpdated: number | null
   instanceId: string
+  // 节点级别的服务运行状态映射
+  serverRunningStates: Map<string, boolean>
 }
 
 // 本地MCP节点状态映射表 - 确保每个节点状态完全独立
@@ -1386,8 +1388,8 @@ const drawNode = (node: WorkflowNode) => {
     // 如果有选中的服务器，显示运行状态统计
     if (hasSelectedServers) {
       const runningCount = selectedServers.filter(serverName => {
-        const server = mcpStore.serverList.find(s => s.name === serverName)
-        return server?.isRunning
+        // 使用节点级别的运行状态
+        return getNodeServerRunningState(node.id, serverName)
       }).length
       
       const statusText = `${runningCount}/${selectedServers.length} 运行中`
@@ -3023,14 +3025,18 @@ const handleMcpModelSelectClick = (node: WorkflowNode) => {
 const handleMcpServerSelectClick = (node: WorkflowNode) => {
   console.log('点击MCP服务器选择，节点:', node.name)
   
-  // 创建服务器选择弹窗
-  const serverOptions = mcpStore.serverList.map(server => ({
-    id: server.name,
-    name: server.name,
-    provider: server.isRunning ? 'MCP (运行中)' : 'MCP (未运行)',
-    disabled: false, // 允许选择未运行的服务器，会自动启动
-    isRunning: server.isRunning
-  }))
+  // 创建服务器选择弹窗 - 使用节点级别的运行状态
+  const serverOptions = mcpStore.serverList.map(server => {
+    // 获取节点级别的服务运行状态，初始化时默认为未运行
+    const nodeRunningState = getNodeServerRunningState(node.id, server.name)
+    return {
+      id: server.name,
+      name: server.name,
+      provider: nodeRunningState ? 'MCP (运行中)' : 'MCP (未运行)',
+      disabled: false, // 允许选择未运行的服务器，会自动启动
+      isRunning: nodeRunningState
+    }
+  })
   
   if (serverOptions.length === 0) {
     serverOptions.push({
@@ -3063,19 +3069,30 @@ const handleMcpServerSelectClick = (node: WorkflowNode) => {
    try {
      serverSelectionLoading.value = true
      
-     // 如果服务器未运行，先启动它
-     if (!selectedServer.isRunning) {
-       console.log('正在启动MCP服务器:', selectedServer.name)
-       await mcpStore.toggleServer(selectedServer.name)
-       console.log('MCP服务器启动成功:', selectedServer.name)
+     // 检查节点级别的服务运行状态
+     const nodeRunningState = getNodeServerRunningState(currentSelectingNode.value.id, selectedServer.name)
+     
+     // 如果节点级别的服务未运行，先启动它
+     if (!nodeRunningState) {
+       console.log('正在为节点启动MCP服务器:', selectedServer.name, '节点:', currentSelectingNode.value.name)
+       
+       // 启动全局服务器（如果需要）
+       if (!selectedServer.isRunning) {
+         await mcpStore.toggleServer(selectedServer.name)
+         console.log('全局MCP服务器启动成功:', selectedServer.name)
+       }
+       
+       // 更新节点级别的运行状态
+       setNodeServerRunningState(currentSelectingNode.value.id, selectedServer.name, true)
+       console.log('节点级别MCP服务器启动成功:', selectedServer.name)
        
        // 更新可用服务器列表中的状态
-        const serverIndex = availableServers.value.findIndex(s => s.name === selectedServer.name)
-        if (serverIndex !== -1) {
-          const server = availableServers.value[serverIndex]
-          server.isRunning = true
-          server.provider = 'MCP (运行中)'
-        }
+       const serverIndex = availableServers.value.findIndex(s => s.name === selectedServer.name)
+       if (serverIndex !== -1) {
+         const server = availableServers.value[serverIndex]
+         server.isRunning = true
+         server.provider = 'MCP (运行中)'
+       }
      }
      
      // 更新节点配置 - 支持多选和取消选择
@@ -3159,7 +3176,9 @@ const initializeMcpNodeState = (nodeId: string, instanceId?: string): McpNodeSta
     mcpEnabled: false,
     selectedModel: null,
     lastUpdated: null,
-    instanceId: instanceId || `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    instanceId: instanceId || `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    // 初始化时所有服务都为未运行状态
+    serverRunningStates: new Map()
   }
   mcpNodeStates.value.set(nodeId, state)
   return state
@@ -3184,9 +3203,19 @@ const setNodeMcpServers = (nodeId: string, servers: string[]) => {
     state = initializeMcpNodeState(nodeId)
   }
   
+  // 更新选中的服务器列表
   state.selectedServers = [...servers]
   state.mcpEnabled = servers.length > 0
   state.lastUpdated = Date.now()
+  
+  // 确保所有选中的服务器都有对应的运行状态记录
+  // 初始状态下所有服务器都设为未运行
+  servers.forEach(serverName => {
+    if (!state.serverRunningStates.has(serverName)) {
+      state.serverRunningStates.set(serverName, false)
+    }
+  })
+  
   mcpNodeStates.value.set(nodeId, state)
   
   // 同步到节点配置（保持兼容性）
@@ -3205,6 +3234,29 @@ const setNodeMcpServers = (nodeId: string, servers: string[]) => {
   }
   
   console.log(`节点 ${nodeId} MCP服务器状态已更新:`, servers, '独立状态ID:', state.instanceId)
+}
+
+// 获取节点级别的服务运行状态
+const getNodeServerRunningState = (nodeId: string, serverName: string): boolean => {
+  const state = mcpNodeStates.value.get(nodeId)
+  if (!state) {
+    return false // 如果节点状态不存在，默认为未运行
+  }
+  return state.serverRunningStates.get(serverName) || false
+}
+
+// 设置节点级别的服务运行状态
+const setNodeServerRunningState = (nodeId: string, serverName: string, isRunning: boolean) => {
+  let state = mcpNodeStates.value.get(nodeId)
+  if (!state) {
+    // 如果状态不存在，创建一个基本状态
+    const instanceId = `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    state = initializeMcpNodeState(nodeId, instanceId)
+  }
+  
+  state.serverRunningStates.set(serverName, isRunning)
+  state.lastUpdated = Date.now()
+  mcpNodeStates.value.set(nodeId, state)
 }
 
 // 全局MCP状态管理
@@ -3277,8 +3329,14 @@ const ensureMcpNodesIndependence = () => {
         mcpEnabled: node.config.mcpEnabled as boolean || false,
         selectedModel: node.config.selectedModel as string || null,
         lastUpdated: node.config.lastUpdated as number || null,
-        instanceId: node.config.instanceId as string || `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        instanceId: node.config.instanceId as string || `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        serverRunningStates: new Map()
       }
+    }
+    
+    // 确保serverRunningStates存在
+    if (!state.serverRunningStates) {
+      state.serverRunningStates = new Map()
     }
     
     // 检查实例ID是否重复
