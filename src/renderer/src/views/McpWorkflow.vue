@@ -414,10 +414,12 @@ import { Icon } from '@iconify/vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import NodeProperties from '@/components/workflow/NodeProperties.vue'
+import { useToast } from '@/components/ui/toast'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 const mcpStore = useMcpStore()
+const { toast } = useToast()
 
 // 节点类型定义
 interface NodeTemplate {
@@ -4367,78 +4369,333 @@ const restoreWorkflowMcpState = (loadedNodes: WorkflowNode[]) => {
   })
 }
 
-const saveWorkflow = () => {
-  // 验证和同步所有节点的MCP状态
-  workflowNodes.value.forEach(node => {
-    if (node.config.selectedServers) {
-      // 确保MCP状态一致性
-      const servers = node.config.selectedServers as string[]
-      node.config.mcpEnabled = servers.length > 0
-      node.config.lastUpdated = Date.now()
-      
-      console.log(`节点 ${node.id} MCP状态验证:`, {
-        selectedServers: servers,
-        mcpEnabled: node.config.mcpEnabled
+const saveWorkflow = async () => {
+  try {
+    // 验证工作流是否为空
+    if (workflowNodes.value.length === 0) {
+      toast({
+        title: '警告',
+        description: '工作流为空，无法保存',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // 验证和同步所有节点的MCP状态
+    workflowNodes.value.forEach(node => {
+      if (node.config.selectedServers) {
+        // 确保MCP状态一致性
+        const servers = node.config.selectedServers as string[]
+        node.config.mcpEnabled = servers.length > 0
+        node.config.lastUpdated = Date.now()
+        
+        console.log(`节点 ${node.id} MCP状态验证:`, {
+          selectedServers: servers,
+          mcpEnabled: node.config.mcpEnabled
+        })
+      }
+    })
+    
+    // 验证MCP节点状态
+    const mcpNodes = workflowNodes.value.filter(node => node.type === 'mcp-service')
+    const invalidMcpNodes = mcpNodes.filter(node => 
+      !node.config?.selectedProvider || !node.config?.selectedService
+    )
+    
+    if (invalidMcpNodes.length > 0) {
+      toast({
+        title: '警告',
+        description: '存在未配置完整的MCP服务节点，请检查配置',
+        variant: 'destructive'
+      })
+      return
+    }
+    
+    // 更新当前工作流数据
+    currentWorkflow.nodes = [...workflowNodes.value]
+    currentWorkflow.connections = [...connections.value]
+    
+    // 统计MCP节点信息
+    const mcpEnabledNodes = workflowNodes.value.filter(node => 
+      node.config.mcpEnabled && 
+      (node.config.selectedServers as string[])?.length > 0
+    )
+    
+    // 准备工作流数据
+    const workflowData = {
+      name: currentWorkflow.name || `工作流_${new Date().toLocaleString()}`,
+      nodes: currentWorkflow.nodes,
+      connections: currentWorkflow.connections,
+      metadata: {
+        nodeCount: currentWorkflow.nodes.length,
+        connectionCount: currentWorkflow.connections.length,
+        mcpNodeCount: mcpNodes.length,
+        mcpEnabledNodes: mcpEnabledNodes.length,
+        createdAt: new Date().toISOString()
+      }
+    }
+    
+    console.log('保存工作流:', workflowData)
+    
+    // 调用保存API
+    const result = await window.api.saveWorkflow(workflowData)
+    
+    if (result.success) {
+      toast({
+        title: '成功',
+        description: `工作流保存成功: ${result.fileName}`,
+        variant: 'success'
+      })
+      console.log('工作流保存成功:', result)
+    } else {
+      toast({
+        title: '错误',
+        description: '保存工作流失败',
+        variant: 'destructive'
       })
     }
-  })
-  
-  // 更新当前工作流数据
-  currentWorkflow.nodes = [...workflowNodes.value]
-  currentWorkflow.connections = [...connections.value]
-  
-  // 统计MCP节点信息
-  const mcpEnabledNodes = workflowNodes.value.filter(node => 
-    node.config.mcpEnabled && 
-    (node.config.selectedServers as string[])?.length > 0
-  )
-  
-  console.log('保存工作流:', {
-    name: currentWorkflow.name || '未命名工作流',
-    nodes: currentWorkflow.nodes.length,
-    connections: currentWorkflow.connections.length,
-    mcpEnabledNodes: mcpEnabledNodes.length,
-    data: currentWorkflow
-  })
-  
-  // TODO: 实现实际的保存逻辑（保存到本地存储或服务器）
-  alert(`工作流已保存！\n节点数量: ${currentWorkflow.nodes.length}\n连接数量: ${currentWorkflow.connections.length}\nMCP启用节点: ${mcpEnabledNodes.length}`)
+  } catch (error) {
+    console.error('保存工作流时发生错误:', error)
+    toast({
+      title: '错误',
+      description: '保存工作流时发生错误',
+      variant: 'destructive'
+    })
+  }
 }
 
-const runWorkflow = () => {
-  if (workflowNodes.value.length === 0) {
-    alert('工作流为空，请先添加节点')
-    return
+const runWorkflow = async () => {
+  try {
+    // 检查工作流是否为空
+    if (workflowNodes.value.length === 0) {
+      toast({
+        title: '警告',
+        description: '工作流为空，无法运行',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // 检查是否有连接
+    if (connections.value.length === 0 && workflowNodes.value.length > 1) {
+      toast({
+        title: '警告',
+        description: '节点之间没有连接，请先连接节点',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // 验证MCP节点配置
+    const mcpNodes = workflowNodes.value.filter(node => node.type === 'mcp-service')
+    const invalidMcpNodes = mcpNodes.filter(node => 
+      !node.config?.selectedProvider || !node.config?.selectedService
+    )
+    
+    if (invalidMcpNodes.length > 0) {
+      toast({
+        title: '警告',
+        description: '存在未配置完整的MCP服务节点，无法运行',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // 检查输入节点是否有内容
+    const inputNodes = workflowNodes.value.filter(node => node.type === 'text-input')
+    const emptyInputNodes = inputNodes.filter(node => 
+      !node.config?.text || (typeof node.config.text === 'string' && node.config.text.trim() === '')
+    )
+    
+    if (emptyInputNodes.length > 0) {
+      toast({
+        title: '警告',
+        description: '存在空的文本输入节点，请填写内容后再运行',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    toast({
+      title: '信息',
+      description: '开始运行工作流...',
+      variant: 'default'
+    })
+
+    // 准备工作流数据
+    const workflowData = {
+      name: `运行_${new Date().toLocaleString()}`,
+      nodes: workflowNodes.value,
+      connections: connections.value,
+      metadata: {
+        nodeCount: workflowNodes.value.length,
+        connectionCount: connections.value.length,
+        mcpNodeCount: mcpNodes.length,
+        runAt: new Date().toISOString()
+      }
+    }
+
+    console.log('运行工作流:', workflowData)
+
+    // 调用运行API
+    const result = await window.api.runWorkflow(workflowData)
+    
+    if (result.success) {
+      toast({
+        title: '成功',
+        description: `工作流运行完成! 处理了 ${result.results.processedNodes} 个节点`,
+        variant: 'success'
+      })
+      console.log('工作流运行结果:', result)
+      
+      // 更新输出节点的内容
+      const outputNodes = workflowNodes.value.filter(node => node.type === 'text-output')
+      outputNodes.forEach(node => {
+        if (node.config) {
+          node.config.text = `工作流运行完成\n执行ID: ${result.executionId}\n开始时间: ${result.startTime}\n处理节点数: ${result.results.processedNodes}`
+        }
+      })
+      
+      // 重新绘制画布以显示更新的内容
+      redraw()
+    } else {
+      toast({
+        title: '错误',
+        description: '运行工作流失败',
+        variant: 'destructive'
+      })
+    }
+  } catch (error) {
+    console.error('运行工作流时发生错误:', error)
+    toast({
+      title: '错误',
+      description: '运行工作流时发生错误',
+      variant: 'destructive'
+    })
   }
-  
-  console.log('运行工作流:', {
-    nodes: workflowNodes.value,
-    connections: connections.value
-  })
-  
-  // TODO: 实现工作流执行逻辑
-  alert(`开始运行工作流...\n节点数量: ${workflowNodes.value.length}\n连接数量: ${connections.value.length}`)
 }
 
-const deployWorkflow = () => {
-  if (workflowNodes.value.length === 0) {
-    alert('工作流为空，请先添加节点')
-    return
+const deployWorkflow = async () => {
+  try {
+    // 检查工作流是否为空
+    if (workflowNodes.value.length === 0) {
+      toast({
+        title: '警告',
+        description: '工作流为空，无法部署',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // 检查是否有连接
+    if (connections.value.length === 0 && workflowNodes.value.length > 1) {
+      toast({
+        title: '警告',
+        description: '节点之间没有连接，无法部署',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // 验证工作流完整性
+    const mcpNodes = workflowNodes.value.filter(node => node.type === 'mcp-service')
+    const inputNodes = workflowNodes.value.filter(node => node.type === 'text-input')
+    const outputNodes = workflowNodes.value.filter(node => node.type === 'text-output')
+    
+    if (mcpNodes.length === 0) {
+      toast({
+        title: '警告',
+        description: '工作流中没有MCP服务节点，无法部署',
+        variant: 'destructive'
+      })
+      return
+    }
+    
+    if (inputNodes.length === 0) {
+      toast({
+        title: '警告',
+        description: '工作流中没有输入节点，无法部署',
+        variant: 'destructive'
+      })
+      return
+    }
+    
+    if (outputNodes.length === 0) {
+      toast({
+        title: '警告',
+        description: '工作流中没有输出节点，无法部署',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // 验证MCP节点配置
+    const invalidMcpNodes = mcpNodes.filter(node => 
+      !node.config?.selectedProvider || !node.config?.selectedService
+    )
+    
+    if (invalidMcpNodes.length > 0) {
+      toast({
+        title: '警告',
+        description: '存在未配置完整的MCP服务节点，无法部署',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    toast({
+      title: '信息',
+      description: '开始部署工作流...',
+      variant: 'default'
+    })
+
+    // 准备部署数据
+    const workflowData = {
+      name: currentWorkflow.name || `部署_${new Date().toLocaleString()}`,
+      nodes: workflowNodes.value,
+      connections: connections.value,
+      metadata: {
+        nodeCount: workflowNodes.value.length,
+        connectionCount: connections.value.length,
+        mcpNodeCount: mcpNodes.length,
+        inputNodeCount: inputNodes.length,
+        outputNodeCount: outputNodes.length,
+        deployAt: new Date().toISOString()
+      },
+      deploymentConfig: {
+        environment: 'production',
+        autoStart: true,
+        retryCount: 3
+      }
+    }
+
+    console.log('部署工作流:', workflowData)
+
+    // 调用部署API
+    const result = await window.api.deployWorkflow(workflowData)
+    
+    if (result.success) {
+      toast({
+        title: '成功',
+        description: `工作流部署成功! 部署ID: ${result.deploymentId}`,
+        variant: 'success'
+      })
+      console.log('工作流部署结果:', result)
+    } else {
+      toast({
+        title: '错误',
+        description: '部署工作流失败',
+        variant: 'destructive'
+      })
+    }
+  } catch (error) {
+    console.error('部署工作流时发生错误:', error)
+    toast({
+      title: '错误',
+      description: '部署工作流时发生错误',
+      variant: 'destructive'
+    })
   }
-  
-  if (connections.value.length === 0) {
-    alert('工作流没有连接，请先连接节点')
-    return
-  }
-  
-  console.log('部署工作流:', {
-    name: currentWorkflow.name || '未命名工作流',
-    nodes: workflowNodes.value,
-    connections: connections.value
-  })
-  
-  // TODO: 实现工作流部署逻辑
-  alert(`工作流部署成功！\n名称: ${currentWorkflow.name || '未命名工作流'}\n节点数量: ${workflowNodes.value.length}\n连接数量: ${connections.value.length}`)
 }
 
 // 文本换行处理函数

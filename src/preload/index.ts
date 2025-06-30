@@ -37,7 +37,20 @@ const api = {
   getUploadedFiles: () => {
     return ipcRenderer.invoke('get-uploaded-files')
   },
-  readUploadedFile: (filePath: string) => ipcRenderer.invoke('read-uploaded-file', filePath)
+  readUploadedFile: (filePath: string) => ipcRenderer.invoke('read-uploaded-file', filePath),
+  // 工作流相关API
+  saveWorkflow: (workflowData: WorkflowData) => {
+    return ipcRenderer.invoke('save-workflow', workflowData)
+  },
+  getWorkflows: () => {
+    return ipcRenderer.invoke('get-workflows')
+  },
+  runWorkflow: (workflowData: WorkflowData) => {
+    return ipcRenderer.invoke('run-workflow', workflowData)
+  },
+  deployWorkflow: (workflowData: WorkflowData) => {
+    return ipcRenderer.invoke('deploy-workflow', workflowData)
+  }
 }
 exposeElectronAPI()
 

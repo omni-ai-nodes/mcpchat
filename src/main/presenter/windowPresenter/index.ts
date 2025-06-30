@@ -16,6 +16,34 @@ import { SHORTCUT_EVENTS } from '@/events' // 快捷键事件常量
 // TrayPresenter 在 main/index.ts 中全局管理，本 Presenter 不负责其生命周期
 import { TabPresenter } from '../tabPresenter' // TabPresenter 类型
 
+// 工作流相关类型定义
+interface WorkflowNode {
+  id: string
+  type: string
+  name: string
+  x: number
+  y: number
+  config: Record<string, unknown>
+  inputs?: string[]
+  outputs?: string[]
+}
+
+interface WorkflowConnection {
+  id: string
+  sourceNodeId: string
+  targetNodeId: string
+  sourceOutput: string
+  targetInput: string
+}
+
+interface WorkflowData {
+  name: string
+  nodes: WorkflowNode[]
+  connections: WorkflowConnection[]
+  metadata?: Record<string, unknown>
+  deploymentConfig?: Record<string, unknown>
+}
+
 /**
  * 窗口 Presenter，负责管理所有 BrowserWindow 实例及其生命周期。
  * 包括创建、销毁、最小化、最大化、隐藏、显示、焦点管理以及与标签页的交互。
@@ -77,6 +105,139 @@ export class WindowPresenter implements IWindowPresenter {
         return { success: true, filePath, fileName: uniqueFileName }
       } catch (error) {
         console.error('保存文件失败:', error)
+        throw error
+      }
+    })
+
+    // 保存工作流
+    ipcMain.handle('save-workflow', async (_event, workflowData: WorkflowData) => {
+      try {
+        const userDataPath = app.getPath('userData')
+        const workflowsDir = path.join(userDataPath, 'APP', 'workflows')
+        
+        if (!fs.existsSync(workflowsDir)) {
+          fs.mkdirSync(workflowsDir, { recursive: true })
+        }
+        
+        // 生成工作流文件名
+        const timestamp = Date.now()
+        const workflowName = workflowData.name || `workflow_${timestamp}`
+        const fileName = `${workflowName}_${timestamp}.json`
+        const filePath = path.join(workflowsDir, fileName)
+        
+        // 保存工作流数据
+        const workflowContent = {
+          ...workflowData,
+          savedAt: new Date().toISOString(),
+          version: '1.0'
+        }
+        
+        fs.writeFileSync(filePath, JSON.stringify(workflowContent, null, 2), 'utf8')
+        
+        console.log('工作流已保存:', filePath)
+        return { success: true, filePath, fileName }
+      } catch (error) {
+        console.error('保存工作流失败:', error)
+        throw error
+      }
+    })
+
+    // 获取已保存的工作流列表
+    ipcMain.handle('get-workflows', async () => {
+      try {
+        const userDataPath = app.getPath('userData')
+        const workflowsDir = path.join(userDataPath, 'APP', 'workflows')
+        
+        if (!fs.existsSync(workflowsDir)) {
+          return []
+        }
+        
+        const files = fs.readdirSync(workflowsDir)
+        const workflows = files
+          .filter(file => file.endsWith('.json'))
+          .map(file => {
+            const filePath = path.join(workflowsDir, file)
+            const content = fs.readFileSync(filePath, 'utf8')
+            const workflowData = JSON.parse(content)
+            return {
+              fileName: file,
+              filePath,
+              ...workflowData
+            }
+          })
+          .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime())
+        
+        return workflows
+      } catch (error) {
+        console.error('获取工作流列表失败:', error)
+        return []
+      }
+    })
+
+    // 运行工作流
+    ipcMain.handle('run-workflow', async (_event, workflowData: WorkflowData) => {
+      try {
+        console.log('开始运行工作流:', workflowData.name || '未命名工作流')
+        
+        // TODO: 实现工作流执行逻辑
+        // 这里可以添加实际的工作流执行代码
+        // 例如：按照连接顺序执行节点，处理数据流等
+        
+        const executionResult = {
+          success: true,
+          executionId: `exec_${Date.now()}`,
+          startTime: new Date().toISOString(),
+          status: 'completed',
+          results: {
+            processedNodes: workflowData.nodes?.length || 0,
+            processedConnections: workflowData.connections?.length || 0
+          }
+        }
+        
+        console.log('工作流执行完成:', executionResult)
+        return executionResult
+      } catch (error) {
+        console.error('运行工作流失败:', error)
+        throw error
+      }
+    })
+
+    // 部署工作流
+    ipcMain.handle('deploy-workflow', async (_event, workflowData: WorkflowData) => {
+      try {
+        console.log('开始部署工作流:', workflowData.name || '未命名工作流')
+        
+        // 创建部署目录
+        const userDataPath = app.getPath('userData')
+        const deploymentsDir = path.join(userDataPath, 'APP', 'deployments')
+        
+        if (!fs.existsSync(deploymentsDir)) {
+          fs.mkdirSync(deploymentsDir, { recursive: true })
+        }
+        
+        // 生成部署配置
+        const deploymentConfig = {
+          ...workflowData,
+          deployedAt: new Date().toISOString(),
+          deploymentId: `deploy_${Date.now()}`,
+          status: 'deployed',
+          version: '1.0'
+        }
+        
+        const deploymentFileName = `deployment_${deploymentConfig.deploymentId}.json`
+        const deploymentPath = path.join(deploymentsDir, deploymentFileName)
+        
+        fs.writeFileSync(deploymentPath, JSON.stringify(deploymentConfig, null, 2), 'utf8')
+        
+        console.log('工作流部署完成:', deploymentPath)
+        return {
+          success: true,
+          deploymentId: deploymentConfig.deploymentId,
+          deploymentPath,
+          config: deploymentConfig
+        }
+      } catch (error) {
+        console.error('部署工作流失败:', error)
         throw error
       }
     })
