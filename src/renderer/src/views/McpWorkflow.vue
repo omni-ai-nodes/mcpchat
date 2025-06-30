@@ -177,6 +177,41 @@
       </div>
     </div>
   </div>
+
+  <!-- MCP服务器选择弹窗 -->
+  <div v-if="showServerSelectModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+      <div class="p-6">
+        <h3 class="text-lg font-semibold mb-4">选择MCP服务器</h3>
+        <div class="space-y-2 max-h-60 overflow-y-auto">
+          <div 
+            v-for="server in availableServers" 
+            :key="server.id"
+            class="p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            :class="{
+              'opacity-50 cursor-not-allowed': server.disabled,
+              'border-green-500 bg-green-50 dark:bg-green-900/20': !server.disabled && server.provider.includes('运行中')
+            }"
+            @click="!server.disabled && handleServerSelection(server.id)"
+          >
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-medium">{{ server.name }}</div>
+                <div class="text-sm text-gray-500">{{ server.provider }}</div>
+              </div>
+              <div v-if="server.provider.includes('运行中')" class="w-2 h-2 bg-green-500 rounded-full"></div>
+              <div v-else-if="!server.disabled" class="w-2 h-2 bg-gray-400 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end mt-6">
+          <Button variant="outline" @click="showServerSelectModal = false">
+            取消
+          </Button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -186,10 +221,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Icon } from '@iconify/vue'
 import { useSettingsStore } from '@/stores/settings'
+import { useMcpStore } from '@/stores/mcp'
 import NodeProperties from '@/components/workflow/NodeProperties.vue'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
+const mcpStore = useMcpStore()
 
 // 节点类型定义
 interface NodeTemplate {
@@ -247,7 +284,7 @@ interface WorkflowNode {
     width: number
     height: number
   }
-  mcpEnableButton?: {
+  mcpServerSelect?: {
     x: number
     y: number
     width: number
@@ -282,6 +319,11 @@ const currentWorkflow = reactive<CurrentWorkflow>({
   nodes: [],
   connections: []
 })
+
+// 服务器选择弹窗相关
+const showServerSelectModal = ref(false)
+const currentSelectingNode = ref<WorkflowNode | null>(null)
+const availableServers = ref<{ id: string; name: string; provider: string; disabled?: boolean }[]>([])
 
 // Canvas 相关变量
 const ctx = ref<CanvasRenderingContext2D | null>(null)
@@ -1068,68 +1110,65 @@ const drawNode = (node: WorkflowNode) => {
       node.mcpModelSelect.height = modelSelectHeight
     }
     
-    // 绘制MCP启用区域
-    const enableAreaY = modelSelectY + modelSelectHeight + 8 * scale.value
-    const enableAreaHeight = serviceAreaHeight - modelSelectHeight - 24 * scale.value
+    // 绘制MCP服务器选择区域
+    const serverSelectY = modelSelectY + modelSelectHeight + 8 * scale.value
+    const serverSelectHeight = serviceAreaHeight - modelSelectHeight - 24 * scale.value
+    const serverSelectX = serviceAreaX + 8 * scale.value
+    const serverSelectWidth = serviceAreaWidth - 16 * scale.value
     
     context.fillStyle = '#0f172a'
     context.beginPath()
-    context.roundRect(serviceAreaX + 8 * scale.value, enableAreaY, serviceAreaWidth - 16 * scale.value, enableAreaHeight, 4 * scale.value)
+    context.roundRect(serverSelectX, serverSelectY, serverSelectWidth, serverSelectHeight, 4 * scale.value)
     context.fill()
     
     context.strokeStyle = '#1e293b'
     context.lineWidth = 1 * scale.value
     context.stroke()
     
-    // 绘制启用MCP文本
+    // 绘制服务器选择标题
     context.fillStyle = '#e2e8f0'
     context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
     context.textAlign = 'left'
     context.textBaseline = 'top'
-    context.fillText('启用MCP', serviceAreaX + 16 * scale.value, enableAreaY + 8 * scale.value)
+    context.fillText('选择MCP服务:', serverSelectX + 8 * scale.value, serverSelectY + 8 * scale.value)
     
-    // 绘制描述文本
+    // 绘制当前选择的服务器或占位符
+    const selectedServerName = (node.config?.selectedServerName as string) || '请选择MCP服务...'
+    const selectedServer = mcpStore.serverList.find(s => s.name === selectedServerName)
+    
+    context.fillStyle = selectedServerName === '请选择MCP服务...' ? '#64748b' : '#cbd5e1'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(selectedServerName, serverSelectX + 8 * scale.value, serverSelectY + 28 * scale.value)
+    
+    // 如果有选中的服务器，显示状态信息
+    if (selectedServer && selectedServerName !== '请选择MCP服务...') {
+      const statusText = selectedServer.isRunning ? '运行中' : '未运行'
+      const statusColor = selectedServer.isRunning ? '#10b981' : '#ef4444'
+      
+      context.fillStyle = statusColor
+      context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.fillText(statusText, serverSelectX + 8 * scale.value, serverSelectY + 42 * scale.value)
+    }
+    
+    // 绘制下拉箭头
     context.fillStyle = '#64748b'
-    context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
-    context.fillText('启用MCP功能以使用工具调用', serviceAreaX + 16 * scale.value, enableAreaY + 26 * scale.value)
+    context.font = `${12 * scale.value}px Arial`
+    context.textAlign = 'right'
+    context.fillText('▼', serverSelectX + serverSelectWidth - 8 * scale.value, serverSelectY + 32 * scale.value)
     
-    // 绘制启用按钮
-    const enableButtonWidth = 80 * scale.value
-    const enableButtonHeight = 24 * scale.value
-    const enableButtonX = serviceAreaX + serviceAreaWidth - enableButtonWidth - 16 * scale.value
-    const enableButtonY = enableAreaY + 8 * scale.value
-    
-    const isEnabled = node.config?.mcpEnabled as boolean
-    context.fillStyle = isEnabled ? '#10b981' : '#374151'
-    context.beginPath()
-    context.roundRect(enableButtonX, enableButtonY, enableButtonWidth, enableButtonHeight, 4 * scale.value)
-    context.fill()
-    
-    // 按钮边框
-    context.strokeStyle = isEnabled ? '#059669' : '#4b5563'
-    context.lineWidth = 1 * scale.value
-    context.stroke()
-    
-    // 按钮文字
-    context.fillStyle = '#ffffff'
-    context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
-    context.textAlign = 'center'
-    context.textBaseline = 'middle'
-    context.fillText(isEnabled ? '已启用' : '启用', enableButtonX + enableButtonWidth / 2, enableButtonY + enableButtonHeight / 2)
-    
-    // 存储启用按钮位置信息
-    if (!node.mcpEnableButton) {
-      node.mcpEnableButton = {
-        x: enableButtonX,
-        y: enableButtonY,
-        width: enableButtonWidth,
-        height: enableButtonHeight
+    // 存储服务器选择区域位置信息
+    if (!node.mcpServerSelect) {
+      node.mcpServerSelect = {
+        x: serverSelectX,
+        y: serverSelectY,
+        width: serverSelectWidth,
+        height: serverSelectHeight
       }
     } else {
-      node.mcpEnableButton.x = enableButtonX
-      node.mcpEnableButton.y = enableButtonY
-      node.mcpEnableButton.width = enableButtonWidth
-      node.mcpEnableButton.height = enableButtonHeight
+      node.mcpServerSelect.x = serverSelectX
+      node.mcpServerSelect.y = serverSelectY
+      node.mcpServerSelect.width = serverSelectWidth
+      node.mcpServerSelect.height = serverSelectHeight
     }
     
     // 存储整个服务区域位置信息
@@ -1744,13 +1783,13 @@ const getMcpModelSelectAtPosition = (x: number, y: number): WorkflowNode | null 
   return null
 }
 
-// 获取MCP启用按钮点击位置
-const getMcpEnableButtonAtPosition = (x: number, y: number): WorkflowNode | null => {
+// 获取MCP服务器选择区域点击位置
+const getMcpServerSelectAtPosition = (x: number, y: number): WorkflowNode | null => {
   for (const node of workflowNodes.value) {
-    if (node.type === 'mcp-service' && node.mcpEnableButton) {
-      const button = node.mcpEnableButton
-      if (x >= button.x && x <= button.x + button.width && 
-          y >= button.y && y <= button.y + button.height) {
+    if (node.type === 'mcp-service' && node.mcpServerSelect) {
+      const selectArea = node.mcpServerSelect
+      if (x >= selectArea.x && x <= selectArea.x + selectArea.width && 
+          y >= selectArea.y && y <= selectArea.y + selectArea.height) {
         return node
       }
     }
@@ -2459,24 +2498,21 @@ const handleMcpModelSelectClick = (node: WorkflowNode) => {
   
   // 获取可用模型列表
   const getAvailableModels = () => {
-    // 从服务商设置中读取已启用的模型
     const availableModels: { id: string; name: string; provider: string }[] = []
     
-    // 遍历所有已启用的服务商和模型
-    settingsStore.enabledModels.forEach(providerData => {
-      const provider = settingsStore.providers.find(p => p.id === providerData.providerId)
-      const providerName = provider?.name || providerData.providerId
-      
-      providerData.models.forEach(model => {
-        availableModels.push({
-          id: model.id,
-          name: model.name || model.id,
-          provider: providerName
-        })
+    // 遍历已启用的模型
+    settingsStore.enabledModels.forEach(providerModels => {
+      providerModels.models.forEach(model => {
+        if (model.enabled) {
+          availableModels.push({
+            id: model.id,
+            name: model.name || model.id,
+            provider: providerModels.providerId
+          })
+        }
       })
     })
     
-    // 如果没有启用的模型，返回空数组
     return availableModels
   }
   
@@ -2702,21 +2738,54 @@ const handleMcpModelSelectClick = (node: WorkflowNode) => {
 }
 
 // 处理MCP启用按钮点击
-const handleMcpEnableButtonClick = (node: WorkflowNode) => {
-  console.log('点击MCP启用按钮，节点:', node.name)
+const handleMcpServerSelectClick = (node: WorkflowNode) => {
+  console.log('点击MCP服务器选择，节点:', node.name)
   
-  const currentState = node.config?.mcpEnabled as boolean
-  const newState = !currentState
+  // 创建服务器选择弹窗
+  const serverOptions = mcpStore.serverList.map(server => ({
+    id: server.name,
+    name: server.name,
+    provider: server.isRunning ? 'MCP (运行中)' : 'MCP (未运行)',
+    disabled: !server.isRunning
+  }))
   
-  updateNode(node.id, {
-    config: {
-      ...node.config,
-      mcpEnabled: newState
-    }
-  })
+  if (serverOptions.length === 0) {
+    serverOptions.push({
+      id: 'no-servers',
+      name: '暂无可用的MCP服务器',
+      provider: 'MCP',
+      disabled: true
+    })
+  }
   
-  console.log('MCP启用状态已更新:', newState)
-}
+  // 显示选择弹窗
+   showServerSelectModal.value = true
+   currentSelectingNode.value = node
+   availableServers.value = serverOptions
+ }
+ 
+ // 处理服务器选择
+ const handleServerSelection = (serverId: string) => {
+   if (!currentSelectingNode.value || serverId === 'no-servers') return
+   
+   const selectedServer = mcpStore.serverList.find(s => s.name === serverId)
+   if (!selectedServer) return
+   
+   updateNode(currentSelectingNode.value.id, {
+     config: {
+       ...currentSelectingNode.value.config,
+       selectedServerName: selectedServer.name,
+       mcpEnabled: selectedServer.isRunning
+     }
+   })
+   
+   // 关闭弹窗
+   showServerSelectModal.value = false
+   currentSelectingNode.value = null
+   availableServers.value = []
+   
+   console.log('已选择MCP服务器:', selectedServer.name)
+ }
 
 const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, port: string, type: 'input' | 'output' } | null => {
   for (const node of workflowNodes.value) {
@@ -2762,7 +2831,7 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedTextArea = getTextAreaAtPosition(pos.x, pos.y)
   const clickedEditButton = getEditButtonAtPosition(pos.x, pos.y)
   const clickedMcpModelSelect = getMcpModelSelectAtPosition(pos.x, pos.y)
-  const clickedMcpEnableButton = getMcpEnableButtonAtPosition(pos.x, pos.y)
+  const clickedMcpServerSelect = getMcpServerSelectAtPosition(pos.x, pos.y)
   
   if (clickedUploadButton) {
     // 处理上传按钮点击
@@ -2776,9 +2845,9 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedMcpModelSelect) {
     // 处理MCP模型选择点击
     handleMcpModelSelectClick(clickedMcpModelSelect)
-  } else if (clickedMcpEnableButton) {
-    // 处理MCP启用按钮点击
-    handleMcpEnableButtonClick(clickedMcpEnableButton)
+  } else if (clickedMcpServerSelect) {
+    // 处理MCP服务器选择点击
+    handleMcpServerSelectClick(clickedMcpServerSelect)
   } else if (clickedTextArea) {
     // 处理文本区域点击
     handleTextAreaClick(clickedTextArea)
