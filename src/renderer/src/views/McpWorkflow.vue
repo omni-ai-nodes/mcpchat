@@ -2227,6 +2227,14 @@ interface UploadedFile {
   createdAt: Date
 }
 
+interface WorkflowConnection {
+  id: string
+  from: string
+  to: string
+  fromPort: string
+  toPort: string
+}
+
 interface WorkflowData {
   name: string
   nodes: WorkflowNode[]
