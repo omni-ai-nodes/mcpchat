@@ -481,6 +481,12 @@ interface WorkflowNode {
     width: number
     height: number
   }
+  textDisplayArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 }
 
 interface Connection {
@@ -558,17 +564,17 @@ const CONNECTION_WIDTH = 3
 // 节点模板
 const inputNodes: NodeTemplate[] = [
   {
-    type: 'file-input',
-    name: '文件输入',
-    description: '读取本地文件',
-    icon: 'lucide:file-input',
-    category: 'input'
-  },
-  {
     type: 'text-input',
     name: '文本输入',
     description: '手动输入文本',
     icon: 'lucide:type',
+    category: 'input'
+  },
+  {
+    type: 'file-input',
+    name: '文件输入',
+    description: '读取本地文件',
+    icon: 'lucide:file-input',
     category: 'input'
   },
   {
@@ -769,11 +775,13 @@ const drawNode = (node: WorkflowNode) => {
   const x = (node.x + offset.value.x) * scale.value
   const y = (node.y + offset.value.y) * scale.value
   const width = NODE_WIDTH * scale.value
-  // 为file-input、text-input和mcp-service节点动态计算高度
+  // 为file-input、text-input、text-output和mcp-service节点动态计算高度
   const height = node.type === 'file-input' 
     ? (NODE_HEIGHT + 226 ) * scale.value  // 基础高度 + 上传区域高度 + 间距
     : node.type === 'text-input'
     ? (NODE_HEIGHT + 95 ) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
+    : node.type === 'text-output'
+    ? (NODE_HEIGHT + 128 ) * scale.value  // 基础高度 + 文本显示区域高度 + 间距
     : node.type === 'mcp-service'
     ? (NODE_HEIGHT + 115) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
     : NODE_HEIGHT * scale.value
@@ -1451,6 +1459,100 @@ const drawNode = (node: WorkflowNode) => {
       node.mcpServiceArea.y = serviceAreaY
       node.mcpServiceArea.width = serviceAreaWidth
       node.mcpServiceArea.height = serviceAreaHeight
+    }
+  }
+
+  // 如果是文本输出节点，绘制文本显示区域
+  if (node.type === 'text-output') {
+    const displayAreaWidth = width - 16 * scale.value
+    const displayAreaHeight = 150 * scale.value
+    const displayAreaX = x + 8 * scale.value
+    const displayAreaY = y + headerHeight + 8 * scale.value
+    
+    // 绘制文本显示区域背景
+    context.fillStyle = '#f8fafc'  // 浅灰色背景
+    context.beginPath()
+    context.roundRect(displayAreaX, displayAreaY, displayAreaWidth, displayAreaHeight, 6 * scale.value)
+    context.fill()
+    
+    // 绘制边框
+    context.strokeStyle = '#e2e8f0'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+    
+    // 绘制标题
+    context.fillStyle = '#64748b'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('输出内容:', displayAreaX + 8 * scale.value, displayAreaY + 8 * scale.value)
+    
+    // 获取节点的输出文本内容
+    const outputText = (node.config?.outputText as string) || '暂无输出内容...'
+    
+    // 绘制文本内容
+    const textAreaX = displayAreaX + 8 * scale.value
+    const textAreaY = displayAreaY + 28 * scale.value
+    const textAreaWidth = displayAreaWidth - 16 * scale.value
+    const textAreaHeight = displayAreaHeight - 36 * scale.value
+    
+    context.fillStyle = outputText === '暂无输出内容...' ? '#94a3b8' : '#1e293b'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    
+    // 处理文本换行
+    const words = outputText.split(' ')
+    const lines: string[] = []
+    let currentLine = ''
+    const maxWidth = textAreaWidth - 8 * scale.value
+    
+    words.forEach(word => {
+      const testLine = currentLine + (currentLine ? ' ' : '') + word
+      const testWidth = context.measureText(testLine).width
+      
+      if (testWidth > maxWidth && currentLine) {
+        lines.push(currentLine)
+        currentLine = word
+      } else {
+        currentLine = testLine
+      }
+    })
+    
+    if (currentLine) {
+      lines.push(currentLine)
+    }
+    
+    // 限制显示行数
+    const maxLines = Math.floor(textAreaHeight / (12 * scale.value))
+    const displayLines = lines.slice(0, maxLines)
+    
+    // 绘制文本行
+    displayLines.forEach((line, index) => {
+      const lineY = textAreaY + index * 12 * scale.value
+      context.fillText(line, textAreaX, lineY)
+    })
+    
+    // 如果文本被截断，显示省略号
+    if (lines.length > maxLines) {
+      context.fillStyle = '#64748b'
+      context.fillText('...', textAreaX, textAreaY + (maxLines - 1) * 12 * scale.value + 12 * scale.value)
+    }
+    
+    // 存储文本显示区域位置信息，用于点击检测
+    if (!node.textDisplayArea) {
+      node.textDisplayArea = {
+        x: displayAreaX / scale.value,
+        y: displayAreaY / scale.value,
+        width: displayAreaWidth / scale.value,
+        height: displayAreaHeight / scale.value
+      }
+    } else {
+      node.textDisplayArea.x = displayAreaX / scale.value
+      node.textDisplayArea.y = displayAreaY / scale.value
+      node.textDisplayArea.width = displayAreaWidth / scale.value
+      node.textDisplayArea.height = displayAreaHeight / scale.value
     }
   }
 }
