@@ -4398,9 +4398,12 @@ const saveWorkflow = async () => {
     
     // 验证MCP节点状态
     const mcpNodes = workflowNodes.value.filter(node => node.type === 'mcp-service')
-    const invalidMcpNodes = mcpNodes.filter(node => 
-      !node.config?.selectedProvider || !node.config?.selectedService
-    )
+    const invalidMcpNodes = mcpNodes.filter(node => {
+      // 检查是否有选择的服务器
+      const hasSelectedServer = node.config?.selectedServerName || 
+                               (node.config?.selectedServers && Array.isArray(node.config.selectedServers) && node.config.selectedServers.length > 0)
+      return !hasSelectedServer
+    })
     
     if (invalidMcpNodes.length > 0) {
       toast({
@@ -4488,9 +4491,12 @@ const runWorkflow = async () => {
 
     // 验证MCP节点配置
     const mcpNodes = workflowNodes.value.filter(node => node.type === 'mcp-service')
-    const invalidMcpNodes = mcpNodes.filter(node => 
-      !node.config?.selectedProvider || !node.config?.selectedService
-    )
+    const invalidMcpNodes = mcpNodes.filter(node => {
+      // 检查是否有选择的服务器
+      const hasSelectedServer = node.config?.selectedServerName || 
+                               (node.config?.selectedServers && Array.isArray(node.config.selectedServers) && node.config.selectedServers.length > 0)
+      return !hasSelectedServer
+    })
     
     if (invalidMcpNodes.length > 0) {
       toast({
@@ -4630,9 +4636,12 @@ const deployWorkflow = async () => {
     }
 
     // 验证MCP节点配置
-    const invalidMcpNodes = mcpNodes.filter(node => 
-      !node.config?.selectedProvider || !node.config?.selectedService
-    )
+    const invalidMcpNodes = mcpNodes.filter(node => {
+      // 检查是否有选择的服务器
+      const hasSelectedServer = node.config?.selectedServerName || 
+                               (node.config?.selectedServers && Array.isArray(node.config.selectedServers) && node.config.selectedServers.length > 0)
+      return !hasSelectedServer
+    })
     
     if (invalidMcpNodes.length > 0) {
       toast({

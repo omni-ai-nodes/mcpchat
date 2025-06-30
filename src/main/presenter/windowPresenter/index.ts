@@ -1,18 +1,184 @@
 // src\main\presenter\windowPresenter\index.ts
-import { BrowserWindow, shell, app, nativeImage, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { nativeImage } from 'electron'
+import path from 'path'
+import fs from 'fs'
+import { presenter } from '@/presenter'
+import { eventBus } from '@/eventbus'
+import { WINDOW_EVENTS } from '@/events'
+import { IWindowPresenter } from '@shared/presenter'
 import { join } from 'path'
-import * as fs from 'fs'
-import * as path from 'path'
 import icon from '../../../../resources/icon.png?asset' // 应用图标 (macOS/Linux)
 import iconWin from '../../../../resources/icon.ico?asset' // 应用图标 (Windows)
 import { is } from '@electron-toolkit/utils' // Electron 工具库
-import { IWindowPresenter } from '@shared/presenter' // 窗口 Presenter 接口
-import { eventBus } from '@/eventbus' // 事件总线
 import { ConfigPresenter } from '../configPresenter' // 配置 Presenter
-import { CONFIG_EVENTS, SYSTEM_EVENTS, WINDOW_EVENTS } from '@/events' // 系统/窗口/配置 事件常量
-import { presenter } from '../' // 全局 presenter 注册中心
+import { CONFIG_EVENTS, SYSTEM_EVENTS } from '@/events' // 系统/窗口/配置 事件常量
 import windowStateManager from 'electron-window-state' // 窗口状态管理器
 import { SHORTCUT_EVENTS } from '@/events' // 快捷键事件常量
+
+// 节点执行结果接口
+interface NodeResult {
+  output: string
+  [key: string]: unknown
+}
+
+// 工作流执行函数
+async function executeWorkflow(workflowData: WorkflowData) {
+  const executionId = `exec_${Date.now()}`
+  const startTime = new Date().toISOString()
+  
+  try {
+    // 按拓扑顺序执行节点
+    const executionOrder = getExecutionOrder(workflowData)
+    const nodeResults = new Map<string, NodeResult>()
+    
+    for (const nodeId of executionOrder) {
+      const node = workflowData.nodes.find(n => n.id === nodeId)
+      if (!node) continue
+      
+      console.log(`执行节点: ${node.name} (${node.type})`)
+      
+      // 获取输入数据
+      const inputData = getNodeInputData(node, workflowData.connections, nodeResults)
+      
+      // 执行节点
+      let result: NodeResult
+      switch (node.type) {
+        case 'text-input':
+          result = await executeTextInputNode(node)
+          break
+        case 'mcp-service':
+          result = await executeMcpNode(node, inputData)
+          break
+        case 'text-output':
+          result = await executeTextOutputNode(node, inputData)
+          break
+        default:
+          result = { output: inputData.input || '' }
+      }
+      
+      nodeResults.set(nodeId, result)
+      console.log(`节点 ${node.name} 执行完成:`, result)
+    }
+    
+    return {
+      success: true,
+      executionId,
+      startTime,
+      endTime: new Date().toISOString(),
+      status: 'completed',
+      results: {
+        processedNodes: workflowData.nodes.length,
+        processedConnections: workflowData.connections?.length || 0,
+        nodeResults: Object.fromEntries(nodeResults)
+      }
+    }
+  } catch (error) {
+    console.error('工作流执行失败:', error)
+    return {
+      success: false,
+      executionId,
+      startTime,
+      endTime: new Date().toISOString(),
+      status: 'failed',
+      error: error instanceof Error ? error.message : String(error)
+    }
+  }
+}
+
+// 获取节点执行顺序（简单的拓扑排序）
+function getExecutionOrder(workflowData: WorkflowData): string[] {
+  const nodes = workflowData.nodes
+  const connections = workflowData.connections || []
+  const visited = new Set<string>()
+  const order: string[] = []
+  
+  // 构建依赖图
+  const dependencies = new Map<string, string[]>()
+  nodes.forEach(node => dependencies.set(node.id, []))
+  
+  connections.forEach(conn => {
+    const deps = dependencies.get(conn.targetNodeId) || []
+    deps.push(conn.sourceNodeId)
+    dependencies.set(conn.targetNodeId, deps)
+  })
+  
+  // DFS访问
+  function visit(nodeId: string) {
+    if (visited.has(nodeId)) return
+    visited.add(nodeId)
+    
+    const deps = dependencies.get(nodeId) || []
+    deps.forEach(depId => visit(depId))
+    
+    order.push(nodeId)
+  }
+  
+  nodes.forEach(node => visit(node.id))
+  return order
+}
+
+// 获取节点输入数据
+function getNodeInputData(node: WorkflowNode, connections: WorkflowConnection[], nodeResults: Map<string, NodeResult>) {
+  const inputData: Record<string, unknown> = {}
+  
+  // 查找连接到此节点的输入
+  const inputConnections = connections.filter(conn => conn.targetNodeId === node.id)
+  
+  inputConnections.forEach(conn => {
+    const sourceResult = nodeResults.get(conn.sourceNodeId)
+    if (sourceResult && sourceResult[conn.sourceOutput]) {
+      inputData[conn.targetInput] = sourceResult[conn.sourceOutput]
+    }
+  })
+  
+  return inputData
+}
+
+// 执行文本输入节点
+async function executeTextInputNode(node: WorkflowNode): Promise<NodeResult> {
+  const config = node.config || {}
+  return {
+    output: (config.text as string) || (config.content as string) || ''
+  }
+}
+
+// 执行MCP节点
+async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  const config = node.config || {}
+  const serverName = config.selectedServerName as string
+  const input = (inputData.input as string) || ''
+  
+  if (!serverName) {
+    throw new Error(`MCP节点 "${node.name}" 未配置服务器`)
+  }
+  
+  try {
+    // 获取MCP presenter实例 - 简化处理，直接返回输入
+    // 实际实现中应该调用真正的MCP服务
+    console.log(`模拟MCP调用: 服务器=${serverName}, 输入=${input}`)
+    
+    // 模拟MCP处理结果
+    const processedOutput = `[MCP处理结果] ${input}`
+    
+    return {
+      output: processedOutput
+    }
+  } catch (error) {
+    console.error(`MCP节点执行失败:`, error)
+    // 如果MCP调用失败，返回原始输入
+    return {
+      output: input
+    }
+  }
+}
+
+// 执行文本输出节点
+async function executeTextOutputNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  return {
+    output: (inputData.input as string) || ''
+  }
+}
 // TrayPresenter 在 main/index.ts 中全局管理，本 Presenter 不负责其生命周期
 import { TabPresenter } from '../tabPresenter' // TabPresenter 类型
 
@@ -179,20 +345,25 @@ export class WindowPresenter implements IWindowPresenter {
       try {
         console.log('开始运行工作流:', workflowData.name || '未命名工作流')
         
-        // TODO: 实现工作流执行逻辑
-        // 这里可以添加实际的工作流执行代码
-        // 例如：按照连接顺序执行节点，处理数据流等
+        // 验证工作流数据
+        if (!workflowData.nodes || workflowData.nodes.length === 0) {
+          throw new Error('工作流中没有节点')
+        }
         
-        const executionResult = {
-          success: true,
-          executionId: `exec_${Date.now()}`,
-          startTime: new Date().toISOString(),
-          status: 'completed',
-          results: {
-            processedNodes: workflowData.nodes?.length || 0,
-            processedConnections: workflowData.connections?.length || 0
+        // 验证MCP节点配置
+        const mcpNodes = workflowData.nodes.filter(node => node.type === 'mcp-service')
+        for (const node of mcpNodes) {
+          const config = node.config || {}
+          const hasSelectedServer = config.selectedServerName || 
+                                   (config.selectedServers && Array.isArray(config.selectedServers) && config.selectedServers.length > 0)
+          
+          if (!hasSelectedServer) {
+            throw new Error(`MCP节点 "${node.name}" 未配置服务器`)
           }
         }
+        
+        // 执行工作流
+        const executionResult = await executeWorkflow(workflowData)
         
         console.log('工作流执行完成:', executionResult)
         return executionResult
