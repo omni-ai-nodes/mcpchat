@@ -589,7 +589,7 @@ const processNodes: NodeTemplate[] = [
     name: 'MCP服务',
     description: '连接MCP服务提供商',
     icon: 'lucide:server',
-    category: 'input'
+    category: 'process'
   },
   {
     type: 'text-transform',
@@ -1586,8 +1586,8 @@ const addNode = (template: NodeTemplate) => {
     x: Math.random() * 400 + 200,
     y: Math.random() * 300 + 150,
     config: initialConfig,
-    inputs: template.category === 'input' ? [] : ['input'],
-    outputs: template.category === 'output' ? [] : ['output']
+    inputs: template.category === 'output' ? [] : (template.type === 'mcp-service' ? ['input'] : ['input']),
+    outputs: template.category === 'input' ? (template.type === 'mcp-service' ? ['output'] : ['output']) : ['output']
   }
   
   workflowNodes.value.push(newNode)
