@@ -212,7 +212,7 @@
              class="p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
              :class="{
                'opacity-50 cursor-not-allowed': server.disabled || serverSelectionLoading,
-               'border-green-500 bg-green-50 dark:bg-green-900/20': !server.disabled && server.provider.includes('运行中'),
+               'border-green-500 bg-green-50 dark:bg-green-900/20': !server.disabled && server.isRunning === true,
                'border-blue-500 bg-blue-50 dark:bg-blue-900/20': isServerSelected(server.name)
              }"
              @click="!server.disabled && !serverSelectionLoading && handleServerSelection(server.name)"
@@ -235,7 +235,7 @@
                  </div>
                </div>
                <div v-if="serverSelectionLoading" class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-               <div v-else-if="server.provider.includes('运行中')" class="w-2 h-2 bg-green-500 rounded-full"></div>
+               <div v-else-if="server.isRunning === true" class="w-2 h-2 bg-green-500 rounded-full"></div>
                <div v-else-if="!server.disabled" class="w-2 h-2 bg-gray-400 rounded-full"></div>
              </div>
            </div>
@@ -363,7 +363,7 @@ const currentWorkflow = reactive<CurrentWorkflow>({
 // 服务器选择弹窗相关
 const showServerSelectModal = ref(false)
 const currentSelectingNode = ref<WorkflowNode | null>(null)
-const availableServers = ref<{ id: string; name: string; provider: string; disabled?: boolean }[]>([])
+const availableServers = ref<{ id: string; name: string; provider: string; disabled?: boolean; isRunning?: boolean }[]>([])
 const serverSelectionLoading = ref(false)
 
 // Canvas 相关变量
@@ -2787,7 +2787,8 @@ const handleMcpServerSelectClick = (node: WorkflowNode) => {
     id: server.name,
     name: server.name,
     provider: server.isRunning ? 'MCP (运行中)' : 'MCP (未运行)',
-    disabled: !server.isRunning
+    disabled: false, // 允许选择未运行的服务器，会自动启动
+    isRunning: server.isRunning
   }))
   
   if (serverOptions.length === 0) {
@@ -2795,7 +2796,8 @@ const handleMcpServerSelectClick = (node: WorkflowNode) => {
       id: 'no-servers',
       name: '暂无可用的MCP服务器',
       provider: 'MCP',
-      disabled: true
+      disabled: true,
+      isRunning: false
     })
   }
   
@@ -2821,6 +2823,14 @@ const handleMcpServerSelectClick = (node: WorkflowNode) => {
        console.log('正在启动MCP服务器:', selectedServer.name)
        await mcpStore.toggleServer(selectedServer.name)
        console.log('MCP服务器启动成功:', selectedServer.name)
+       
+       // 更新可用服务器列表中的状态
+        const serverIndex = availableServers.value.findIndex(s => s.name === selectedServer.name)
+        if (serverIndex !== -1) {
+          const server = availableServers.value[serverIndex]
+          server.isRunning = true
+          server.provider = 'MCP (运行中)'
+        }
      }
      
      // 更新节点配置 - 支持多选
@@ -2852,7 +2862,7 @@ const handleMcpServerSelectClick = (node: WorkflowNode) => {
          ...currentSelectingNode.value.config,
          selectedServers: updatedServers,
          selectedServerName: selectedServer.name,
-         mcpEnabled: selectedServer.isRunning
+         mcpEnabled: true // 即使启动失败也启用MCP，让用户知道已选择了服务器
        }
      })
    } finally {
@@ -2894,6 +2904,14 @@ const removeSelectedServer = async (serverName: string) => {
       console.log('正在停止MCP服务器:', serverName)
       await mcpStore.toggleServer(serverName)
       console.log('MCP服务器已停止:', serverName)
+      
+      // 更新可用服务器列表中的状态
+       const serverIndex = availableServers.value.findIndex(s => s.name === serverName)
+       if (serverIndex !== -1) {
+         const server = availableServers.value[serverIndex]
+         server.isRunning = false
+         server.provider = 'MCP (未运行)'
+       }
     }
     
     // 更新节点配置
