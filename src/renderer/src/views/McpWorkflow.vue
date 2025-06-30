@@ -182,33 +182,73 @@
   <div v-if="showServerSelectModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
       <div class="p-6">
-        <h3 class="text-lg font-semibold mb-4">选择MCP服务器</h3>
-        <div class="space-y-2 max-h-60 overflow-y-auto">
-          <div 
-            v-for="server in availableServers" 
-            :key="server.id"
-            class="p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            :class="{
-              'opacity-50 cursor-not-allowed': server.disabled,
-              'border-green-500 bg-green-50 dark:bg-green-900/20': !server.disabled && server.provider.includes('运行中')
-            }"
-            @click="!server.disabled && handleServerSelection(server.id)"
-          >
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="font-medium">{{ server.name }}</div>
-                <div class="text-sm text-gray-500">{{ server.provider }}</div>
-              </div>
-              <div v-if="server.provider.includes('运行中')" class="w-2 h-2 bg-green-500 rounded-full"></div>
-              <div v-else-if="!server.disabled" class="w-2 h-2 bg-gray-400 rounded-full"></div>
-            </div>
+        <h3 class="text-lg font-semibold mb-4">选择MCP服务器（支持多选）</h3>
+        
+        <!-- 已选择的服务器显示 -->
+        <div v-if="getSelectedServers().length > 0" class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+          <div class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">已选择的服务器:</div>
+          <div class="flex flex-wrap gap-2">
+            <span 
+              v-for="serverName in getSelectedServers()" 
+              :key="serverName"
+              class="px-2 py-1 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded text-xs flex items-center gap-1"
+            >
+              {{ serverName }}
+              <button 
+                @click="removeSelectedServer(serverName)"
+                class="hover:bg-blue-200 dark:hover:bg-blue-700 rounded-full w-4 h-4 flex items-center justify-center"
+                :disabled="serverSelectionLoading"
+              >
+                ×
+              </button>
+            </span>
           </div>
         </div>
-        <div class="flex justify-end mt-6">
-          <Button variant="outline" @click="showServerSelectModal = false">
-            取消
-          </Button>
+        
+        <div class="space-y-2 max-h-60 overflow-y-auto">
+          <div 
+             v-for="server in availableServers" 
+             :key="server.id"
+             class="p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+             :class="{
+               'opacity-50 cursor-not-allowed': server.disabled || serverSelectionLoading,
+               'border-green-500 bg-green-50 dark:bg-green-900/20': !server.disabled && server.provider.includes('运行中'),
+               'border-blue-500 bg-blue-50 dark:bg-blue-900/20': isServerSelected(server.name)
+             }"
+             @click="!server.disabled && !serverSelectionLoading && handleServerSelection(server.name)"
+           >
+             <div class="flex items-center justify-between">
+               <div class="flex items-center gap-3">
+                 <!-- 复选框 -->
+                 <div class="w-4 h-4 border-2 rounded flex items-center justify-center"
+                      :class="{
+                        'bg-blue-500 border-blue-500': isServerSelected(server.name),
+                        'border-gray-300': !isServerSelected(server.name)
+                      }">
+                   <svg v-if="isServerSelected(server.name)" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                   </svg>
+                 </div>
+                 <div>
+                   <div class="font-medium">{{ server.name }}</div>
+                   <div class="text-sm text-gray-500">{{ server.provider }}</div>
+                 </div>
+               </div>
+               <div v-if="serverSelectionLoading" class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+               <div v-else-if="server.provider.includes('运行中')" class="w-2 h-2 bg-green-500 rounded-full"></div>
+               <div v-else-if="!server.disabled" class="w-2 h-2 bg-gray-400 rounded-full"></div>
+             </div>
+           </div>
         </div>
+        <div class="flex justify-end mt-6">
+           <Button 
+             variant="outline" 
+             :disabled="serverSelectionLoading"
+             @click="showServerSelectModal = false"
+           >
+             {{ serverSelectionLoading ? '处理中...' : '取消' }}
+           </Button>
+         </div>
       </div>
     </div>
   </div>
@@ -324,6 +364,7 @@ const currentWorkflow = reactive<CurrentWorkflow>({
 const showServerSelectModal = ref(false)
 const currentSelectingNode = ref<WorkflowNode | null>(null)
 const availableServers = ref<{ id: string; name: string; provider: string; disabled?: boolean }[]>([])
+const serverSelectionLoading = ref(false)
 
 // Canvas 相关变量
 const ctx = ref<CanvasRenderingContext2D | null>(null)
@@ -2765,19 +2806,58 @@ const handleMcpServerSelectClick = (node: WorkflowNode) => {
  }
  
  // 处理服务器选择
- const handleServerSelection = (serverId: string) => {
+ const handleServerSelection = async (serverId: string) => {
    if (!currentSelectingNode.value || serverId === 'no-servers') return
    
+   // 根据serverId查找对应的服务器（serverId实际上是server.name）
    const selectedServer = mcpStore.serverList.find(s => s.name === serverId)
    if (!selectedServer) return
    
-   updateNode(currentSelectingNode.value.id, {
-     config: {
-       ...currentSelectingNode.value.config,
-       selectedServerName: selectedServer.name,
-       mcpEnabled: selectedServer.isRunning
+   try {
+     serverSelectionLoading.value = true
+     
+     // 如果服务器未运行，先启动它
+     if (!selectedServer.isRunning) {
+       console.log('正在启动MCP服务器:', selectedServer.name)
+       await mcpStore.toggleServer(selectedServer.name)
+       console.log('MCP服务器启动成功:', selectedServer.name)
      }
-   })
+     
+     // 更新节点配置 - 支持多选
+     const currentServers = (currentSelectingNode.value.config.selectedServers as string[]) || []
+     const updatedServers = currentServers.includes(selectedServer.name) 
+       ? currentServers // 如果已选择，保持不变
+       : [...currentServers, selectedServer.name] // 添加新选择的服务器
+     
+     updateNode(currentSelectingNode.value.id, {
+       config: {
+         ...currentSelectingNode.value.config,
+         selectedServers: updatedServers,
+         selectedServerName: selectedServer.name, // 保持兼容性
+         mcpEnabled: true // 选择服务器后自动启用MCP
+       }
+     })
+     
+     console.log('已选择并启用MCP服务器:', selectedServer.name)
+   } catch (error) {
+     console.error('启动MCP服务器失败:', error)
+     // 即使启动失败，也更新节点配置，但保持原有状态
+     const currentServers = (currentSelectingNode.value.config.selectedServers as string[]) || []
+     const updatedServers = currentServers.includes(selectedServer.name) 
+       ? currentServers
+       : [...currentServers, selectedServer.name]
+     
+     updateNode(currentSelectingNode.value.id, {
+       config: {
+         ...currentSelectingNode.value.config,
+         selectedServers: updatedServers,
+         selectedServerName: selectedServer.name,
+         mcpEnabled: selectedServer.isRunning
+       }
+     })
+   } finally {
+     serverSelectionLoading.value = false
+   }
    
    // 关闭弹窗
    showServerSelectModal.value = false
@@ -2786,6 +2866,52 @@ const handleMcpServerSelectClick = (node: WorkflowNode) => {
    
    console.log('已选择MCP服务器:', selectedServer.name)
  }
+
+// 获取当前选中的服务器列表
+const getSelectedServers = (): string[] => {
+  if (!currentSelectingNode.value) return []
+  return (currentSelectingNode.value.config.selectedServers as string[]) || []
+}
+
+// 检查服务器是否已选中
+const isServerSelected = (serverName: string): boolean => {
+  return getSelectedServers().includes(serverName)
+}
+
+// 移除选中的服务器
+const removeSelectedServer = async (serverName: string) => {
+  if (!currentSelectingNode.value || serverSelectionLoading.value) return
+  
+  try {
+    serverSelectionLoading.value = true
+    
+    const currentServers = getSelectedServers()
+    const updatedServers = currentServers.filter(name => name !== serverName)
+    
+    // 停止被移除的服务器
+    const serverToStop = mcpStore.serverList.find(s => s.name === serverName)
+    if (serverToStop && serverToStop.isRunning) {
+      console.log('正在停止MCP服务器:', serverName)
+      await mcpStore.toggleServer(serverName)
+      console.log('MCP服务器已停止:', serverName)
+    }
+    
+    // 更新节点配置
+    updateNode(currentSelectingNode.value.id, {
+      config: {
+        ...currentSelectingNode.value.config,
+        selectedServers: updatedServers,
+        mcpEnabled: updatedServers.length > 0
+      }
+    })
+    
+    console.log('已移除MCP服务器:', serverName)
+  } catch (error) {
+    console.error('停止MCP服务器失败:', error)
+  } finally {
+    serverSelectionLoading.value = false
+  }
+}
 
 const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, port: string, type: 'input' | 'output' } | null => {
   for (const node of workflowNodes.value) {
