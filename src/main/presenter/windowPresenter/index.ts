@@ -147,29 +147,50 @@ async function executeTextInputNode(node: WorkflowNode): Promise<NodeResult> {
 async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
   const config = node.config || {}
   const serverName = config.selectedServerName as string
+  const toolName = config.selectedTool as string
   const input = (inputData.input as string) || ''
   
   if (!serverName) {
     throw new Error(`MCP节点 "${node.name}" 未配置服务器`)
   }
   
+  if (!toolName) {
+    throw new Error(`MCP节点 "${node.name}" 未配置工具`)
+  }
+  
   try {
-    // 获取MCP presenter实例 - 简化处理，直接返回输入
-    // 实际实现中应该调用真正的MCP服务
-    console.log(`模拟MCP调用: 服务器=${serverName}, 输入=${input}`)
+    // 获取MCP presenter实例
+    const { presenter } = await import('@/presenter')
+    const mcpPresenter = presenter.mcpPresenter
     
-    // 模拟MCP处理结果
-    const processedOutput = `[MCP处理结果] ${input}`
+    if (!mcpPresenter) {
+      throw new Error('MCP服务未初始化')
+    }
+    
+    console.log(`调用MCP工具: 服务器=${serverName}, 工具=${toolName}, 输入=${input}`)
+    
+    // 构造MCP工具调用请求
+    const toolCall = {
+      toolName: toolName,
+      serverName: serverName,
+      arguments: {
+        input: input,
+        query: input,
+        text: input
+      }
+    }
+    
+    // 调用MCP工具
+    const result = await mcpPresenter.callTool(toolCall)
+    
+    console.log(`MCP工具调用结果:`, result)
     
     return {
-      output: processedOutput
+      output: result.content || input
     }
   } catch (error) {
     console.error(`MCP节点执行失败:`, error)
-    // 如果MCP调用失败，返回原始输入
-    return {
-      output: input
-    }
+    throw new Error(`MCP节点 "${node.name}" 执行失败: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 

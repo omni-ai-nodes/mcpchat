@@ -2227,12 +2227,20 @@ interface UploadedFile {
   createdAt: Date
 }
 
+interface WorkflowData {
+  name: string
+  nodes: WorkflowNode[]
+  connections: WorkflowConnection[]
+  metadata?: Record<string, unknown>
+  deploymentConfig?: Record<string, unknown>
+}
+
 interface WindowAPI {
   getUploadedFiles: () => Promise<UploadedFile[]>
   readUploadedFile: (filePath: string) => Promise<string>
   saveUploadedFile: (fileName: string, fileData: string) => Promise<{ success: boolean; filePath: string; fileName: string }>
-  saveWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; filePath: string }>
-  runWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; executionId: string; startTime: string; results: { processedNodes: number } }>
+  saveWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; filePath: string; fileName: string }>
+  runWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; executionId: string; startTime: string; results: { processedNodes: number }; error?: string }>
   deployWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; deploymentId: string; timestamp: string }>
 }
 
@@ -4447,9 +4455,11 @@ const saveWorkflow = async () => {
     const result = await window.api.saveWorkflow(workflowData)
     
     if (result.success) {
+      // 从文件路径中提取文件名
+      const fileName = result.fileName || result.filePath.split('/').pop() || '未知文件'
       toast({
         title: '成功',
-        description: `工作流保存成功: ${result.fileName}`,
+        description: `工作流保存成功: ${fileName}`,
         variant: 'default'
       })
       console.log('工作流保存成功:', result)
@@ -4531,11 +4541,11 @@ const runWorkflow = async () => {
       variant: 'default'
     })
 
-    // 准备工作流数据
+    // 准备工作流数据 - 将响应式对象转换为普通对象以避免序列化错误
     const workflowData = {
       name: `运行_${new Date().toLocaleString()}`,
-      nodes: workflowNodes.value,
-      connections: connections.value,
+      nodes: JSON.parse(JSON.stringify(workflowNodes.value)),
+      connections: JSON.parse(JSON.stringify(connections.value)),
       metadata: {
         nodeCount: workflowNodes.value.length,
         connectionCount: connections.value.length,
@@ -4568,17 +4578,32 @@ const runWorkflow = async () => {
       // 重新绘制画布以显示更新的内容
       redraw()
     } else {
+      // 显示具体的错误信息
+      const errorMessage = result.error || '运行工作流失败，原因未知'
       toast({
-        title: '错误',
-        description: '运行工作流失败',
+        title: '运行失败',
+        description: `错误详情: ${errorMessage}`,
         variant: 'destructive'
       })
+      console.error('工作流运行失败:', result)
     }
   } catch (error) {
     console.error('运行工作流时发生错误:', error)
+    
+    // 提供更详细的错误信息
+    let errorMessage = '运行工作流时发生未知错误'
+    
+    if (error instanceof Error) {
+      errorMessage = error.message
+    } else if (typeof error === 'string') {
+      errorMessage = error
+    } else if (error && typeof error === 'object' && 'message' in error) {
+      errorMessage = String(error.message)
+    }
+    
     toast({
-      title: '错误',
-      description: '运行工作流时发生错误',
+      title: '运行失败',
+      description: `错误详情: ${errorMessage}`,
       variant: 'destructive'
     })
   }
