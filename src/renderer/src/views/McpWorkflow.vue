@@ -233,6 +233,24 @@ interface WorkflowNode {
     width: number
     height: number
   }
+  mcpServiceArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  mcpModelSelect?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  mcpEnableButton?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 }
 
 interface Connection {
@@ -312,6 +330,13 @@ const inputNodes: NodeTemplate[] = [
 ]
 
 const processNodes: NodeTemplate[] = [
+  {
+    type: 'mcp-service',
+    name: 'MCP服务',
+    description: '连接MCP服务提供商',
+    icon: 'lucide:server',
+    category: 'input'
+  },
   {
     type: 'text-transform',
     name: '文本处理',
@@ -479,11 +504,13 @@ const drawNode = (node: WorkflowNode) => {
   const x = (node.x + offset.value.x) * scale.value
   const y = (node.y + offset.value.y) * scale.value
   const width = NODE_WIDTH * scale.value
-  // 为file-input和text-input节点动态计算高度
+  // 为file-input、text-input和mcp-service节点动态计算高度
   const height = node.type === 'file-input' 
     ? (NODE_HEIGHT + 226 ) * scale.value  // 基础高度 + 上传区域高度 + 间距
     : node.type === 'text-input'
     ? (NODE_HEIGHT + 100 ) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
+    : node.type === 'mcp-service'
+    ? (NODE_HEIGHT + 140 + 16) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
     : NODE_HEIGHT * scale.value
   
   // 绘制节点阴影
@@ -958,6 +985,155 @@ const drawNode = (node: WorkflowNode) => {
       node.editButton.y = buttonY
       node.editButton.width = buttonWidth
       node.editButton.height = buttonHeight
+    }
+  }
+
+  // 如果是MCP服务节点，绘制MCP服务区域
+  if (node.type === 'mcp-service') {
+    const serviceAreaWidth = width - 16 * scale.value
+    const serviceAreaHeight = 140 * scale.value
+    const serviceAreaX = x + 8 * scale.value
+    const serviceAreaY = y + headerHeight + 8 * scale.value
+    
+    // 绘制整体背景
+    context.fillStyle = '#1e293b'  // 深蓝灰色背景
+    context.beginPath()
+    context.roundRect(serviceAreaX, serviceAreaY, serviceAreaWidth, serviceAreaHeight, 8 * scale.value)
+    context.fill()
+    
+    // 绘制边框
+    context.strokeStyle = '#334155'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+    
+    // 绘制模型选择区域
+    const modelSelectHeight = 60 * scale.value
+    const modelSelectY = serviceAreaY + 8 * scale.value
+    const modelSelectX = serviceAreaX + 8 * scale.value
+    const modelSelectWidth = serviceAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#0f172a'  // 更深的背景
+    context.beginPath()
+    context.roundRect(modelSelectX, modelSelectY, modelSelectWidth, modelSelectHeight, 4 * scale.value)
+    context.fill()
+    
+    // 绘制模型选择边框
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制模型选择标题
+    context.fillStyle = '#e2e8f0'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('选择模型:', modelSelectX + 8 * scale.value, modelSelectY + 8 * scale.value)
+    
+    // 绘制当前选择的模型或占位符
+    const selectedModel = (node.config?.selectedModel as string) || '请选择模型...'
+    context.fillStyle = selectedModel === '请选择模型...' ? '#64748b' : '#cbd5e1'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(selectedModel, modelSelectX + 8 * scale.value, modelSelectY + 28 * scale.value)
+    
+    // 绘制下拉箭头
+    context.fillStyle = '#64748b'
+    context.font = `${12 * scale.value}px Arial`
+    context.textAlign = 'right'
+    context.fillText('▼', modelSelectX + modelSelectWidth - 8 * scale.value, modelSelectY + 32 * scale.value)
+    
+    // 存储模型选择区域位置信息
+    if (!node.mcpModelSelect) {
+      node.mcpModelSelect = {
+        x: modelSelectX,
+        y: modelSelectY,
+        width: modelSelectWidth,
+        height: modelSelectHeight
+      }
+    } else {
+      node.mcpModelSelect.x = modelSelectX
+      node.mcpModelSelect.y = modelSelectY
+      node.mcpModelSelect.width = modelSelectWidth
+      node.mcpModelSelect.height = modelSelectHeight
+    }
+    
+    // 绘制MCP启用区域
+    const enableAreaY = modelSelectY + modelSelectHeight + 8 * scale.value
+    const enableAreaHeight = serviceAreaHeight - modelSelectHeight - 24 * scale.value
+    
+    context.fillStyle = '#0f172a'
+    context.beginPath()
+    context.roundRect(serviceAreaX + 8 * scale.value, enableAreaY, serviceAreaWidth - 16 * scale.value, enableAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制启用MCP文本
+    context.fillStyle = '#e2e8f0'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('启用MCP', serviceAreaX + 16 * scale.value, enableAreaY + 8 * scale.value)
+    
+    // 绘制描述文本
+    context.fillStyle = '#64748b'
+    context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText('启用MCP功能以使用工具调用', serviceAreaX + 16 * scale.value, enableAreaY + 26 * scale.value)
+    
+    // 绘制启用按钮
+    const enableButtonWidth = 80 * scale.value
+    const enableButtonHeight = 24 * scale.value
+    const enableButtonX = serviceAreaX + serviceAreaWidth - enableButtonWidth - 16 * scale.value
+    const enableButtonY = enableAreaY + 8 * scale.value
+    
+    const isEnabled = node.config?.mcpEnabled as boolean
+    context.fillStyle = isEnabled ? '#10b981' : '#374151'
+    context.beginPath()
+    context.roundRect(enableButtonX, enableButtonY, enableButtonWidth, enableButtonHeight, 4 * scale.value)
+    context.fill()
+    
+    // 按钮边框
+    context.strokeStyle = isEnabled ? '#059669' : '#4b5563'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 按钮文字
+    context.fillStyle = '#ffffff'
+    context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'center'
+    context.textBaseline = 'middle'
+    context.fillText(isEnabled ? '已启用' : '启用', enableButtonX + enableButtonWidth / 2, enableButtonY + enableButtonHeight / 2)
+    
+    // 存储启用按钮位置信息
+    if (!node.mcpEnableButton) {
+      node.mcpEnableButton = {
+        x: enableButtonX,
+        y: enableButtonY,
+        width: enableButtonWidth,
+        height: enableButtonHeight
+      }
+    } else {
+      node.mcpEnableButton.x = enableButtonX
+      node.mcpEnableButton.y = enableButtonY
+      node.mcpEnableButton.width = enableButtonWidth
+      node.mcpEnableButton.height = enableButtonHeight
+    }
+    
+    // 存储整个服务区域位置信息
+    if (!node.mcpServiceArea) {
+      node.mcpServiceArea = {
+        x: serviceAreaX,
+        y: serviceAreaY,
+        width: serviceAreaWidth,
+        height: serviceAreaHeight
+      }
+    } else {
+      node.mcpServiceArea.x = serviceAreaX
+      node.mcpServiceArea.y = serviceAreaY
+      node.mcpServiceArea.width = serviceAreaWidth
+      node.mcpServiceArea.height = serviceAreaHeight
     }
   }
 }
@@ -1534,6 +1710,34 @@ const getEditButtonAtPosition = (x: number, y: number): WorkflowNode | null => {
   for (const node of workflowNodes.value) {
     if (node.type === 'text-input' && node.editButton) {
       const button = node.editButton
+      if (x >= button.x && x <= button.x + button.width && 
+          y >= button.y && y <= button.y + button.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取MCP模型选择区域点击位置
+const getMcpModelSelectAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'mcp-service' && node.mcpModelSelect) {
+      const area = node.mcpModelSelect
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取MCP启用按钮点击位置
+const getMcpEnableButtonAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'mcp-service' && node.mcpEnableButton) {
+      const button = node.mcpEnableButton
       if (x >= button.x && x <= button.x + button.width && 
           y >= button.y && y <= button.y + button.height) {
         return node
@@ -2134,6 +2338,129 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
   }, 100)
 }
 
+// 处理MCP模型选择点击
+const handleMcpModelSelectClick = (node: WorkflowNode) => {
+  console.log('点击MCP模型选择，节点:', node.name)
+  
+  // 创建模型选择对话框
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  `
+  
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 24px;
+    width: 400px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow: auto;
+    border: 1px solid #404040;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '选择MCP模型'
+  title.style.cssText = `
+    margin: 0 0 16px 0;
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 600;
+  `
+  
+  // 模型列表
+  const models = ['gpt-4', 'gpt-3.5-turbo', 'claude-3', 'llama-2']
+  const modelList = document.createElement('div')
+  modelList.style.cssText = `
+    margin-bottom: 16px;
+  `
+  
+  models.forEach(model => {
+    const modelOption = document.createElement('div')
+    modelOption.textContent = model
+    modelOption.style.cssText = `
+      padding: 12px;
+      margin-bottom: 8px;
+      background: #374151;
+      border: 1px solid #4b5563;
+      border-radius: 4px;
+      color: #ffffff;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    `
+    
+    modelOption.onmouseover = () => {
+      modelOption.style.background = '#4b5563'
+    }
+    
+    modelOption.onmouseout = () => {
+      modelOption.style.background = '#374151'
+    }
+    
+    modelOption.onclick = () => {
+      updateNode(node.id, {
+        config: {
+          ...node.config,
+          selectedModel: model
+        }
+      })
+      console.log('选择模型:', model)
+      document.body.removeChild(dialog)
+    }
+    
+    modelList.appendChild(modelOption)
+  })
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 8px 16px;
+    background: #6b7280;
+    border: 1px solid #9ca3af;
+    border-radius: 4px;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 14px;
+  `
+  
+  cancelButton.onclick = () => {
+    document.body.removeChild(dialog)
+  }
+  
+  dialogContent.appendChild(title)
+  dialogContent.appendChild(modelList)
+  dialogContent.appendChild(cancelButton)
+  dialog.appendChild(dialogContent)
+  document.body.appendChild(dialog)
+}
+
+// 处理MCP启用按钮点击
+const handleMcpEnableButtonClick = (node: WorkflowNode) => {
+  console.log('点击MCP启用按钮，节点:', node.name)
+  
+  const currentState = node.config?.mcpEnabled as boolean
+  const newState = !currentState
+  
+  updateNode(node.id, {
+    config: {
+      ...node.config,
+      mcpEnabled: newState
+    }
+  })
+  
+  console.log('MCP启用状态已更新:', newState)
+}
+
 const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, port: string, type: 'input' | 'output' } | null => {
   for (const node of workflowNodes.value) {
     // 检查输入端口
@@ -2177,6 +2504,8 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedFileNameArea = getFileNameAreaAtPosition(pos.x, pos.y)
   const clickedTextArea = getTextAreaAtPosition(pos.x, pos.y)
   const clickedEditButton = getEditButtonAtPosition(pos.x, pos.y)
+  const clickedMcpModelSelect = getMcpModelSelectAtPosition(pos.x, pos.y)
+  const clickedMcpEnableButton = getMcpEnableButtonAtPosition(pos.x, pos.y)
   
   if (clickedUploadButton) {
     // 处理上传按钮点击
@@ -2187,6 +2516,12 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedEditButton) {
     // 处理编辑按钮点击
     handleTextEditButtonClick(clickedEditButton)
+  } else if (clickedMcpModelSelect) {
+    // 处理MCP模型选择点击
+    handleMcpModelSelectClick(clickedMcpModelSelect)
+  } else if (clickedMcpEnableButton) {
+    // 处理MCP启用按钮点击
+    handleMcpEnableButtonClick(clickedMcpEnableButton)
   } else if (clickedTextArea) {
     // 处理文本区域点击
     handleTextAreaClick(clickedTextArea)
