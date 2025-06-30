@@ -2231,6 +2231,9 @@ interface WindowAPI {
   getUploadedFiles: () => Promise<UploadedFile[]>
   readUploadedFile: (filePath: string) => Promise<string>
   saveUploadedFile: (fileName: string, fileData: string) => Promise<{ success: boolean; filePath: string; fileName: string }>
+  saveWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; filePath: string }>
+  runWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; executionId: string; startTime: string; results: { processedNodes: number } }>
+  deployWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; deploymentId: string; timestamp: string }>
 }
 
 declare global {
@@ -4447,7 +4450,7 @@ const saveWorkflow = async () => {
       toast({
         title: '成功',
         description: `工作流保存成功: ${result.fileName}`,
-        variant: 'success'
+        variant: 'default'
       })
       console.log('工作流保存成功:', result)
     } else {
@@ -4510,7 +4513,7 @@ const runWorkflow = async () => {
     // 检查输入节点是否有内容
     const inputNodes = workflowNodes.value.filter(node => node.type === 'text-input')
     const emptyInputNodes = inputNodes.filter(node => 
-      !node.config?.text || (typeof node.config.text === 'string' && node.config.text.trim() === '')
+      !node.config?.textContent || (typeof node.config.textContent === 'string' && node.config.textContent.trim() === '')
     )
     
     if (emptyInputNodes.length > 0) {
@@ -4550,7 +4553,7 @@ const runWorkflow = async () => {
       toast({
         title: '成功',
         description: `工作流运行完成! 处理了 ${result.results.processedNodes} 个节点`,
-        variant: 'success'
+        variant: 'default'
       })
       console.log('工作流运行结果:', result)
       
@@ -4687,7 +4690,7 @@ const deployWorkflow = async () => {
       toast({
         title: '成功',
         description: `工作流部署成功! 部署ID: ${result.deploymentId}`,
-        variant: 'success'
+        variant: 'default'
       })
       console.log('工作流部署结果:', result)
     } else {

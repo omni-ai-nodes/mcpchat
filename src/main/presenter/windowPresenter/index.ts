@@ -54,7 +54,7 @@ async function executeWorkflow(workflowData: WorkflowData) {
           result = await executeTextOutputNode(node, inputData)
           break
         default:
-          result = { output: inputData.input || '' }
+          result = { output: (inputData.input as string) || '' }
       }
       
       nodeResults.set(nodeId, result)
@@ -139,7 +139,7 @@ function getNodeInputData(node: WorkflowNode, connections: WorkflowConnection[],
 async function executeTextInputNode(node: WorkflowNode): Promise<NodeResult> {
   const config = node.config || {}
   return {
-    output: (config.text as string) || (config.content as string) || ''
+    output: (config.textContent as string) || (config.text as string) || (config.content as string) || ''
   }
 }
 

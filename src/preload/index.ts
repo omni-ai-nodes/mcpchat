@@ -1,5 +1,6 @@
 import { clipboard, contextBridge, nativeImage, webUtils, webFrame, ipcRenderer } from 'electron'
 import { exposeElectronAPI } from '@electron-toolkit/preload'
+import type { WorkflowData } from './index.d'
 
 // 缓存变量
 let cachedWindowId: number | undefined = undefined
