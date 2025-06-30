@@ -358,12 +358,36 @@
                 >
                   清除
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  @click="resetMcpNodeToInitialState(nodeStatus.nodeId)"
+                  title="重置节点到初始状态，确保数据独立性"
+                >
+                  重置
+                </Button>
               </div>
             </div>
           </div>
         </div>
         
-        <div class="flex justify-end mt-6">
+        <div class="flex justify-between mt-6">
+          <div class="flex gap-2">
+            <Button 
+              variant="outline" 
+              @click="ensureMcpNodesIndependence()"
+              title="确保所有MCP节点数据相互独立"
+            >
+              确保节点独立性
+            </Button>
+            <Button 
+              variant="outline" 
+              @click="clearAllNodesMcpSelection()"
+              title="清除所有节点的MCP服务器选择"
+            >
+              清除所有选择
+            </Button>
+          </div>
           <Button @click="showMcpStatusModal = false">
             关闭
           </Button>
@@ -1475,13 +1499,30 @@ const drawTempConnection = () => {
 
 // 方法
 const addNode = (template: NodeTemplate) => {
+  // 为每个节点类型创建独立的初始配置
+  let initialConfig: Record<string, unknown> = {}
+  
+  if (template.type === 'file-input') {
+    initialConfig = { fileName: '' }
+  } else if (template.type === 'mcp-service') {
+    // MCP节点的初始状态：完全独立，无任何选择
+    initialConfig = {
+      selectedServers: [],
+      mcpEnabled: false,
+      selectedModel: null,
+      lastUpdated: null,
+      // 确保每个MCP节点都有独立的状态标识
+      instanceId: `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    }
+  }
+  
   const newNode: WorkflowNode = {
-    id: `node_${Date.now()}`,
+    id: `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     type: template.type,
     name: template.name,
     x: Math.random() * 400 + 200,
     y: Math.random() * 300 + 150,
-    config: template.type === 'file-input' ? { fileName: '' } : {},
+    config: initialConfig,
     inputs: template.category === 'input' ? [] : ['input'],
     outputs: template.category === 'output' ? [] : ['output']
   }
@@ -1493,6 +1534,15 @@ const addNode = (template: NodeTemplate) => {
   // 同步到当前工作流
   currentWorkflow.nodes = [...workflowNodes.value]
   console.log('节点已添加:', newNode)
+  
+  // 如果是MCP节点，确保状态完全独立
+  if (template.type === 'mcp-service') {
+    console.log(`MCP节点 ${newNode.id} 已创建，初始状态:`, {
+      selectedServers: [],
+      mcpEnabled: false,
+      instanceId: newNode.config.instanceId
+    })
+  }
 }
 
 // 添加节流机制优化连接线更新
@@ -3073,6 +3123,52 @@ const clearAllNodesMcpSelection = () => {
   console.log('已清除所有节点的MCP服务器选择')
 }
 
+// 重置单个MCP节点到初始状态
+const resetMcpNodeToInitialState = (nodeId: string) => {
+  const nodeIndex = workflowNodes.value.findIndex(n => n.id === nodeId)
+  if (nodeIndex !== -1) {
+    const node = workflowNodes.value[nodeIndex]
+    if (node.type === 'mcp-service') {
+      // 重置MCP节点到完全独立的初始状态
+      workflowNodes.value[nodeIndex].config = {
+        ...node.config,
+        selectedServers: [],
+        mcpEnabled: false,
+        selectedModel: null,
+        lastUpdated: null,
+        // 生成新的实例ID确保完全独立
+        instanceId: `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      }
+      
+      // 同步到工作流数据
+      syncNodeMcpState(nodeId)
+      
+      console.log(`MCP节点 ${nodeId} 已重置到初始状态，新实例ID: ${node.config.instanceId}`)
+    }
+  }
+}
+
+// 确保所有MCP节点数据相互独立
+const ensureMcpNodesIndependence = () => {
+  const mcpNodes = workflowNodes.value.filter(node => node.type === 'mcp-service')
+  const instanceIds = new Set()
+  
+  mcpNodes.forEach(node => {
+    const instanceId = node.config.instanceId
+    
+    // 如果没有实例ID或实例ID重复，重新生成
+    if (!instanceId || instanceIds.has(instanceId)) {
+      const newInstanceId = `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      node.config.instanceId = newInstanceId
+      console.log(`为MCP节点 ${node.id} 生成新的实例ID: ${newInstanceId}`)
+    }
+    
+    instanceIds.add(node.config.instanceId)
+  })
+  
+  console.log(`确保了 ${mcpNodes.length} 个MCP节点的数据独立性`)
+}
+
 
 
 // 移除选中的服务器
@@ -3320,13 +3416,31 @@ const onDrop = (event: DragEvent) => {
     if (template) {
       // 使用Canvas坐标转换函数
       const pos = getCanvasPosition(event)
+      
+      // 为每个节点类型创建独立的初始配置（与addNode函数保持一致）
+      let initialConfig: Record<string, unknown> = {}
+      
+      if (template.type === 'file-input') {
+        initialConfig = { fileName: '' }
+      } else if (template.type === 'mcp-service') {
+        // MCP节点的初始状态：完全独立，无任何选择
+        initialConfig = {
+          selectedServers: [],
+          mcpEnabled: false,
+          selectedModel: null,
+          lastUpdated: null,
+          // 确保每个MCP节点都有独立的状态标识
+          instanceId: `mcp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        }
+      }
+      
       const newNode: WorkflowNode = {
-        id: `node_${Date.now()}`,
+        id: `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         type: template.type,
         name: template.name,
         x: pos.x - NODE_WIDTH / 2, // 居中放置
         y: pos.y - NODE_HEIGHT / 2,
-        config: {},
+        config: initialConfig,
         inputs: template.category === 'input' ? [] : ['input'],
         outputs: template.category === 'output' ? [] : ['output']
       }
@@ -3337,6 +3451,15 @@ const onDrop = (event: DragEvent) => {
       // 同步到当前工作流
       currentWorkflow.nodes = [...workflowNodes.value]
       console.log('拖拽添加节点:', newNode)
+      
+      // 如果是MCP节点，确保状态完全独立
+      if (template.type === 'mcp-service') {
+        console.log(`拖拽创建MCP节点 ${newNode.id}，初始状态:`, {
+          selectedServers: [],
+          mcpEnabled: false,
+          instanceId: newNode.config.instanceId
+        })
+      }
     }
   }
 }
@@ -3347,6 +3470,9 @@ const onDragOver = (event: DragEvent) => {
 
 // 加载工作流时恢复MCP状态
 const restoreWorkflowMcpState = (loadedNodes: WorkflowNode[]) => {
+  // 首先确保所有MCP节点数据相互独立
+  ensureMcpNodesIndependence()
+  
   loadedNodes.forEach(node => {
     if (node.config.selectedServers) {
       const servers = node.config.selectedServers as string[]
@@ -3494,7 +3620,7 @@ onMounted(() => {
   // 存储定时器ID以便清理
   // 为window添加类型声明
   interface CustomWindow extends Window {
-    mcpStatusUpdateInterval?: number
+    mcpStatusUpdateInterval?: ReturnType<typeof setInterval>
   }
   ;(window as CustomWindow).mcpStatusUpdateInterval = statusUpdateInterval
   
@@ -3502,6 +3628,10 @@ onMounted(() => {
   nextTick(() => {
     if (workflowNodes.value.length > 0) {
       console.log('初始化现有节点的MCP状态...')
+      
+      // 确保所有MCP节点数据相互独立
+      ensureMcpNodesIndependence()
+      
       restoreWorkflowMcpState(workflowNodes.value)
       
       // 输出当前所有节点的MCP状态
