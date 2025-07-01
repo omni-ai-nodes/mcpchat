@@ -164,13 +164,18 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
     
     console.log(`MCP节点处理输入文本: ${input}`)
     
-    // 获取当前LLM配置
-    const currentProvider = llmproviderPresenter.getCurrentProvider()
+    // 获取当前LLM配置，如果没有当前提供者则自动选择第一个可用的
+    let currentProvider = llmproviderPresenter.getCurrentProvider()
     if (!currentProvider) {
-      throw new Error('未配置LLM提供者')
+      const availableProviders = llmproviderPresenter.getProviders().filter(p => p.enable)
+      if (availableProviders.length === 0) {
+        throw new Error('没有可用的LLM提供者，请先配置并启用至少一个LLM提供者')
+      }
+      currentProvider = availableProviders[0]
+      console.log(`自动选择LLM提供者: ${currentProvider.name}`)
     }
     
-    const models = await llmproviderPresenter.getModels(currentProvider.id)
+    const models = await llmproviderPresenter.getModelList(currentProvider.id)
     if (!models || models.length === 0) {
       throw new Error('未找到可用的模型')
     }
@@ -225,8 +230,11 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
         
         // 处理工具调用结果
         if (data.tool_call === 'end' && data.tool_call_response) {
-          toolCallResults.push(data.tool_call_response)
-          console.log(`工具调用完成: ${data.tool_call_name}, 结果: ${data.tool_call_response}`)
+          const response = typeof data.tool_call_response === 'string' 
+            ? data.tool_call_response 
+            : JSON.stringify(data.tool_call_response)
+          toolCallResults.push(response)
+          console.log(`工具调用完成: ${data.tool_call_name}, 结果: ${response}`)
         }
       } else if (event.type === 'error') {
         throw new Error(`LLM生成错误: ${event.data.error}`)
