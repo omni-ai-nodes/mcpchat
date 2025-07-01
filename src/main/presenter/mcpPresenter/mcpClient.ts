@@ -563,27 +563,61 @@ export class McpClient {
 
     try {
       // 调用工具
-      const result = (await this.client.callTool({
+      const result = await this.client.callTool({
         name: toolName,
         arguments: args
-      })) as ToolCallResult
+      })
 
-      // 检查结果
-      if (result.isError) {
-        const errorText = result.content && result.content[0] ? result.content[0].text : '未知错误'
-        // 如果调用失败，清空工具缓存，以便下次重新获取
-        this.cachedTools = null
-        return {
-          isError: true,
-          content: [{ type: 'error', text: errorText }]
+      // 将SDK返回的结果转换为ToolCallResult格式
+      if (result && typeof result === 'object') {
+        // 检查是否有错误
+        if ('isError' in result && result.isError) {
+          return {
+            isError: true,
+            content: [{ type: 'error', text: String(result.content || '未知错误') }]
+          }
+        }
+
+        // 处理正常结果
+        if ('content' in result) {
+          const content = result.content
+          
+          // 如果content是数组格式，直接使用
+          if (Array.isArray(content)) {
+            return {
+              isError: false,
+              content: content.map(item => ({
+                type: item.type || 'text',
+                text: item.text || String(item)
+              }))
+            }
+          }
+          
+          // 如果content是字符串，包装成数组格式
+          if (typeof content === 'string') {
+            return {
+              isError: false,
+              content: [{ type: 'text', text: content }]
+            }
+          }
         }
       }
-      return result
+
+      // 如果结果格式不符合预期，将整个结果作为文本返回
+      return {
+        isError: false,
+        content: [{ type: 'text', text: JSON.stringify(result) }]
+      }
     } catch (error) {
       console.error(`Failed to call MCP tool ${toolName}:`, error)
       // 调用失败，清空工具缓存
       this.cachedTools = null
-      throw error
+      
+      // 返回错误结果而不是抛出异常
+      return {
+        isError: true,
+        content: [{ type: 'error', text: error instanceof Error ? error.message : String(error) }]
+      }
     }
   }
 
