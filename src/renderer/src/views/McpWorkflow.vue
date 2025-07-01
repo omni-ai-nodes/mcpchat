@@ -2248,7 +2248,7 @@ interface WindowAPI {
   readUploadedFile: (filePath: string) => Promise<string>
   saveUploadedFile: (fileName: string, fileData: string) => Promise<{ success: boolean; filePath: string; fileName: string }>
   saveWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; filePath: string; fileName: string }>
-  runWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; executionId: string; startTime: string; results: { processedNodes: number }; error?: string }>
+  runWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; executionId: string; startTime: string; results: { processedNodes: number; processedConnections: number; nodeResults: Record<string, { output: string }> }; error?: string }>
   deployWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; deploymentId: string; timestamp: string }>
 }
 
@@ -4591,7 +4591,26 @@ const runWorkflow = async () => {
       const outputNodes = workflowNodes.value.filter(node => node.type === 'text-output')
       outputNodes.forEach(node => {
         if (node.config) {
-          node.config.text = `工作流运行完成\n执行ID: ${result.executionId}\n开始时间: ${result.startTime}\n处理节点数: ${result.results.processedNodes}`
+          // 检查是否有实际的节点执行结果
+          if (result.results.nodeResults) {
+            // 查找连接到此输出节点的源节点
+            const inputConnection = connections.value.find(conn => conn.to === node.id)
+            if (inputConnection) {
+              const sourceNodeId = inputConnection.from
+              const nodeResult = result.results.nodeResults[sourceNodeId]
+              if (nodeResult && nodeResult.output) {
+                // 显示实际的节点执行结果
+                node.config.outputText = nodeResult.output
+              } else {
+                node.config.outputText = '未找到上游节点的执行结果'
+              }
+            } else {
+              node.config.outputText = '此输出节点没有连接到任何输入源'
+            }
+          } else {
+            // 如果没有详细的节点结果，显示基本的执行信息
+            node.config.outputText = `工作流运行完成\n执行ID: ${result.executionId}\n开始时间: ${result.startTime}\n处理节点数: ${result.results.processedNodes}`
+          }
         }
       })
       
