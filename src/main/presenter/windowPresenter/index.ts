@@ -145,48 +145,107 @@ async function executeTextInputNode(node: WorkflowNode): Promise<NodeResult> {
 
 // 执行MCP节点
 async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
-  const config = node.config || {}
-  const serverName = config.selectedServerName as string
-  const toolName = config.selectedTool as string
   const input = (inputData.input as string) || ''
   
-  if (!serverName) {
-    throw new Error(`MCP节点 "${node.name}" 未配置服务器`)
-  }
-  
-  if (!toolName) {
-    throw new Error(`MCP节点 "${node.name}" 未配置工具`)
+  if (!input.trim()) {
+    throw new Error(`MCP节点 "${node.name}" 没有接收到输入文本`)
   }
   
   try {
-    // 获取MCP presenter实例
+    // 获取presenter实例
     const { presenter } = await import('@/presenter')
     const mcpPresenter = presenter.mcpPresenter
+    const llmproviderPresenter = presenter.llmproviderPresenter
+    const configPresenter = presenter.configPresenter
     
-    if (!mcpPresenter) {
-      throw new Error('MCP服务未初始化')
+    if (!mcpPresenter || !llmproviderPresenter || !configPresenter) {
+      throw new Error('必要的服务未初始化')
     }
     
-    console.log(`调用MCP工具: 服务器=${serverName}, 工具=${toolName}, 输入=${input}`)
+    console.log(`MCP节点处理输入文本: ${input}`)
     
-    // 构造MCP工具调用请求
-    const toolCall = {
-      toolName: toolName,
-      serverName: serverName,
-      arguments: {
-        input: input,
-        query: input,
-        text: input
+    // 获取当前LLM配置
+    const currentProvider = llmproviderPresenter.getCurrentProvider()
+    if (!currentProvider) {
+      throw new Error('未配置LLM提供者')
+    }
+    
+    const models = await llmproviderPresenter.getModels(currentProvider.id)
+    if (!models || models.length === 0) {
+      throw new Error('未找到可用的模型')
+    }
+    
+    const modelId = models[0].id // 使用第一个可用模型
+    
+    // 获取所有可用的MCP工具
+    const mcpTools = await mcpPresenter.getAllToolDefinitions()
+    if (!mcpTools || mcpTools.length === 0) {
+      throw new Error('未找到可用的MCP工具')
+    }
+    
+    console.log(`找到 ${mcpTools.length} 个MCP工具`)
+    
+    // 构建消息
+    const messages = [
+      {
+        role: 'system' as const,
+        content: '你是一个智能助手，可以使用各种工具来帮助用户。请根据用户的输入选择合适的工具并调用它们。'
+      },
+      {
+        role: 'user' as const,
+        content: input
+      }
+    ]
+    
+    // 生成唯一的事件ID
+    const eventId = `workflow_${node.id}_${Date.now()}`
+    
+    // 启动流式生成
+    const stream = llmproviderPresenter.startStreamCompletion(
+      currentProvider.id,
+      messages,
+      modelId,
+      eventId,
+      0.7, // temperature
+      4096 // maxTokens
+    )
+    
+    let finalContent = ''
+    const toolCallResults: string[] = []
+    
+    // 处理流式响应
+    for await (const event of stream) {
+      if (event.type === 'response') {
+        const data = event.data
+        
+        // 收集文本内容
+        if (data.content) {
+          finalContent += data.content
+        }
+        
+        // 处理工具调用结果
+        if (data.tool_call === 'end' && data.tool_call_response) {
+          toolCallResults.push(data.tool_call_response)
+          console.log(`工具调用完成: ${data.tool_call_name}, 结果: ${data.tool_call_response}`)
+        }
+      } else if (event.type === 'error') {
+        throw new Error(`LLM生成错误: ${event.data.error}`)
+      } else if (event.type === 'end') {
+        console.log('LLM生成完成')
+        break
       }
     }
     
-    // 调用MCP工具
-    const result = await mcpPresenter.callTool(toolCall)
+    // 组合最终输出
+    let output = finalContent
+    if (toolCallResults.length > 0) {
+      output += '\n\n工具调用结果:\n' + toolCallResults.join('\n')
+    }
     
-    console.log(`MCP工具调用结果:`, result)
+    console.log(`MCP节点执行完成，输出: ${output}`)
     
     return {
-      output: result.content || input
+      output: output || input
     }
   } catch (error) {
     console.error(`MCP节点执行失败:`, error)

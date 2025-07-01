@@ -2229,10 +2229,10 @@ interface UploadedFile {
 
 interface WorkflowConnection {
   id: string
-  from: string
-  to: string
-  fromPort: string
-  toPort: string
+  sourceNodeId: string
+  targetNodeId: string
+  sourceOutput: string
+  targetInput: string
 }
 
 interface WorkflowData {
@@ -4447,7 +4447,13 @@ const saveWorkflow = async () => {
     const workflowData = {
       name: currentWorkflow.name || `工作流_${new Date().toLocaleString()}`,
       nodes: currentWorkflow.nodes,
-      connections: currentWorkflow.connections,
+      connections: connections.value.map(conn => ({
+        id: conn.id,
+        sourceNodeId: conn.from,
+        targetNodeId: conn.to,
+        sourceOutput: conn.fromPort,
+        targetInput: conn.toPort
+      })),
       metadata: {
         nodeCount: currentWorkflow.nodes.length,
         connectionCount: currentWorkflow.connections.length,
@@ -4553,7 +4559,13 @@ const runWorkflow = async () => {
     const workflowData = {
       name: `运行_${new Date().toLocaleString()}`,
       nodes: JSON.parse(JSON.stringify(workflowNodes.value)),
-      connections: JSON.parse(JSON.stringify(connections.value)),
+      connections: connections.value.map(conn => ({
+      id: conn.id,
+      sourceNodeId: conn.from,
+      targetNodeId: conn.to,
+      sourceOutput: conn.fromPort,
+      targetInput: conn.toPort
+    })),
       metadata: {
         nodeCount: workflowNodes.value.length,
         connectionCount: connections.value.length,
@@ -4698,7 +4710,13 @@ const deployWorkflow = async () => {
     const workflowData = {
       name: currentWorkflow.name || `部署_${new Date().toLocaleString()}`,
       nodes: workflowNodes.value,
-      connections: connections.value,
+      connections: connections.value.map(conn => ({
+      id: conn.id,
+      sourceNodeId: conn.from,
+      targetNodeId: conn.to,
+      sourceOutput: conn.fromPort,
+      targetInput: conn.toPort
+    })),
       metadata: {
         nodeCount: workflowNodes.value.length,
         connectionCount: connections.value.length,
