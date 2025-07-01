@@ -127,8 +127,9 @@ function getNodeInputData(node: WorkflowNode, connections: WorkflowConnection[],
   
   inputConnections.forEach(conn => {
     const sourceResult = nodeResults.get(conn.sourceNodeId)
-    if (sourceResult && sourceResult[conn.sourceOutput]) {
-      inputData[conn.targetInput] = sourceResult[conn.sourceOutput]
+    if (sourceResult && sourceResult.output !== undefined) {
+      // NodeResult只有output属性，所以直接使用output的值
+      inputData[conn.targetInput] = sourceResult.output
     }
   })
   
