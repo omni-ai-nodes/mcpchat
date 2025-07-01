@@ -182,10 +182,49 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
     
     const modelId = models[0].id // 使用第一个可用模型
     
+    // 检查MCP是否启用
+    const mcpEnabled = await mcpPresenter.getMcpEnabled()
+    if (!mcpEnabled) {
+      console.log('MCP未启用，正在自动启用...')
+      await mcpPresenter.setMcpEnabled(true)
+    }
+    
     // 获取所有可用的MCP工具
-    const mcpTools = await mcpPresenter.getAllToolDefinitions()
+    let mcpTools = await mcpPresenter.getAllToolDefinitions()
     if (!mcpTools || mcpTools.length === 0) {
-      throw new Error('未找到可用的MCP工具')
+      // 检查是否有配置的MCP服务器
+      const mcpServers = await mcpPresenter.getMcpServers()
+      const enabledServers = Object.entries(mcpServers).filter(([, server]) => !server.disable)
+      
+      if (enabledServers.length === 0) {
+        throw new Error('未找到可用的MCP工具：没有启用的MCP服务器，请先在设置中配置并启用MCP服务器')
+      }
+      
+      // 尝试启动默认服务器
+      console.log('未找到MCP工具，尝试启动默认服务器...')
+      const defaultServers = await mcpPresenter.getMcpDefaultServers()
+      const serversToStart = defaultServers.length > 0 ? defaultServers : [enabledServers[0][0]]
+      
+      for (const serverName of serversToStart) {
+        if (enabledServers.find(([name]) => name === serverName)) {
+          try {
+            console.log(`正在启动MCP服务器: ${serverName}`)
+            await mcpPresenter.startServer(serverName)
+            console.log(`MCP服务器启动成功: ${serverName}`)
+          } catch (error) {
+            console.warn(`启动MCP服务器失败: ${serverName}`, error)
+          }
+        }
+      }
+      
+      // 等待一段时间让服务器完全启动
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // 重新获取工具
+      mcpTools = await mcpPresenter.getAllToolDefinitions()
+      if (!mcpTools || mcpTools.length === 0) {
+        throw new Error('未找到可用的MCP工具：已尝试启动服务器但仍无法获取工具，请检查服务器配置和状态')
+      }
     }
     
     console.log(`找到 ${mcpTools.length} 个MCP工具`)
