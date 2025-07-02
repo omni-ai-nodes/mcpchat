@@ -279,7 +279,7 @@ export const useMcpStore = defineStore('mcp', () => {
   }
 
   // 启动 gallery 类型的服务器
-  const startGalleryServer = async (serverName: string, serverConfig: any) => {
+  const startGalleryServer = async (serverName: string, _serverConfig: MCPServerConfig) => {
     // Gallery 类型服务器现在通过 mcpClient.ts 中的 stdio 传输方式启动
     // 直接调用标准的 startServer 方法，mcpClient 会根据 type='gallery' 进行正确处理
     await mcpPresenter.startServer(serverName)
@@ -500,6 +500,22 @@ export const useMcpStore = defineStore('mcp', () => {
         if (result && result.function_name) {
           toolResults.value[result.function_name] = result.content
         }
+      }
+    )
+
+    window.electron.ipcRenderer.on(
+      MCP_EVENTS.GALLERY_CONVERTED,
+      (_event, data: { serverName: string; localPath: string; config: MCPServerConfig }) => {
+        console.log(`Gallery server ${data.serverName} converted to local code at: ${data.localPath}`)
+        // 重新加载配置以反映更改
+        loadConfig()
+      }
+    )
+
+    window.electron.ipcRenderer.on(
+      MCP_EVENTS.GALLERY_CONVERSION_FAILED,
+      (_event, data: { serverName: string; error: string }) => {
+        console.error(`Gallery server ${data.serverName} conversion failed: ${data.error}`)
       }
     )
   }

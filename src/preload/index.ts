@@ -51,6 +51,10 @@ const api = {
   },
   deployWorkflow: (workflowData: WorkflowData) => {
     return ipcRenderer.invoke('deploy-workflow', workflowData)
+  },
+  // Gallery管理相关API
+  convertGalleryToLocal: (serverName: string, serverConfig: any, deployJson: string) => {
+    return ipcRenderer.invoke('convert-gallery-to-local', serverName, serverConfig, deployJson)
   }
 }
 exposeElectronAPI()

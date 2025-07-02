@@ -20,7 +20,7 @@ interface WorkflowConnection {
   targetInput: string
 }
 
-interface WorkflowData {
+export interface WorkflowData {
   name: string
   nodes: WorkflowNode[]
   connections: WorkflowConnection[]
@@ -64,6 +64,9 @@ declare global {
   getWorkflows: () => Promise<WorkflowData[]>
   runWorkflow: (workflowData: WorkflowData) => Promise<WorkflowExecutionResult>
   deployWorkflow: (workflowData: WorkflowData) => Promise<WorkflowDeploymentResult>
+  
+  // Gallery管理相关API
+  convertGalleryToLocal: (serverName: string, serverConfig: any, deployJson: string) => Promise<any>
     }
   }
 }

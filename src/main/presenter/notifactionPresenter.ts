@@ -1,5 +1,14 @@
 import { nativeImage, Notification, NotificationConstructorOptions } from 'electron'
-import icon from '../../../resources/icon.png?asset'
+import { join } from 'path'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+
+// ES module compatible __dirname
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+// 应用图标路径 (使用ES模块兼容的路径解析)
+const icon = join(__dirname, '../../../resources/icon.png')
 import { eventBus, SendTarget } from '@/eventbus'
 import { NOTIFICATION_EVENTS } from '@/events'
 import { presenter } from '.'

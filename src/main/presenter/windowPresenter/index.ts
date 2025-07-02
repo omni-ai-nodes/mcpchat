@@ -3,13 +3,21 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { nativeImage } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
 import { presenter } from '@/presenter'
 import { eventBus } from '@/eventbus'
 import { WINDOW_EVENTS } from '@/events'
 import { IWindowPresenter } from '@shared/presenter'
 import { join } from 'path'
-import icon from '../../../../resources/icon.png?asset' // 应用图标 (macOS/Linux)
-import iconWin from '../../../../resources/icon.ico?asset' // 应用图标 (Windows)
+
+// ES module compatible __dirname
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+// 应用图标路径 (使用ES模块兼容的路径解析)
+const icon = join(__dirname, '../../../../resources/icon.png') // 应用图标 (macOS/Linux)
+const iconWin = join(__dirname, '../../../../resources/icon.ico') // 应用图标 (Windows)
 import { is } from '@electron-toolkit/utils' // Electron 工具库
 import { ConfigPresenter } from '../configPresenter' // 配置 Presenter
 import { CONFIG_EVENTS, SYSTEM_EVENTS } from '@/events' // 系统/窗口/配置 事件常量
@@ -302,7 +310,7 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
 }
 
 // 执行文本输出节点
-async function executeTextOutputNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+async function executeTextOutputNode(_node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
   return {
     output: (inputData.input as string) || ''
   }

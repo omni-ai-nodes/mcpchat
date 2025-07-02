@@ -92,7 +92,9 @@ export const MCP_EVENTS = {
   TOOL_CALL_RESULT: 'mcp:tool-call-result',
   SERVER_STATUS_CHANGED: 'mcp:server-status-changed',
   CLIENT_LIST_UPDATED: 'mcp:client-list-updated',
-  INITIALIZED: 'mcp:initialized' // 新增：MCP初始化完成事件
+  INITIALIZED: 'mcp:initialized', // 新增：MCP初始化完成事件
+  GALLERY_CONVERTED: 'mcp:gallery-converted', // 新增：Gallery服务器转换为本地代码事件
+  GALLERY_CONVERSION_FAILED: 'mcp:gallery-conversion-failed' // 新增：Gallery服务器转换失败事件
 }
 
 // 同步相关事件

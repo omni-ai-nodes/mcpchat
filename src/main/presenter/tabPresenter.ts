@@ -5,11 +5,17 @@ import { is } from '@electron-toolkit/utils'
 import { ITabPresenter, TabCreateOptions, IWindowPresenter, TabData } from '@shared/presenter'
 import { BrowserWindow, WebContentsView, shell, nativeImage } from 'electron'
 import { join } from 'path'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
 import contextMenu from '@/contextMenuHelper'
 import { getContextMenuLabels } from '@shared/i18n'
 import { app } from 'electron'
 import { addWatermarkToNativeImage } from '@/lib/watermark'
 import { stitchImagesVertically } from '@/lib/scrollCapture'
+
+// ES module compatible __dirname
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 export class TabPresenter implements ITabPresenter {
   // 全局标签页实例存储

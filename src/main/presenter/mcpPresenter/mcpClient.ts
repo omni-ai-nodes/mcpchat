@@ -11,6 +11,7 @@ import { app } from 'electron'
 import fs from 'fs'
 // import { NO_PROXY, proxyConfig } from '@/presenter/proxyConfig'
 import { getInMemoryServer } from './inMemoryServers/builder'
+import { galleryManager } from './galleryManager'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import {
   PromptListEntry,
@@ -155,6 +156,36 @@ export class McpClient {
         const _server = getInMemoryServer(this.serverName, _args, _env)
         _server.startServer(serverTransport)
         this.transport = clientTransport
+      } else if (this.serverConfig.type === 'gallery-local') {
+        // Gallery-local 类型服务器使用本地化的代码
+        const localServerPath = galleryManager.getLocalServerPath(this.serverName)
+        const command = 'node'
+        const args = [localServerPath]
+        
+        // 设置环境变量
+        const env: Record<string, string> = {
+          GALLERY_SERVER_DIR: galleryManager.getGalleryPath(),
+          GALLERY_SERVER_NAME: this.serverName
+        }
+        
+        // 添加自定义环境变量
+        if (this.serverConfig.env) {
+          Object.entries(this.serverConfig.env as Record<string, string>).forEach(
+            ([key, value]) => {
+              if (value !== undefined) {
+                env[key] = value
+              }
+            }
+          )
+        }
+        
+        console.log('gallery-local mcp env', env)
+        this.transport = new StdioClientTransport({
+          command,
+          args,
+          env,
+          stderr: 'pipe'
+        })
       } else if (this.serverConfig.type === 'gallery') {
         // Gallery 类型服务器使用 stdio 传输方式
         const command = this.serverConfig.command as string

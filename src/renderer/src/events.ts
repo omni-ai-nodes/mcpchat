@@ -63,7 +63,9 @@ export const MCP_EVENTS = {
   SERVER_STOPPED: 'mcp:server-stopped',
   CONFIG_CHANGED: 'mcp:config-changed',
   TOOL_CALL_RESULT: 'mcp:tool-call-result',
-  SERVER_STATUS_CHANGED: 'mcp:server-status-changed'
+  SERVER_STATUS_CHANGED: 'mcp:server-status-changed',
+  GALLERY_CONVERTED: 'mcp:gallery-converted', // 新增：Gallery服务器转换为本地代码事件
+  GALLERY_CONVERSION_FAILED: 'mcp:gallery-conversion-failed' // 新增：Gallery服务器转换失败事件
 }
 // 同步相关事件
 export const SYNC_EVENTS = {

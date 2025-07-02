@@ -13,6 +13,7 @@ import { DevicePresenter } from './devicePresenter'
 import { UpgradePresenter } from './upgradePresenter'
 import { FilePresenter } from './filePresenter/FilePresenter'
 import { McpPresenter } from './mcpPresenter'
+import { galleryManager } from './mcpPresenter/galleryManager'
 import { SyncPresenter } from './syncPresenter'
 import { DeeplinkPresenter } from './deeplinkPresenter'
 import { NotificationPresenter } from './notifactionPresenter'
@@ -185,6 +186,25 @@ ipcMain.handle(
     ) {
       console.error('error on presenter handle', e) // 保留错误日志
       return { error: e.message || String(e) }
+    }
+  }
+)
+
+// Gallery管理相关的IPC处理器
+ipcMain.handle(
+  'convert-gallery-to-local',
+  async (_event: IpcMainInvokeEvent, serverName: string, serverConfig: any, deployJson: string) => {
+    try {
+      console.log('Converting gallery server to local:', serverName)
+      const localConfig = await galleryManager.convertToLocalGalleryServer(
+        serverName,
+        serverConfig,
+        deployJson
+      )
+      return localConfig
+    } catch (error) {
+      console.error('Failed to convert gallery server to local:', error)
+      throw error
     }
   }
 )

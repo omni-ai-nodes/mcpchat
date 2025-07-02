@@ -825,7 +825,7 @@ export interface ProgressResponse {
 export interface MCPServerConfig {
   command: string
   args: string[]
-  env: Record<string, unknow>
+  env: Record<string, unknown>
   descriptions: string
   icons: string
   autoApprove: string[]
@@ -833,7 +833,9 @@ export interface MCPServerConfig {
   baseUrl?: string
   customHeaders?: Record<string, string>
   customNpmRegistry?: string
-  type: 'sse' | 'stdio' | 'inmemory' | 'http'
+  type: 'sse' | 'stdio' | 'inmemory' | 'http' | 'gallery' | 'gallery-local'
+  localPath?: string // 本地化服务器的路径
+  originalDeployJson?: string // 原始部署配置JSON
 }
 
 export interface MCPConfig {

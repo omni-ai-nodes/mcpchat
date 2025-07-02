@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/toast/use-toast'
 import McpServerForm from '@/components/mcp-config/mcpServerForm.vue'
 import McpServers from '@/components/mcp-config/components/McpServers.vue'
 import McpSettings from '@/components/settings/McpSettings.vue'
-import type { MCPServerConfig } from '@/types/mcp'
+import type { MCPServerConfig } from '@/shared/presenter'
 import {
   Dialog,
   DialogContent,
@@ -28,8 +28,7 @@ const SelectItem = defineAsyncComponent(() => import('@/components/ui/select').t
 const SelectTrigger = defineAsyncComponent(() => import('@/components/ui/select').then(mod => mod.SelectTrigger))
 const SelectValue = defineAsyncComponent(() => import('@/components/ui/select').then(mod => mod.SelectValue))
 const Badge = defineAsyncComponent(() => import('@/components/ui/badge').then(mod => mod.Badge))
-const Switch = defineAsyncComponent(() => import('@/components/ui/switch').then(mod => mod.Switch))
-const Separator = defineAsyncComponent(() => import('@/components/ui/separator').then(mod => mod.Separator))
+// Removed unused Switch and Separator components
 const DropdownMenu = defineAsyncComponent(() => import('@/components/ui/dropdown-menu').then(mod => mod.DropdownMenu))
 const DropdownMenuContent = defineAsyncComponent(() => import('@/components/ui/dropdown-menu').then(mod => mod.DropdownMenuContent))
 const DropdownMenuItem = defineAsyncComponent(() => import('@/components/ui/dropdown-menu').then(mod => mod.DropdownMenuItem))
@@ -88,6 +87,7 @@ interface ServerItem {
   args?: string[]
   baseUrl?: string
   errorMessage?: string
+  config?: MCPServerConfig
 }
 
 // 响应式数据
@@ -263,10 +263,10 @@ onMounted(() => {
 })
 
 // 监听搜索查询变化，实现实时搜索
-watch(searchQuery, (newQuery) => {
+watch(searchQuery, (newQuery: string) => {
   // 重置到第一页并执行搜索
   fetchServers(1, pageSize.value, newQuery)
-}, { debounce: 500 }) // 添加防抖，避免频繁请求
+})
 
 // 修改翻页函数以支持搜索
 const goToPageWithSearch = (page: number) => {
@@ -320,7 +320,7 @@ const filteredServers = computed(() => {
 })
 
 // 状态相关函数
-const getStatusText = (status: string, server?: ServerItem) => {
+const getStatusText = (status: string) => {
   switch (status) {
     case 'running':
       return t('mcp.mcpGallery.running')
@@ -336,7 +336,7 @@ const getStatusText = (status: string, server?: ServerItem) => {
   }
 }
 
-const getStatusDotClass = (status: string, server?: ServerItem) => {
+const getStatusDotClass = (status: string) => {
   switch (status) {
     case 'running':
       return 'bg-green-500'
@@ -352,7 +352,7 @@ const getStatusDotClass = (status: string, server?: ServerItem) => {
   }
 }
 
-const getStatusTextClass = (status: string, server?: ServerItem) => {
+const getStatusTextClass = (status: string) => {
   switch (status) {
     case 'running':
       return 'text-green-600'
@@ -368,10 +368,7 @@ const getStatusTextClass = (status: string, server?: ServerItem) => {
   }
 }
 
-// 服务器操作函数
-const addServer = () => {
-  showAddDialog.value = true
-}
+// 服务器操作函数 - removed unused addServer function
 
 const editServer = (server: ServerItem) => {
   // 检查服务器是否已安装到本地
@@ -404,9 +401,9 @@ const editServer = (server: ServerItem) => {
             serverConfig.icons = server.icon || '🔧'
           }
           
-          // 添加默认 type 字段
+          // 添加默认 type 字段 - gallery服务器应该设置为gallery类型
           if (!serverConfig.type) {
-            serverConfig.type = 'stdio'
+            serverConfig.type = 'gallery'
           }
           
           // 添加简介
@@ -559,17 +556,7 @@ const toggleServer = async (server: ServerItem) => {
   }
 }
 
-const viewTools = (server: ServerItem) => {
-  console.log('查看工具:', server)
-}
-
-const viewPrompts = (server: ServerItem) => {
-  console.log('查看提示词:', server)
-}
-
-const viewResources = (server: ServerItem) => {
-  console.log('查看资源:', server)
-}
+// 查看功能（预留） - removed unused view functions
 
 // 安装对话框状态
 const isInstallDialogOpen = ref(false)
@@ -599,7 +586,7 @@ const installServer = (server: ServerItem) => {
           
           // 添加默认 type 字段
           if (!serverConfig.type) {
-            serverConfig.type = 'stdio'
+            serverConfig.type = 'gallery'
           }
           // 添加 简介
           if (!serverConfig.descriptions) {
@@ -626,16 +613,44 @@ const installServer = (server: ServerItem) => {
 }
 
 // 处理表单提交
-const handleInstallSubmit = async (name: string, config: any) => {
+const handleInstallSubmit = async (name: string, config: MCPServerConfig) => {
   console.log('安装服务器配置:', name, config)
   
   try {
+    // 对于gallery类型的服务器，先转换为本地代码
+    let finalConfig = { ...config }
+    
+    if (config.type === 'gallery' || !config.type) {
+      console.log('正在将gallery服务器转换为本地代码...')
+      
+      try {
+        // 调用主进程的gallery管理器来转换服务器
+        const localConfig = await (window as unknown as { electronAPI: { convertGalleryToLocal: (name: string, config: MCPServerConfig, deployJson: string) => Promise<MCPServerConfig> } }).electronAPI.convertGalleryToLocal(
+          name,
+          config,
+          prefilledJsonConfig.value
+        )
+        
+        if (localConfig) {
+          finalConfig = {
+            ...localConfig,
+            type: 'gallery-local' // 设置为本地化类型
+          }
+          console.log('Gallery服务器已成功转换为本地代码')
+        } else {
+          console.warn('Gallery服务器转换失败，使用原始配置')
+          finalConfig.type = 'gallery'
+        }
+      } catch (conversionError) {
+        console.error('转换gallery服务器时发生错误:', conversionError)
+        // 转换失败时回退到原始gallery类型
+        finalConfig.type = 'gallery'
+      }
+    }
+    
     // 调用 McpServers 组件的 handleAddServer 方法
     if (mcpServersRef.value) {
-      await mcpServersRef.value.handleAddServer(name, {
-        ...config,
-        type: 'gallery' // 确保类型为 gallery
-      })
+      await mcpServersRef.value.handleAddServer(name, finalConfig)
       console.log('服务器添加成功:', name)
     } else {
       console.error('McpServers 组件引用不可用')
@@ -745,7 +760,7 @@ const goToMcpSettings = () => {
                           :src="getServerIcon(server.icon)"
                           :alt="server.name"
                           class="w-10 h-10 rounded-lg object-cover"
-                          @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'"
+                          @error="(e: Event) => { const target = e.target as HTMLImageElement; target.style.display='none'; if (target.nextElementSibling) (target.nextElementSibling as HTMLElement).style.display='flex' }"
                       />
                       <div 
                           v-else
@@ -896,7 +911,7 @@ const goToMcpSettings = () => {
                     :src="getServerIcon(server.icon)"
                     :alt="server.name"
                     class="w-8 h-8 rounded object-cover"
-                    @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'"
+                    @error="(e: Event) => { const target = e.target as HTMLImageElement; target.style.display='none'; if (target.nextElementSibling) (target.nextElementSibling as HTMLElement).style.display='flex' }"
                   />
                   <div 
                     v-else
