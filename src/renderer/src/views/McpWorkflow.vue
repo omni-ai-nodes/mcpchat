@@ -2126,6 +2126,11 @@ class ConnectionManager {
         this.cancelConnection()
         this.clearSelection()
       }
+      // Ctrl+Enter 快捷键运行工作流
+      if (event.ctrlKey && event.key === 'Enter') {
+        event.preventDefault()
+        runWorkflow()
+      }
     }
     
     document.addEventListener('keydown', handleKeyDown)
