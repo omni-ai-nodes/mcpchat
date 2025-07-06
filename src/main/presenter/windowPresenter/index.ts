@@ -71,7 +71,7 @@ async function executeWorkflow(workflowData: WorkflowData) {
       endTime: new Date().toISOString(),
       status: 'completed',
       results: {
-        processedNodes: workflowData.nodes.length,
+        processedNodes: executionOrder.length,
         processedConnections: workflowData.connections?.length || 0,
         nodeResults: Object.fromEntries(nodeResults)
       }
@@ -96,6 +96,12 @@ function getExecutionOrder(workflowData: WorkflowData): string[] {
   const visited = new Set<string>()
   const order: string[] = []
   
+  // 如果没有连接，返回空数组（不执行任何节点）
+  if (connections.length === 0) {
+    console.log('工作流中没有连接线，跳过执行')
+    return []
+  }
+  
   // 构建依赖图
   const dependencies = new Map<string, string[]>()
   nodes.forEach(node => dependencies.set(node.id, []))
@@ -104,6 +110,13 @@ function getExecutionOrder(workflowData: WorkflowData): string[] {
     const deps = dependencies.get(conn.targetNodeId) || []
     deps.push(conn.sourceNodeId)
     dependencies.set(conn.targetNodeId, deps)
+  })
+  
+  // 找到所有参与连接的节点
+  const connectedNodes = new Set<string>()
+  connections.forEach(conn => {
+    connectedNodes.add(conn.sourceNodeId)
+    connectedNodes.add(conn.targetNodeId)
   })
   
   // DFS访问
@@ -117,7 +130,14 @@ function getExecutionOrder(workflowData: WorkflowData): string[] {
     order.push(nodeId)
   }
   
-  nodes.forEach(node => visit(node.id))
+  // 只访问参与连接的节点
+  connectedNodes.forEach(nodeId => {
+    if (nodes.find(n => n.id === nodeId)) {
+      visit(nodeId)
+    }
+  })
+  
+  console.log(`工作流执行顺序: ${order.map(id => nodes.find(n => n.id === id)?.name || id).join(' -> ')}`)
   return order
 }
 
