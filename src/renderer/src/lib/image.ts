@@ -9,7 +9,7 @@ export const imageFileToBase64 = (file: File) => {
   })
 }
 
-const MAX_SIZE = 1200
+const MAX_SIZE = 256
 
 interface ImageDimensions {
   width: number
@@ -68,7 +68,7 @@ export const getClipboardImageInfo = (
 
       // Draw and compress image
       ctx.drawImage(img, 0, 0, compressedWidth, compressedHeight)
-      const compressedBase64 = canvas.toDataURL(file.type, 0.9)
+      const compressedBase64 = canvas.toDataURL(file.type, 0.3)
 
       const imageInfo = {
         width: img.width,

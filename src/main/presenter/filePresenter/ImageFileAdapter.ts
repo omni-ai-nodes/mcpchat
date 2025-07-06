@@ -46,18 +46,23 @@ export class ImageFileAdapter extends BaseFileAdapter {
   public async getThumbnail(): Promise<string | undefined> {
     // 压缩图片并转换为JPG格式
     const compressedImage = await sharp(this.filePath)
-      .resize(256, 256, {
+      .resize(128, 128, {
         // 限制最大尺寸
         fit: 'inside',
         withoutEnlargement: true
       })
       .jpeg({
         // 统一转换为JPG
-        quality: 70, // 压缩质量
+        quality: 30, // 压缩质量
         mozjpeg: true // 使用mozjpeg优化
       })
 
     const buffer = await compressedImage.toBuffer()
+    
+    // 记录压缩效果
+    const originalStats = await fs.stat(this.filePath)
+    const compressionRatio = ((originalStats.size - buffer.length) / originalStats.size * 100).toFixed(1)
+    console.log(`图片压缩完成: ${path.basename(this.filePath)} - 原始大小: ${(originalStats.size / 1024).toFixed(1)}KB, 压缩后: ${(buffer.length / 1024).toFixed(1)}KB, 压缩率: ${compressionRatio}%`)
 
     const base64ImageString = buffer.toString('base64')
     return `data:image/jpeg;base64,${base64ImageString}`
@@ -74,14 +79,14 @@ export class ImageFileAdapter extends BaseFileAdapter {
 
     // 压缩图片并转换为JPG格式
     const compressedImage = await sharp(this.filePath)
-      .resize(1200, 1200, {
+      .resize(256, 256, {
         // 限制最大尺寸
         fit: 'inside',
         withoutEnlargement: true
       })
       .jpeg({
         // 统一转换为JPG
-        quality: 70, // 压缩质量
+        quality: 30, // 压缩质量
         mozjpeg: true // 使用mozjpeg优化
       })
     this.imageMetadata.compressWidth =
@@ -90,6 +95,11 @@ export class ImageFileAdapter extends BaseFileAdapter {
       (await compressedImage.metadata()).height ?? this.imageMetadata.height
 
     const buffer = await compressedImage.toBuffer()
+    
+    // 记录压缩效果
+    const originalStats = await fs.stat(this.filePath)
+    const compressionRatio = ((originalStats.size - buffer.length) / originalStats.size * 100).toFixed(1)
+    console.log(`LLM图片压缩完成: ${path.basename(this.filePath)} - 原始大小: ${(originalStats.size / 1024).toFixed(1)}KB, 压缩后: ${(buffer.length / 1024).toFixed(1)}KB, 压缩率: ${compressionRatio}%`)
 
     const base64ImageString = buffer.toString('base64')
     return `data:image/jpeg;base64,${base64ImageString}`

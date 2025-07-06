@@ -55,7 +55,7 @@ declare global {
       getPathForFile(file: File): string
       getWindowId(): number | null
       getWebContentsId(): number
-      saveUploadedFile: (file: File) => Promise<{ success: boolean; filePath: string; fileName: string }>
+      saveUploadedFile: (fileName: string, fileData: string) => Promise<{ success: boolean; filePath: string; fileName: string }>
   getUploadedFiles: () => Promise<string[]>
   readUploadedFile: (filePath: string) => Promise<string>
   

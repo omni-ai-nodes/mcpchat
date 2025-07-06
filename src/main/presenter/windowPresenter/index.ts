@@ -264,7 +264,7 @@ async function executeFileInputNode(node: WorkflowNode): Promise<NodeResult> {
       // 如果FilePresenter处理失败，继续使用原始的图片大小检查逻辑
       if (imageData && imageData.startsWith('data:image/')) {
         const imageSizeInBytes = Math.ceil(imageData.length * 0.75)
-        const maxImageSize = 10 * 1024 * 1024 // 10MB限制
+        const maxImageSize = 2 * 1024 * 1024 // 2MB限制
         
         if (imageSizeInBytes > maxImageSize) {
           console.warn(`文件输入节点 "${node.name}" 中的图片过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，已清除图片数据`)
@@ -275,7 +275,7 @@ async function executeFileInputNode(node: WorkflowNode): Promise<NodeResult> {
   } else if (imageData && imageData.startsWith('data:image/')) {
     // 如果没有文件路径但有图片数据，进行大小检查
     const imageSizeInBytes = Math.ceil(imageData.length * 0.75)
-    const maxImageSize = 10 * 1024 * 1024 // 10MB限制
+    const maxImageSize = 2 * 1024 * 1024 // 2MB限制
     
     if (imageSizeInBytes > maxImageSize) {
       console.warn(`文件输入节点 "${node.name}" 中的图片过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，已清除图片数据`)
@@ -430,7 +430,7 @@ async function executeModelServiceNode(node: WorkflowNode, inputData: Record<str
       
       // 检查处理后的图片大小
       const imageSizeInBytes = Math.ceil(processedImageData.length * 0.75) // base64编码大约增加33%大小
-      const maxImageSize = 10 * 1024 * 1024 // 10MB限制
+      const maxImageSize = 2 * 1024 * 1024 // 2MB限制
       
       if (imageSizeInBytes > maxImageSize) {
         console.warn(`图片过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，跳过图片处理，仅发送文本内容`)
@@ -471,7 +471,10 @@ async function executeModelServiceNode(node: WorkflowNode, inputData: Record<str
      // 调用模型
      const outputText = await llmproviderPresenter.generateCompletion(
        currentProvider.id,
-       messages as Array<{ role: string; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> }>, // 支持多模态消息格式
+       messages as Array<{
+         role: 'user' | 'system' | 'assistant';
+         content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+       }>, // 支持多模态消息格式
        modelId
      )
      

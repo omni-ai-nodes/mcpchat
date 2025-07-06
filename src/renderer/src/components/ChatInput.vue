@@ -406,14 +406,44 @@ const handleFileSelect = async (e: Event) => {
 
   if (files && files.length > 0) {
     for (const file of files) {
-      const path = window.api.getPathForFile(file)
       try {
-        const mimeType = await filePresenter.getMimeType(path)
-        const fileInfo: MessageFile = await filePresenter.prepareFile(path, mimeType)
-        if (fileInfo) {
-          selectedFiles.value.push(fileInfo)
+        if (file.type.startsWith('image/')) {
+          // 处理图片文件 - 使用压缩
+          const imageInfo = await getClipboardImageInfo(file)
+          
+          const tempFilePath = await filePresenter.writeImageBase64({
+            name: file.name ?? 'image',
+            content: imageInfo.compressedBase64
+          })
+
+          const fileInfo: MessageFile = {
+            name: file.name ?? 'image',
+            content: imageInfo.compressedBase64,
+            mimeType: file.type,
+            metadata: {
+              fileName: file.name ?? 'image',
+              fileSize: file.size,
+              fileDescription: file.type,
+              fileCreated: new Date(),
+              fileModified: new Date()
+            },
+            token: calculateImageTokens(imageInfo.compressedWidth, imageInfo.compressedHeight),
+            path: tempFilePath,
+            thumbnail: imageInfo.compressedBase64
+          }
+          if (fileInfo) {
+            selectedFiles.value.push(fileInfo)
+          }
         } else {
-          console.error('File info is null:', file.name)
+          // 处理其他类型的文件
+          const path = window.api.getPathForFile(file)
+          const mimeType = await filePresenter.getMimeType(path)
+          const fileInfo: MessageFile = await filePresenter.prepareFile(path, mimeType)
+          if (fileInfo) {
+            selectedFiles.value.push(fileInfo)
+          } else {
+            console.error('File info is null:', file.name)
+          }
         }
       } catch (error) {
         console.error('文件准备失败:', error)
@@ -758,28 +788,57 @@ const handleDrop = async (e: DragEvent) => {
   if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
     for (const file of e.dataTransfer.files) {
       try {
-        const path = window.api.getPathForFile(file)
-        if (file.type === '') {
-          const isDirectory = await filePresenter.isDirectory(path)
-          if (isDirectory) {
-            const fileInfo: MessageFile = await filePresenter.prepareDirectory(path)
-            if (fileInfo) {
-              selectedFiles.value.push(fileInfo)
+        if (file.type.startsWith('image/')) {
+          // 处理图片文件 - 使用压缩
+          const imageInfo = await getClipboardImageInfo(file)
+          
+          const tempFilePath = await filePresenter.writeImageBase64({
+            name: file.name ?? 'image',
+            content: imageInfo.compressedBase64
+          })
+
+          const fileInfo: MessageFile = {
+            name: file.name ?? 'image',
+            content: imageInfo.compressedBase64,
+            mimeType: file.type,
+            metadata: {
+              fileName: file.name ?? 'image',
+              fileSize: file.size,
+              fileDescription: file.type,
+              fileCreated: new Date(),
+              fileModified: new Date()
+            },
+            token: calculateImageTokens(imageInfo.compressedWidth, imageInfo.compressedHeight),
+            path: tempFilePath,
+            thumbnail: imageInfo.compressedBase64
+          }
+          if (fileInfo) {
+            selectedFiles.value.push(fileInfo)
+          }
+        } else {
+          const path = window.api.getPathForFile(file)
+          if (file.type === '') {
+            const isDirectory = await filePresenter.isDirectory(path)
+            if (isDirectory) {
+              const fileInfo: MessageFile = await filePresenter.prepareDirectory(path)
+              if (fileInfo) {
+                selectedFiles.value.push(fileInfo)
+              }
+            } else {
+              const mimeType = await filePresenter.getMimeType(path)
+              console.log('mimeType', mimeType)
+              const fileInfo: MessageFile = await filePresenter.prepareFile(path, mimeType)
+              console.log('fileInfo', fileInfo)
+              if (fileInfo) {
+                selectedFiles.value.push(fileInfo)
+              }
             }
           } else {
             const mimeType = await filePresenter.getMimeType(path)
-            console.log('mimeType', mimeType)
             const fileInfo: MessageFile = await filePresenter.prepareFile(path, mimeType)
-            console.log('fileInfo', fileInfo)
             if (fileInfo) {
               selectedFiles.value.push(fileInfo)
             }
-          }
-        } else {
-          const mimeType = await filePresenter.getMimeType(path)
-          const fileInfo: MessageFile = await filePresenter.prepareFile(path, mimeType)
-          if (fileInfo) {
-            selectedFiles.value.push(fileInfo)
           }
         }
       } catch (error) {
