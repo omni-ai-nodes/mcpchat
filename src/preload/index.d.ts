@@ -60,8 +60,9 @@ declare global {
   readUploadedFile: (filePath: string) => Promise<string>
   
   // 工作流相关API
-  saveWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; filePath: string; fileName: string }>
-  getWorkflows: () => Promise<WorkflowData[]>
+  saveWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; filePath?: string; fileName?: string; error?: string; message?: string }>
+  getWorkflows: () => Promise<{ success: boolean; workflows: Array<{ name: string; filePath: string; savedAt: string }>; error?: string }>
+  loadWorkflow: (filePath: string) => Promise<{ success: boolean; workflow?: WorkflowData; error?: string }>
   runWorkflow: (workflowData: WorkflowData) => Promise<WorkflowExecutionResult>
   deployWorkflow: (workflowData: WorkflowData) => Promise<WorkflowDeploymentResult>
     }

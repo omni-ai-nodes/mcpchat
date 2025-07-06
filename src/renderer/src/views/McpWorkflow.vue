@@ -111,6 +111,26 @@
           <Badge variant="outline">{{ t('common.mcp.workflow.draft') }}</Badge>
         </div>
         <div class="flex items-center gap-2">
+          <!-- 工作流选择下拉列表 -->
+          <select 
+            v-model="selectedWorkflowPath"
+            @change="loadSelectedWorkflow"
+            class="px-3 py-1.5 text-sm border rounded-md bg-background min-w-[200px]"
+          >
+            <option value="">选择已保存的工作流...</option>
+            <option 
+              v-for="workflow in savedWorkflows" 
+              :key="workflow.filePath"
+              :value="workflow.filePath"
+            >
+              {{ workflow.name }} ({{ formatDate(workflow.savedAt) }})
+            </option>
+          </select>
+          
+          <Button variant="outline" size="sm" @click="newWorkflow">
+            <Icon icon="lucide:plus" class="w-4 h-4 mr-2" />
+            新建
+          </Button>
           <Button variant="outline" size="sm" @click="saveWorkflow">
             <Icon icon="lucide:save" class="w-4 h-4 mr-2" />
             {{ t('common.mcp.workflow.save') }}
@@ -433,6 +453,40 @@
       </div>
     </div>
   </div>
+
+  <!-- 工作流名称输入对话框 -->
+  <Dialog :open="showWorkflowNameDialog" @update:open="showWorkflowNameDialog = $event">
+    <DialogContent class="sm:max-w-[425px]">
+      <DialogHeader>
+        <DialogTitle>设置工作流名称</DialogTitle>
+        <DialogDescription>
+          请为您的工作流设置一个名称
+        </DialogDescription>
+      </DialogHeader>
+      <div class="grid gap-4 py-4">
+        <div class="grid grid-cols-4 items-center gap-4">
+          <Label for="workflow-name" class="text-right">
+            名称
+          </Label>
+          <Input
+            id="workflow-name"
+            v-model="workflowNameInput"
+            class="col-span-3"
+            placeholder="请输入工作流名称"
+            @keyup.enter="handleWorkflowNameConfirm"
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" @click="handleWorkflowNameCancel">
+          取消
+        </Button>
+        <Button @click="handleWorkflowNameConfirm">
+          确认
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <script setup lang="ts">
@@ -447,6 +501,16 @@ import { usePromptsStore } from '@/stores/prompts'
 import NodeProperties from '@/components/workflow/NodeProperties.vue'
 import PromptSetting from '@/components/settings/PromptSetting.vue'
 import { useToast } from '@/components/ui/toast'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
@@ -576,6 +640,14 @@ const currentWorkflow = reactive<CurrentWorkflow>({
   connections: []
 })
 
+// 工作流列表相关
+const savedWorkflows = ref<Array<{
+  name: string
+  filePath: string
+  savedAt: string
+}>>([])
+const selectedWorkflowPath = ref('')
+
 // 服务器选择弹窗相关
 const showServerSelectModal = ref(false)
 const currentSelectingNode = ref<WorkflowNode | null>(null)
@@ -587,6 +659,11 @@ const serverSelectionLoading = ref(false)
 
 // 提示词管理弹窗相关
 const showPromptManagement = ref(false)
+
+// 工作流名称输入对话框相关
+const showWorkflowNameDialog = ref(false)
+const workflowNameInput = ref('')
+const workflowNameDialogCallback = ref<((name: string | null) => void) | null>(null)
 
 // 独立的MCP节点状态管理
 interface McpNodeState {
@@ -2608,6 +2685,8 @@ interface WindowAPI {
   readUploadedFile: (filePath: string) => Promise<string>
   saveUploadedFile: (fileName: string, fileData: string) => Promise<{ success: boolean; filePath: string; fileName: string }>
   saveWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; filePath: string; fileName: string }>
+  getWorkflows: () => Promise<Array<{ name: string; filePath: string; savedAt: string }>>
+  loadWorkflow: (filePath: string) => Promise<{ success: boolean; workflowData: WorkflowData }>
   runWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; executionId: string; startTime: string; results: { processedNodes: number; processedConnections: number; nodeResults: Record<string, { output: string }> }; error?: string }>
   deployWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; deploymentId: string; timestamp: string }>
 }
@@ -5881,6 +5960,20 @@ const saveWorkflow = async () => {
       return
     }
 
+    // 检查工作流名称
+    if (!currentWorkflow.name || currentWorkflow.name.trim() === '') {
+      const workflowName = await showWorkflowNamePrompt('请为工作流设置名称：')
+      if (!workflowName || workflowName.trim() === '') {
+        toast({
+          title: '提示',
+          description: '保存已取消，请设置工作流名称',
+          variant: 'default'
+        })
+        return
+      }
+      currentWorkflow.name = workflowName.trim()
+    }
+
     // 验证和同步所有节点的MCP状态
     workflowNodes.value.forEach(node => {
       if (node.config.selectedServers) {
@@ -5924,20 +6017,59 @@ const saveWorkflow = async () => {
       (node.config.selectedServers as string[])?.length > 0
     )
     
-    // 准备工作流数据
-    const workflowData = {
-      name: currentWorkflow.name || `工作流_${new Date().toLocaleString()}`,
-      nodes: currentWorkflow.nodes,
-      connections: connections.value.map(conn => ({
+    // 清理节点数据，移除不可序列化的属性
+    const cleanNodes = currentWorkflow.nodes.map(node => {
+      const cleanNode = {
+        id: node.id,
+        type: node.type,
+        name: node.name,
+        x: node.x,
+        y: node.y,
+        config: { ...node.config },
+        inputs: node.inputs,
+        outputs: node.outputs
+      }
+      
+      // 移除不可序列化的属性
+      const nodeWithUIProps = cleanNode as WorkflowNode
+      delete nodeWithUIProps.cachedImage
+      delete nodeWithUIProps.imageLoadError
+      delete nodeWithUIProps.uploadButton
+      delete nodeWithUIProps.fileNameArea
+      delete nodeWithUIProps.textArea
+      delete nodeWithUIProps.editButton
+      delete nodeWithUIProps.mcpServiceArea
+      delete nodeWithUIProps.mcpModelSelect
+      delete nodeWithUIProps.mcpServerSelect
+      delete nodeWithUIProps.providerSelect
+      delete nodeWithUIProps.modelSelect
+      delete nodeWithUIProps.modelServiceArea
+      delete nodeWithUIProps.promptSelect
+      delete nodeWithUIProps.textDisplayArea
+      
+      return cleanNode
+    })
+    
+    // 清理连接数据，移除不可序列化的属性
+    const cleanConnections = connections.value.map(conn => {
+      // 只保留可序列化的核心属性
+      return {
         id: conn.id,
         sourceNodeId: conn.from,
         targetNodeId: conn.to,
         sourceOutput: conn.fromPort,
         targetInput: conn.toPort
-      })),
+      }
+    })
+
+    // 准备工作流数据
+    const workflowData = {
+      name: currentWorkflow.name || `工作流_${new Date().toLocaleString()}`,
+      nodes: cleanNodes,
+      connections: cleanConnections,
       metadata: {
-        nodeCount: currentWorkflow.nodes.length,
-        connectionCount: currentWorkflow.connections.length,
+        nodeCount: cleanNodes.length,
+        connectionCount: cleanConnections.length,
         mcpNodeCount: mcpNodes.length,
         mcpEnabledNodes: mcpEnabledNodes.length,
         createdAt: new Date().toISOString()
@@ -5951,17 +6083,29 @@ const saveWorkflow = async () => {
     
     if (result.success) {
       // 从文件路径中提取文件名
-      const fileName = result.fileName || result.filePath.split('/').pop() || '未知文件'
+      const fileName = result.fileName || result.filePath?.split('/').pop() || '未知文件'
       toast({
         title: '成功',
         description: `工作流保存成功: ${fileName}`,
         variant: 'default'
       })
       console.log('工作流保存成功:', result)
+      // 刷新工作流列表
+      await loadWorkflowList()
     } else {
+      const errorResult = result as { success: boolean; error?: string; message?: string }
+      if (errorResult.error === 'MISSING_NAME') {
+        // 后端也检查到名称缺失，再次提示用户
+        const workflowName = await showWorkflowNamePrompt('请为工作流设置名称：')
+        if (workflowName && workflowName.trim() !== '') {
+          currentWorkflow.name = workflowName.trim()
+          // 重新尝试保存
+          return saveWorkflow()
+        }
+      }
       toast({
         title: '错误',
-        description: '保存工作流失败',
+        description: errorResult.error || errorResult.message || '保存工作流失败',
         variant: 'destructive'
       })
     }
@@ -5973,6 +6117,140 @@ const saveWorkflow = async () => {
       variant: 'destructive'
     })
   }
+}
+
+// 加载工作流列表
+const loadWorkflowList = async () => {
+  try {
+    const result = await window.api.getWorkflows()
+    savedWorkflows.value = result
+  } catch (error) {
+    console.error('加载工作流列表时发生错误:', error)
+  }
+}
+
+// 加载选中的工作流
+const loadSelectedWorkflow = async () => {
+  if (!selectedWorkflowPath.value) return
+  
+  try {
+    const result = await window.api.loadWorkflow(selectedWorkflowPath.value)
+    if (result.success && result.workflowData) {
+      const workflow = result.workflowData
+      
+      // 清空当前工作流
+      workflowNodes.value = []
+      connections.value = []
+      
+      // 加载工作流数据
+      currentWorkflow.name = workflow.name || ''
+      currentWorkflow.description = ''
+      workflowNodes.value = workflow.nodes || []
+      // 转换连接数据格式
+      connections.value = (workflow.connections || []).map(conn => ({
+        id: conn.id,
+        from: conn.sourceNodeId,
+        to: conn.targetNodeId,
+        fromPort: conn.sourceOutput,
+        toPort: conn.targetInput
+      }))
+      
+      // 恢复MCP状态
+      if (workflow.nodes) {
+        restoreWorkflowMcpState(workflow.nodes)
+      }
+      
+      // 重新绘制画布
+      redraw()
+      
+      toast({
+        title: '成功',
+        description: `已加载工作流: ${workflow.name}`,
+        variant: 'default'
+      })
+    } else {
+      toast({
+        title: '加载失败',
+        description: '加载工作流失败',
+        variant: 'destructive'
+      })
+    }
+  } catch (error) {
+    console.error('加载工作流时发生错误:', error)
+    toast({
+      title: '加载失败',
+      description: '加载工作流时发生错误',
+      variant: 'destructive'
+    })
+  }
+}
+
+// 新建工作流
+const newWorkflow = () => {
+  // 清空当前工作流
+  workflowNodes.value = []
+  connections.value = []
+  currentWorkflow.name = ''
+  currentWorkflow.description = ''
+  selectedWorkflowPath.value = ''
+  
+  // 清空MCP状态
+  mcpNodeStates.value.clear()
+  
+  // 重新绘制画布
+  redraw()
+  
+  toast({
+    title: '信息',
+    description: '已创建新的工作流',
+    variant: 'default'
+  })
+}
+
+// 格式化日期
+const formatDate = (dateStr: string) => {
+  try {
+    const date = new Date(dateStr)
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch {
+    return dateStr
+  }
+}
+
+// 替换 prompt() 的对话框函数
+const showWorkflowNamePrompt = (message: string, defaultValue = ''): Promise<string | null> => {
+  return new Promise((resolve) => {
+    workflowNameInput.value = defaultValue
+    workflowNameDialogCallback.value = resolve
+    showWorkflowNameDialog.value = true
+  })
+}
+
+// 处理工作流名称对话框确认
+const handleWorkflowNameConfirm = () => {
+  const name = workflowNameInput.value.trim()
+  if (workflowNameDialogCallback.value) {
+    workflowNameDialogCallback.value(name || null)
+  }
+  showWorkflowNameDialog.value = false
+  workflowNameInput.value = ''
+  workflowNameDialogCallback.value = null
+}
+
+// 处理工作流名称对话框取消
+const handleWorkflowNameCancel = () => {
+  if (workflowNameDialogCallback.value) {
+    workflowNameDialogCallback.value(null)
+  }
+  showWorkflowNameDialog.value = false
+  workflowNameInput.value = ''
+  workflowNameDialogCallback.value = null
 }
 
 // 节点状态管理
@@ -6498,6 +6776,9 @@ onMounted(() => {
   
   // 更新MCP服务器状态
   mcpStore.updateAllServerStatuses()
+  
+  // 加载工作流列表
+  loadWorkflowList()
   
   // 设置定期更新服务器状态（每30秒更新一次）
   const statusUpdateInterval = setInterval(() => {

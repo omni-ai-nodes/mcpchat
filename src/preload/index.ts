@@ -1,6 +1,33 @@
 import { clipboard, contextBridge, nativeImage, webUtils, webFrame, ipcRenderer } from 'electron'
 import { exposeElectronAPI } from '@electron-toolkit/preload'
-import type { WorkflowData } from './index.d'
+
+// 工作流相关类型定义
+interface WorkflowNode {
+  id: string
+  type: string
+  name: string
+  x: number
+  y: number
+  config: Record<string, unknown>
+  inputs?: string[]
+  outputs?: string[]
+}
+
+interface WorkflowConnection {
+  id: string
+  sourceNodeId: string
+  targetNodeId: string
+  sourceOutput: string
+  targetInput: string
+}
+
+interface WorkflowData {
+  name: string
+  nodes: WorkflowNode[]
+  connections: WorkflowConnection[]
+  metadata?: Record<string, unknown>
+  deploymentConfig?: Record<string, unknown>
+}
 
 // 缓存变量
 let cachedWindowId: number | undefined = undefined
@@ -45,6 +72,9 @@ const api = {
   },
   getWorkflows: () => {
     return ipcRenderer.invoke('get-workflows')
+  },
+  loadWorkflow: (filePath: string) => {
+    return ipcRenderer.invoke('load-workflow', filePath)
   },
   runWorkflow: (workflowData: WorkflowData) => {
     return ipcRenderer.invoke('run-workflow', workflowData)

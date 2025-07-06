@@ -815,15 +815,20 @@ export class WindowPresenter implements IWindowPresenter {
     ipcMain.handle('save-workflow', async (_event, workflowData: WorkflowData) => {
       try {
         const userDataPath = app.getPath('userData')
-        const workflowsDir = path.join(userDataPath, 'APP', 'workflows')
+        const workflowsDir = path.join(userDataPath, 'McpWorkflow')
         
         if (!fs.existsSync(workflowsDir)) {
           fs.mkdirSync(workflowsDir, { recursive: true })
         }
         
+        // 检查工作流名称
+        if (!workflowData.name || workflowData.name.trim() === '') {
+          return { success: false, error: 'MISSING_NAME', message: '请为工作流设置名称' }
+        }
+        
         // 生成工作流文件名
         const timestamp = Date.now()
-        const workflowName = workflowData.name || `workflow_${timestamp}`
+        const workflowName = workflowData.name.trim()
         const fileName = `${workflowName}_${timestamp}.json`
         const filePath = path.join(workflowsDir, fileName)
         
@@ -848,7 +853,7 @@ export class WindowPresenter implements IWindowPresenter {
     ipcMain.handle('get-workflows', async () => {
       try {
         const userDataPath = app.getPath('userData')
-        const workflowsDir = path.join(userDataPath, 'APP', 'workflows')
+        const workflowsDir = path.join(userDataPath, 'McpWorkflow')
         
         if (!fs.existsSync(workflowsDir)) {
           return []
@@ -905,6 +910,19 @@ export class WindowPresenter implements IWindowPresenter {
         return executionResult
       } catch (error) {
         console.error('运行工作流失败:', error)
+        throw error
+      }
+    })
+
+    // 加载工作流
+    ipcMain.handle('load-workflow', async (_event, filePath: string) => {
+      try {
+        const content = fs.readFileSync(filePath, 'utf8')
+        const workflowData = JSON.parse(content)
+        console.log('工作流加载成功:', workflowData.name)
+        return { success: true, workflowData }
+      } catch (error) {
+        console.error('加载工作流失败:', error)
         throw error
       }
     })
