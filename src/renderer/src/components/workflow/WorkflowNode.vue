@@ -18,7 +18,7 @@
       <!-- 输入端口 -->
       <div class="header-inputs" v-if="node.inputs?.length">
         <div 
-          v-for="(input, index) in node.inputs" 
+          v-for="input in node.inputs" 
           :key="input"
           class="header-port input-port"
           :class="{ 
@@ -43,7 +43,7 @@
       <!-- 输出端口 -->
       <div class="header-outputs" v-if="node.outputs?.length">
         <div 
-          v-for="(output, index) in node.outputs" 
+          v-for="output in node.outputs" 
           :key="output"
           class="header-port output-port"
           :class="{ 
@@ -61,10 +61,20 @@
 
     <!-- 节点内容 -->
     <div class="node-content">
-      <!-- 非文件输入节点显示通用文字区域 -->
-      <template v-if="node.type !== 'file-input'">
+      <!-- 文本输出节点特殊显示 -->
+      <template v-if="node.type === 'text-output'">
         <div class="node-type">{{ getNodeTypeLabel(node.type) }}</div>
-        <div class="node-description">{{ node.description || '暂无描述' }}</div>
+        <div v-if="node.config?.outputText" class="output-text-content">
+          <div class="output-text-label">输出内容:</div>
+          <div class="output-text-value">{{ node.config.outputText }}</div>
+        </div>
+        <div v-else class="node-description">等待执行结果...</div>
+      </template>
+      
+      <!-- 非文件输入和非文本输出节点显示通用文字区域 -->
+      <template v-else-if="node.type !== 'file-input'">
+        <div class="node-type">{{ getNodeTypeLabel(node.type) }}</div>
+        <div class="node-description">{{ node.config?.description || '暂无描述' }}</div>
       </template>
       
       <!-- 文件输入节点特殊内容 -->
@@ -107,8 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onUnmounted } from 'vue'
-import { Icon } from '@iconify/vue'
+import { ref, onUnmounted } from 'vue'
 
 interface WorkflowNode {
   id: string
@@ -116,7 +125,17 @@ interface WorkflowNode {
   name: string
   x: number
   y: number
-  config: Record<string, any>
+  config: {
+    description?: string
+    outputText?: string
+    uploadedFile?: {
+      name: string
+      size: number
+      localPath: string
+      originalPath: string
+    }
+    [key: string]: unknown
+  }
   inputs: string[]
   outputs: string[]
 }
@@ -172,6 +191,10 @@ const getNodeIcon = (type: string) => {
 const getNodeTypeLabel = (type: string) => {
   const labelMap: Record<string, string> = {
     'file-input': '文件输入',
+    'text-input': '文本输入',
+    'text-output': '文本输出',
+    'model-service': '模型服务',
+    'mcp-service': 'MCP服务',
     'api-input': 'API输入',
     'text-transform': '文本转换',
     'data-filter': '数据过滤',
@@ -249,12 +272,11 @@ const isPortHighlighted = (port: string, type: 'input' | 'output') => {
   return false
 }
 
-// 计算端口位置（现在端口在头部，这个方法可能不再需要，但保留以防其他地方使用）
-const getPortPosition = (index: number, type: 'input' | 'output') => {
-  // 端口现在在头部，返回头部中心位置
-  const headerHeight = 32 // 节点头部高度
-  return headerHeight / 2
-}
+// 端口位置计算函数（如需要可以实现）
+// const getPortPosition = (index: number, type: 'input' | 'output') => {
+//   const headerHeight = 32 // 节点头部高度
+//   return headerHeight / 2
+// }
 
 // 文件上传相关函数
 const triggerFileUpload = () => {
@@ -267,12 +289,6 @@ const handleFileUpload = async (event: Event) => {
   if (!file) return
 
   try {
-    // 获取文件的本地路径（如果可用）
-    let localPath = ''
-    if (window.api?.getPathForFile) {
-      localPath = window.api.getPathForFile(file)
-    }
-
     // 创建文件的本地URL用于预览
     const fileUrl = URL.createObjectURL(file)
 
@@ -284,18 +300,21 @@ const handleFileUpload = async (event: Event) => {
     const arrayBuffer = await file.arrayBuffer()
     
     // 发送文件保存请求到主进程
-    const savedPath = await window.electron.ipcRenderer.invoke('save-uploaded-file', {
-      fileName,
-      fileData: Array.from(new Uint8Array(arrayBuffer)),
-      originalName: file.name
-    })
+    let savedPath = ''
+    if (window.electron?.ipcRenderer) {
+      savedPath = await window.electron.ipcRenderer.invoke('save-uploaded-file', {
+        fileName,
+        fileData: Array.from(new Uint8Array(arrayBuffer)),
+        originalName: file.name
+      })
+    }
 
     // 更新上传文件信息
     uploadedFile.value = {
       name: file.name,
       size: file.size,
       localPath: isImageFile(file.name) ? fileUrl : savedPath,
-      originalPath: savedPath || localPath
+      originalPath: savedPath
     }
 
     // 更新节点配置
@@ -633,5 +652,31 @@ onUnmounted(() => {
   color: #60a5fa;
   text-transform: uppercase;
   font-weight: 500;
+}
+
+/* 文本输出节点样式 */
+.output-text-content {
+  margin-top: 8px;
+  padding: 8px;
+  background: #333;
+  border-radius: 6px;
+  border: 1px solid #404040;
+}
+
+.output-text-label {
+  font-size: 10px;
+  color: #888;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.output-text-value {
+  font-size: 11px;
+  color: #fff;
+  line-height: 1.4;
+  max-height: 80px;
+  overflow-y: auto;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 </style>

@@ -47,6 +47,9 @@ async function executeWorkflow(workflowData: WorkflowData) {
         case 'text-input':
           result = await executeTextInputNode(node)
           break
+        case 'file-input':
+          result = await executeFileInputNode(node)
+          break
         case 'model-service':
           result = await executeModelServiceNode(node, inputData)
           break
@@ -208,8 +211,15 @@ function getNodeInputData(node: WorkflowNode, connections: WorkflowConnection[],
   inputConnections.forEach(conn => {
     const sourceResult = nodeResults.get(conn.sourceNodeId)
     if (sourceResult && sourceResult.output !== undefined) {
-      // NodeResult只有output属性，所以直接使用output的值
-      inputData[conn.targetInput] = sourceResult.output
+      // 根据目标输入端口类型存储数据
+      if (conn.targetInput === 'text-input') {
+        inputData.textInput = sourceResult.output
+      } else if (conn.targetInput === 'file-input') {
+        inputData.fileInput = sourceResult.output
+      } else {
+        // 兼容旧的单一输入方式
+        inputData[conn.targetInput] = sourceResult.output
+      }
     }
   })
   
@@ -224,13 +234,91 @@ async function executeTextInputNode(node: WorkflowNode): Promise<NodeResult> {
   }
 }
 
-// 执行模型服务节点
-async function executeModelServiceNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
-  const input = (inputData.input as string) || ''
+// 执行文件输入节点
+async function executeFileInputNode(node: WorkflowNode): Promise<NodeResult> {
   const config = node.config || {}
   
-  if (!input.trim()) {
-    throw new Error(`模型服务节点 "${node.name}" 没有接收到输入文本`)
+  let imageData = config.imageData as string || ''
+  const filePath = config.filePath as string || ''
+  
+  // 如果有文件路径且是图片文件，使用FilePresenter进行优化处理
+  if (filePath && config.fileType && (config.fileType as string).startsWith('image/')) {
+    try {
+      // 获取FilePresenter实例
+      const { presenter } = await import('@/presenter')
+      const filePresenter = presenter.filePresenter
+      
+      if (filePresenter) {
+        console.log(`使用FilePresenter优化处理图片: ${config.fileName}`)
+        
+        // 使用prepareFile方法处理图片，这会自动压缩和优化
+         const preparedFile = await filePresenter.prepareFile(filePath, config.fileType as string)
+        
+        if (preparedFile && preparedFile.content) {
+          imageData = preparedFile.content
+          console.log(`图片已通过FilePresenter优化处理: ${config.fileName}`)
+        }
+      }
+    } catch (error) {
+      console.warn(`FilePresenter处理图片失败，使用原始数据: ${error}`)
+      // 如果FilePresenter处理失败，继续使用原始的图片大小检查逻辑
+      if (imageData && imageData.startsWith('data:image/')) {
+        const imageSizeInBytes = Math.ceil(imageData.length * 0.75)
+        const maxImageSize = 10 * 1024 * 1024 // 10MB限制
+        
+        if (imageSizeInBytes > maxImageSize) {
+          console.warn(`文件输入节点 "${node.name}" 中的图片过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，已清除图片数据`)
+          imageData = ''
+        }
+      }
+    }
+  } else if (imageData && imageData.startsWith('data:image/')) {
+    // 如果没有文件路径但有图片数据，进行大小检查
+    const imageSizeInBytes = Math.ceil(imageData.length * 0.75)
+    const maxImageSize = 10 * 1024 * 1024 // 10MB限制
+    
+    if (imageSizeInBytes > maxImageSize) {
+      console.warn(`文件输入节点 "${node.name}" 中的图片过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，已清除图片数据`)
+      imageData = ''
+    }
+  }
+  
+  // 返回文件信息，包括路径、类型、内容等
+  const fileInfo = {
+    fileName: config.fileName as string || '',
+    filePath: filePath,
+    fileType: config.fileType as string || '',
+    fileSize: config.fileSize as number || 0,
+    imageData: imageData,
+    fileContent: config.fileContent as string || ''
+  }
+  
+  return {
+    output: JSON.stringify(fileInfo)
+  }
+}
+
+// 执行模型服务节点
+async function executeModelServiceNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  const config = node.config || {}
+  
+  // 获取文本输入和文件输入
+  const textInput = (inputData.textInput as string) || (inputData.input as string) || ''
+  const fileInput = inputData.fileInput as string || ''
+  
+  // 解析文件输入（如果有）
+  let fileInfo: { fileName?: string; filePath?: string; fileType?: string; fileSize?: number; imageData?: string; fileContent?: string } | null = null
+  if (fileInput) {
+    try {
+      fileInfo = JSON.parse(fileInput)
+    } catch (error) {
+      console.warn('解析文件输入失败:', error)
+    }
+  }
+  
+  // 检查是否有任何输入
+  if (!textInput.trim() && !fileInfo) {
+    throw new Error(`模型服务节点 "${node.name}" 没有接收到任何输入（文本或文件）`)
   }
   
   try {
@@ -243,7 +331,7 @@ async function executeModelServiceNode(node: WorkflowNode, inputData: Record<str
       throw new Error('必要的服务未初始化')
     }
     
-    console.log(`模型服务节点处理输入文本: ${input}`)
+    console.log(`模型服务节点处理输入 - 文本: ${textInput.substring(0, 100)}${textInput.length > 100 ? '...' : ''}, 文件: ${fileInfo ? fileInfo.fileName || '未知文件' : '无'}`)
     
     // 获取节点配置的模型信息
     const selectedProviderId = config.selectedProviderId as string
@@ -280,41 +368,110 @@ async function executeModelServiceNode(node: WorkflowNode, inputData: Record<str
     }
     
     // 构建消息内容
-    let messageContent = input
+    let messageContent = textInput
+    
+    // 如果有文件输入，添加文件信息到消息中
+    if (fileInfo) {
+      if (fileInfo.fileName) {
+        messageContent += `\n\n[文件: ${fileInfo.fileName}]`
+      }
+      if (fileInfo.fileContent) {
+        messageContent += `\n文件内容:\n${fileInfo.fileContent}`
+      }
+    }
     
     // 如果配置了prompt，则应用prompt
-      if (selectedPromptId) {
+    if (selectedPromptId) {
+      try {
+        // 通过configPresenter获取prompt内容
+        const prompts = await configPresenter.getCustomPrompts()
+        const selectedPrompt = prompts.find(p => p.id === selectedPromptId)
+        
+        if (selectedPrompt && selectedPrompt.content) {
+          // 将prompt内容与输入文本结合
+          messageContent = `${selectedPrompt.content}\n\n用户输入: ${messageContent}`
+          console.log(`应用了prompt: ${selectedPrompt.name}`)
+        } else {
+          console.warn(`未找到指定的prompt: ${selectedPromptId}`)
+        }
+      } catch (error) {
+        console.warn('获取prompt失败，使用原始输入:', error)
+      }
+    }
+     
+    // 构建消息 - 支持多模态输入
+    const messages: Array<{ role: 'user' | 'system' | 'assistant'; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> }> = []
+    
+    if (fileInfo && fileInfo.imageData && fileInfo.imageData.startsWith('data:image/')) {
+      let processedImageData = fileInfo.imageData
+      
+      // 如果有文件路径且是图片文件，尝试使用FilePresenter进行优化处理
+      if (fileInfo.filePath && fileInfo.fileType && fileInfo.fileType.startsWith('image/')) {
         try {
-          // 通过configPresenter获取prompt内容
-          const prompts = await configPresenter.getCustomPrompts()
-          const selectedPrompt = prompts.find(p => p.id === selectedPromptId)
+          // 获取FilePresenter实例
+          const { presenter } = await import('@/presenter')
+          const filePresenter = presenter.filePresenter
           
-          if (selectedPrompt && selectedPrompt.content) {
-            // 将prompt内容与输入文本结合
-            messageContent = `${selectedPrompt.content}\n\n用户输入: ${input}`
-            console.log(`应用了prompt: ${selectedPrompt.name}`)
-          } else {
-            console.warn(`未找到指定的prompt: ${selectedPromptId}`)
+          if (filePresenter) {
+            console.log(`使用FilePresenter优化处理图片: ${fileInfo.fileName}`)
+            
+            // 使用prepareFile方法处理图片，这会自动压缩和优化
+             const preparedFile = await filePresenter.prepareFile(fileInfo.filePath, fileInfo.fileType)
+            
+            if (preparedFile && preparedFile.content) {
+              processedImageData = preparedFile.content
+              console.log(`图片已通过FilePresenter优化处理: ${fileInfo.fileName}`)
+            }
           }
         } catch (error) {
-          console.warn('获取prompt失败，使用原始输入:', error)
+          console.warn(`FilePresenter处理图片失败，使用原始数据: ${error}`)
         }
       }
-     
-     // 构建消息
-     const messages = [
-       {
-         role: 'user' as const,
-         content: messageContent
-       }
-     ]
+      
+      // 检查处理后的图片大小
+      const imageSizeInBytes = Math.ceil(processedImageData.length * 0.75) // base64编码大约增加33%大小
+      const maxImageSize = 10 * 1024 * 1024 // 10MB限制
+      
+      if (imageSizeInBytes > maxImageSize) {
+        console.warn(`图片过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，跳过图片处理，仅发送文本内容`)
+        // 仅发送文本消息，并提示图片过大
+        const textWithWarning = `${messageContent}\n\n[注意：图片文件过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，已跳过图片处理。建议使用较小的图片文件。]`
+        messages.push({
+          role: 'user' as const,
+          content: textWithWarning
+        })
+      } else {
+        // 如果图片大小合适，构建多模态消息
+        messages.push({
+          role: 'user' as const,
+          content: [
+            {
+              type: 'text',
+              text: messageContent || '请分析这张图片'
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: processedImageData
+              }
+            }
+          ]
+        })
+      }
+    } else {
+      // 纯文本消息
+      messages.push({
+        role: 'user' as const,
+        content: messageContent
+      })
+    }
      
      console.log(`调用模型 ${modelId} 处理消息`)
      
      // 调用模型
      const outputText = await llmproviderPresenter.generateCompletion(
        currentProvider.id,
-       messages,
+       messages as Array<{ role: string; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> }>, // 支持多模态消息格式
        modelId
      )
      
@@ -335,10 +492,57 @@ async function executeModelServiceNode(node: WorkflowNode, inputData: Record<str
 
 // 执行MCP节点
 async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
-  const input = (inputData.input as string) || ''
+  // 获取文本输入和文件输入
+  const textInput = (inputData.textInput as string) || (inputData.input as string) || ''
+  const fileInput = inputData.fileInput as string || ''
   
-  if (!input.trim()) {
-    throw new Error(`MCP节点 "${node.name}" 没有接收到输入文本`)
+  // 解析文件输入（如果有）
+  let fileInfo: { fileName?: string; filePath?: string; fileType?: string; fileSize?: number; imageData?: string; fileContent?: string } | null = null
+  if (fileInput) {
+    try {
+      fileInfo = JSON.parse(fileInput)
+    } catch (error) {
+      console.warn('解析文件输入失败:', error)
+    }
+  }
+  
+  // 检查是否有任何输入
+  if (!textInput.trim() && !fileInfo) {
+    throw new Error(`MCP节点 "${node.name}" 没有接收到任何输入（文本或文件）`)
+  }
+  
+  // 如果有图片文件，使用FilePresenter进行优化处理
+  if (fileInfo && fileInfo.imageData && fileInfo.imageData.startsWith('data:image/') && fileInfo.filePath && fileInfo.fileType && fileInfo.fileType.startsWith('image/')) {
+    try {
+      // 获取FilePresenter实例
+      const { presenter } = await import('@/presenter')
+      const filePresenter = presenter.filePresenter
+      
+      if (filePresenter) {
+        console.log(`MCP节点使用FilePresenter优化处理图片: ${fileInfo.fileName}`)
+        
+        // 使用prepareFile方法处理图片，这会自动压缩和优化
+         const preparedFile = await filePresenter.prepareFile(fileInfo.filePath, fileInfo.fileType)
+        
+        if (preparedFile && preparedFile.content) {
+          fileInfo.imageData = preparedFile.content
+          console.log(`MCP节点图片已通过FilePresenter优化处理: ${fileInfo.fileName}`)
+        }
+      }
+    } catch (error) {
+      console.warn(`MCP节点FilePresenter处理图片失败，使用原始数据: ${error}`)
+    }
+  }
+  
+  // 构建完整的输入内容
+  let fullInput = textInput
+  if (fileInfo) {
+    if (fileInfo.fileName) {
+      fullInput += `\n\n[文件: ${fileInfo.fileName}]`
+    }
+    if (fileInfo.fileContent) {
+      fullInput += `\n文件内容:\n${fileInfo.fileContent}`
+    }
   }
   
   try {
@@ -352,7 +556,7 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
       throw new Error('必要的服务未初始化')
     }
     
-    console.log(`MCP节点处理输入文本: ${input}`)
+    console.log(`MCP节点处理输入 - 文本: ${textInput.substring(0, 100)}${textInput.length > 100 ? '...' : ''}, 文件: ${fileInfo ? fileInfo.fileName || '未知文件' : '无'}`)
     
     // 获取当前LLM配置，如果没有当前提供者则自动选择第一个可用的
     let currentProvider = llmproviderPresenter.getCurrentProvider()
@@ -427,7 +631,7 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
       },
       {
         role: 'user' as const,
-        content: input
+        content: fullInput
       }
     ]
     
@@ -482,7 +686,7 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
     console.log(`MCP节点执行完成，输出: ${output}`)
     
     return {
-      output: output || input
+      output: output || fullInput
     }
   } catch (error) {
     console.error(`MCP节点执行失败:`, error)
@@ -564,6 +768,18 @@ export class WindowPresenter implements IWindowPresenter {
       if (typeof fileData !== 'string') {
         console.error('文件数据类型错误，期望string，实际:', typeof fileData)
         throw new Error('文件数据类型错误')
+      }
+      
+      // 检查文件大小（针对图片文件）
+      if (fileData.startsWith('data:image/')) {
+        const imageSizeInBytes = Math.ceil(fileData.length * 0.75) // base64编码大约增加33%大小
+        const maxImageSize = 10 * 1024 * 1024 // 10MB限制
+        
+        if (imageSizeInBytes > maxImageSize) {
+          const sizeMB = Math.round(imageSizeInBytes / 1024 / 1024)
+          console.warn(`图片文件过大: ${sizeMB}MB，超过10MB限制`)
+          throw new Error(`图片文件过大 (${sizeMB}MB)，请使用小于10MB的图片文件`)
+        }
       }
       
       try {

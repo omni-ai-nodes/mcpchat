@@ -2020,8 +2020,9 @@ const addNode = (template: NodeTemplate) => {
     x: Math.random() * 400 + 200,
     y: Math.random() * 300 + 150,
     config: initialConfig,
-    inputs: template.category === 'output' ? ['input'] : (template.type === 'mcp-service' ? ['input'] : ['input']),
-    outputs: template.category === 'output' ? [] : (template.type === 'mcp-service' ? ['output'] : ['output'])
+    inputs: template.category === 'output' ? ['input'] : 
+            (template.type === 'mcp-service' || template.type === 'model-service' ? ['text-input', 'file-input'] : ['input']),
+    outputs: template.category === 'output' ? [] : ['output']
   }
   
   workflowNodes.value.push(newNode)
@@ -3048,7 +3049,8 @@ const handleTextDisplayAreaClick = (node: WorkflowNode) => {
 
 // 显示文本输出内容对话框（只读）
 const showTextDisplayDialog = (node: WorkflowNode) => {
-  const currentText = (node.config?.textContent as string) || '暂无内容'
+  // 修改：优先从outputText获取文本内容，然后是textContent，最后是默认值
+  const currentText = (node.config?.outputText as string) || (node.config?.textContent as string) || '暂无内容'
   
   // 创建对话框容器
   const dialog = document.createElement('div')
@@ -3067,14 +3069,14 @@ const showTextDisplayDialog = (node: WorkflowNode) => {
     animation: fadeIn 0.2s ease-out;
   `
   
-  // 优化对话框尺寸计算
+  // 优化对话框尺寸计算 - 加大宽度以提供更好的阅读体验
   const nodeScale = scale.value || 1
-  const minWidth = 500
-  const maxWidth = Math.min(800, window.innerWidth * 0.9)
-  const alignedWidth = Math.max(minWidth, Math.min(maxWidth, 180 * nodeScale + 100))
-  const minHeight = 400
-  const maxHeight = Math.min(600, window.innerHeight * 0.8)
-  const alignedHeight = Math.max(minHeight, Math.min(maxHeight, 60 * nodeScale * 5 + 150))
+  const minWidth = 700  // 增加最小宽度从500到700
+  const maxWidth = Math.min(1200, window.innerWidth * 0.95)  // 增加最大宽度从800到1200，屏幕占比从90%到95%
+  const alignedWidth = Math.max(minWidth, Math.min(maxWidth, 180 * nodeScale + 200))  // 增加额外宽度
+  const minHeight = 500  // 增加最小高度从400到500
+  const maxHeight = Math.min(700, window.innerHeight * 0.85)  // 增加最大高度从600到700，屏幕占比从80%到85%
+  const alignedHeight = Math.max(minHeight, Math.min(maxHeight, 60 * nodeScale * 6 + 200))  // 增加额外高度
   
   // 创建对话框内容
   const dialogContent = document.createElement('div')
@@ -3179,26 +3181,58 @@ const showTextDisplayDialog = (node: WorkflowNode) => {
     display: block;
   `
   
-  // 创建文本显示区域（只读）
+  // 创建文本显示区域（只读）- 增加高度以配合更大的弹窗
   const textDisplay = document.createElement('div')
   textDisplay.textContent = currentText
   textDisplay.style.cssText = `
     width: 100%;
     flex: 1;
-    min-height: 200px;
+    min-height: 300px;
+    max-height: 500px;
     background: #0f172a;
     border: 2px solid #334155;
     border-radius: 8px;
-    padding: 16px;
+    padding: 20px;
     color: #e2e8f0;
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
     font-size: 14px;
-    line-height: 1.5;
+    line-height: 1.6;
     box-sizing: border-box;
     overflow-y: auto;
+    overflow-x: hidden;
     white-space: pre-wrap;
     word-wrap: break-word;
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #1f2937;
   `
+  
+  // 为 WebKit 浏览器添加自定义滚动条样式
+  textDisplay.style.setProperty('--webkit-scrollbar-width', '8px')
+  const scrollbarStyle = `
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1f2937;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #4b5563;
+      border-radius: 4px;
+      transition: background 0.2s ease;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #6b7280;
+    }
+  `
+  
+  // 添加滚动条样式到文本显示区域
+  if (!document.querySelector('#text-display-scrollbar-styles')) {
+    const scrollbarStyleElement = document.createElement('style')
+    scrollbarStyleElement.id = 'text-display-scrollbar-styles'
+    scrollbarStyleElement.textContent = scrollbarStyle
+    document.head.appendChild(scrollbarStyleElement)
+  }
   
   // 创建字符计数
   const charCount = document.createElement('div')
