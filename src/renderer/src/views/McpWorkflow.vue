@@ -913,7 +913,7 @@ const drawNode = (node: WorkflowNode) => {
     // 计算文本输出节点的自适应高度
     const outputText = (node.config?.outputText as string) || '暂无输出内容...'
     const adaptiveHeight = calculateTextOutputHeight(outputText, width - 16 * scale.value, context)
-    height = (NODE_HEIGHT + adaptiveHeight + 16) * scale.value  // 基础高度 + 自适应文本区域高度 + 间距
+    height = (NODE_HEIGHT + adaptiveHeight - 22) * scale.value  // 基础高度 + 自适应文本区域高度 + 间距
   } else if (node.type === 'mcp-service') {
     height = (NODE_HEIGHT + 116) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
   } else if (node.type === 'model-service') {
