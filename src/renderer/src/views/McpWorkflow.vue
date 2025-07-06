@@ -2560,6 +2560,20 @@ const getPromptSelectAtPosition = (x: number, y: number): WorkflowNode | null =>
   return null
 }
 
+// 获取文本输出区域点击位置
+const getTextDisplayAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'text-output' && node.textDisplayArea) {
+      const area = node.textDisplayArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
 interface UploadedFile {
   name: string
   path: string
@@ -3021,7 +3035,310 @@ const handleUploadButtonClick = (node: WorkflowNode) => {
 // 处理文本区域点击
 const handleTextAreaClick = (node: WorkflowNode) => {
   console.log('点击文本区域，节点:', node.name)
-  // 可以在这里添加文本区域的特殊处理逻辑
+  // 直接调用文本编辑对话框
+  handleTextEditButtonClick(node)
+}
+
+// 处理文本输出区域点击
+const handleTextDisplayAreaClick = (node: WorkflowNode) => {
+  console.log('点击文本输出区域，节点:', node.name)
+  // 文本输出区域点击时显示文本内容（只读模式）
+  showTextDisplayDialog(node)
+}
+
+// 显示文本输出内容对话框（只读）
+const showTextDisplayDialog = (node: WorkflowNode) => {
+  const currentText = (node.config?.textContent as string) || '暂无内容'
+  
+  // 创建对话框容器
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease-out;
+  `
+  
+  // 优化对话框尺寸计算
+  const nodeScale = scale.value || 1
+  const minWidth = 500
+  const maxWidth = Math.min(800, window.innerWidth * 0.9)
+  const alignedWidth = Math.max(minWidth, Math.min(maxWidth, 180 * nodeScale + 100))
+  const minHeight = 400
+  const maxHeight = Math.min(600, window.innerHeight * 0.8)
+  const alignedHeight = Math.max(minHeight, Math.min(maxHeight, 60 * nodeScale * 5 + 150))
+  
+  // 创建对话框内容
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-radius: 12px;
+    padding: 28px;
+    width: ${alignedWidth}px;
+    height: ${alignedHeight}px;
+    min-width: 400px;
+    min-height: 300px;
+    max-width: 90vw;
+    max-height: 80vh;
+    border: 1px solid #374151;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.3s ease-out;
+    position: relative;
+    resize: both;
+    overflow: hidden;
+  `
+  
+  // 创建标题区域
+  const titleContainer = document.createElement('div')
+  titleContainer.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '查看文本内容'
+  title.style.cssText = `
+    margin: 0;
+    color: #f9fafb;
+    font-size: 20px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  `
+  
+  // 添加图标
+  const titleIcon = document.createElement('span')
+  titleIcon.innerHTML = '👁️'
+  titleIcon.style.cssText = `
+    font-size: 18px;
+  `
+  title.insertBefore(titleIcon, title.firstChild)
+  
+  // 创建关闭按钮
+  const closeButton = document.createElement('button')
+  closeButton.innerHTML = '✕'
+  closeButton.style.cssText = `
+    background: none;
+    border: none;
+    color: #9ca3af;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `
+  closeButton.onmouseover = () => {
+    closeButton.style.background = '#374151'
+    closeButton.style.color = '#ffffff'
+  }
+  closeButton.onmouseout = () => {
+    closeButton.style.background = 'none'
+    closeButton.style.color = '#9ca3af'
+  }
+  
+  titleContainer.appendChild(title)
+  titleContainer.appendChild(closeButton)
+  
+  // 创建文本显示区域容器
+  const textContainer = document.createElement('div')
+  textContainer.style.cssText = `
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+  `
+  
+  // 创建文本区域标签
+  const textLabel = document.createElement('label')
+  textLabel.textContent = '文本内容（只读）'
+  textLabel.style.cssText = `
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    display: block;
+  `
+  
+  // 创建文本显示区域（只读）
+  const textDisplay = document.createElement('div')
+  textDisplay.textContent = currentText
+  textDisplay.style.cssText = `
+    width: 100%;
+    flex: 1;
+    min-height: 200px;
+    background: #0f172a;
+    border: 2px solid #334155;
+    border-radius: 8px;
+    padding: 16px;
+    color: #e2e8f0;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    box-sizing: border-box;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  `
+  
+  // 创建字符计数
+  const charCount = document.createElement('div')
+  charCount.style.cssText = `
+    color: #9ca3af;
+    font-size: 12px;
+    text-align: right;
+    margin-top: 8px;
+  `
+  charCount.textContent = `${currentText.length} 字符`
+  
+  // 创建按钮容器
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 20px;
+  `
+  
+  // 创建复制按钮
+  const copyButton = document.createElement('button')
+  copyButton.textContent = '复制内容'
+  copyButton.style.cssText = `
+    background: #4f46e5;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+  `
+  copyButton.onmouseover = () => {
+    copyButton.style.background = '#4338ca'
+  }
+  copyButton.onmouseout = () => {
+    copyButton.style.background = '#4f46e5'
+  }
+  copyButton.onclick = () => {
+    navigator.clipboard.writeText(currentText).then(() => {
+      copyButton.textContent = '已复制!'
+      setTimeout(() => {
+        copyButton.textContent = '复制内容'
+      }, 1000)
+    })
+  }
+  
+  // 创建关闭按钮
+  const closeDialogButton = document.createElement('button')
+  closeDialogButton.textContent = '关闭'
+  closeDialogButton.style.cssText = `
+    background: #6b7280;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+  `
+  closeDialogButton.onmouseover = () => {
+    closeDialogButton.style.background = '#4b5563'
+  }
+  closeDialogButton.onmouseout = () => {
+    closeDialogButton.style.background = '#6b7280'
+  }
+  
+  buttonContainer.appendChild(copyButton)
+  buttonContainer.appendChild(closeDialogButton)
+  
+  // 组装对话框
+  textContainer.appendChild(textLabel)
+  textContainer.appendChild(textDisplay)
+  textContainer.appendChild(charCount)
+  
+  dialogContent.appendChild(titleContainer)
+  dialogContent.appendChild(textContainer)
+  dialogContent.appendChild(buttonContainer)
+  
+  dialog.appendChild(dialogContent)
+  
+  // 关闭对话框函数
+  const closeDialog = () => {
+    dialog.style.animation = 'fadeOut 0.2s ease-out'
+    dialogContent.style.animation = 'slideOut 0.2s ease-out'
+    setTimeout(() => {
+      if (dialog.parentNode) {
+        dialog.parentNode.removeChild(dialog)
+      }
+    }, 200)
+  }
+  
+  // 绑定关闭事件
+  closeButton.onclick = closeDialog
+  closeDialogButton.onclick = closeDialog
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      closeDialog()
+    }
+  }
+  
+  // ESC键关闭
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      closeDialog()
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }
+  document.addEventListener('keydown', handleKeyDown)
+  
+  // 添加CSS动画
+  if (!document.querySelector('#text-display-dialog-styles')) {
+    const style = document.createElement('style')
+    style.id = 'text-display-dialog-styles'
+    style.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
+      @keyframes slideIn {
+        from { transform: translateY(-20px) scale(0.95); opacity: 0; }
+        to { transform: translateY(0) scale(1); opacity: 1; }
+      }
+      @keyframes slideOut {
+        from { transform: translateY(0) scale(1); opacity: 1; }
+        to { transform: translateY(-20px) scale(0.95); opacity: 0; }
+      }
+    `
+    document.head.appendChild(style)
+  }
+  
+  // 添加到DOM
+  document.body.appendChild(dialog)
 }
 
 // 处理文本编辑按钮点击
@@ -5157,6 +5474,7 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedUploadButton = getUploadButtonAtPosition(pos.x, pos.y)
   const clickedFileNameArea = getFileNameAreaAtPosition(pos.x, pos.y)
   const clickedTextArea = getTextAreaAtPosition(pos.x, pos.y)
+  const clickedTextDisplayArea = getTextDisplayAreaAtPosition(pos.x, pos.y)
   const clickedEditButton = getEditButtonAtPosition(pos.x, pos.y)
   const clickedMcpModelSelect = getMcpModelSelectAtPosition(pos.x, pos.y)
   const clickedMcpServerSelect = getMcpServerSelectAtPosition(pos.x, pos.y)
@@ -5187,6 +5505,9 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedTextArea) {
     // 处理文本区域点击
     handleTextAreaClick(clickedTextArea)
+  } else if (clickedTextDisplayArea) {
+    // 处理文本输出区域点击
+    handleTextDisplayAreaClick(clickedTextDisplayArea)
   } else if (clickedTypeTag) {
     // 处理类型标签点击，显示属性面板
     selectedNode.value = clickedTypeTag
