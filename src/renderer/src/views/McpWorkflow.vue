@@ -443,6 +443,7 @@ import { Badge } from '@/components/ui/badge'
 import { Icon } from '@iconify/vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
+import { usePromptsStore } from '@/stores/prompts'
 import NodeProperties from '@/components/workflow/NodeProperties.vue'
 import PromptSetting from '@/components/settings/PromptSetting.vue'
 import { useToast } from '@/components/ui/toast'
@@ -450,6 +451,7 @@ import { useToast } from '@/components/ui/toast'
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 const mcpStore = useMcpStore()
+const promptsStore = usePromptsStore()
 const { toast } = useToast()
 
 // 节点类型定义
@@ -846,13 +848,13 @@ const drawNode = (node: WorkflowNode) => {
   const height = node.type === 'file-input' 
     ? (NODE_HEIGHT + 226 ) * scale.value  // 基础高度 + 上传区域高度 + 间距
     : node.type === 'text-input'
-    ? (NODE_HEIGHT + 95 ) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
+    ? (NODE_HEIGHT + 96 ) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
     : node.type === 'text-output'
-    ? (NODE_HEIGHT + 128 ) * scale.value  // 基础高度 + 文本显示区域高度 + 间距
+    ? (NODE_HEIGHT + 126 ) * scale.value  // 基础高度 + 文本显示区域高度 + 间距
     : node.type === 'mcp-service'
-    ? (NODE_HEIGHT + 115) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
+    ? (NODE_HEIGHT + 116) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
     : node.type === 'model-service'
-    ? (NODE_HEIGHT + 70) * scale.value  // 基础高度 + 模型选择区域高度 + 间距
+    ? (NODE_HEIGHT + 106) * scale.value  // 基础高度 + 模型选择区域高度 + 间距
     : NODE_HEIGHT * scale.value
   
   // 根据节点类型设置不同的背景色
@@ -3956,8 +3958,11 @@ const handleMcpModelSelectClick = (node: WorkflowNode) => {
 }
 
 // 处理Prompt选择点击
-const handlePromptSelectClick = (node: WorkflowNode) => {
+const handlePromptSelectClick = async (node: WorkflowNode) => {
   console.log('点击Prompt选择，节点:', node.name)
+  
+  // 加载最新的提示词数据
+  await promptsStore.loadPrompts()
   
   // 创建Prompt选择弹窗
   const dialog = document.createElement('div')
@@ -4077,17 +4082,12 @@ const handlePromptSelectClick = (node: WorkflowNode) => {
   document.head.appendChild(scrollbarStyle)
   promptList.className = 'prompt-list'
   
-  // 模拟Prompt数据（实际应用中应该从API获取）
-  const allPrompts = [
-    { id: 'creative-writing', name: '创意写作助手', description: '帮助用户进行创意写作，提供灵感和建议' },
-    { id: 'code-review', name: '代码审查专家', description: '专业的代码审查和优化建议' },
-    { id: 'data-analysis', name: '数据分析师', description: '数据分析和可视化专家' },
-    { id: 'translation', name: '翻译专家', description: '多语言翻译和本地化专家' },
-    { id: 'marketing', name: '营销策划师', description: '营销策略和内容创作专家' },
-    { id: 'technical-writer', name: '技术文档专家', description: '技术文档编写和API文档专家' },
-    { id: 'ui-designer', name: 'UI设计顾问', description: '用户界面设计和用户体验专家' },
-    { id: 'business-analyst', name: '商业分析师', description: '商业需求分析和流程优化专家' }
-  ]
+  // 从promptsStore获取真实的Prompt数据
+  const allPrompts = promptsStore.prompts.map(prompt => ({
+    id: prompt.id,
+    name: prompt.name,
+    description: prompt.description || '暂无描述'
+  }))
   
   let filteredPrompts = [...allPrompts]
   
@@ -5925,6 +5925,9 @@ onMounted(() => {
   
   // 开始渲染循环
   startRenderLoop()
+  
+  // 加载提示词数据
+  promptsStore.loadPrompts()
   
   // 更新MCP服务器状态
   mcpStore.updateAllServerStatuses()
