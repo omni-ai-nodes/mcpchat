@@ -403,6 +403,36 @@
       </div>
     </div>
   </div>
+
+  <!-- 提示词管理弹窗 -->
+  <div 
+    v-if="showPromptManagement" 
+    class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+    @click="showPromptManagement = false"
+  >
+    <div 
+      class="bg-background border border-border rounded-lg shadow-xl w-[90vw] h-[90vh] max-w-6xl flex flex-col"
+      @click.stop
+    >
+      <!-- 弹窗标题栏 -->
+      <div class="flex items-center justify-between p-4 border-b border-border">
+        <h2 class="text-lg font-semibold">提示词管理</h2>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          @click="showPromptManagement = false"
+          class="h-8 w-8"
+        >
+          <Icon icon="lucide:x" class="w-4 h-4" />
+        </Button>
+      </div>
+      
+      <!-- 提示词管理组件 -->
+      <div class="flex-1 overflow-hidden">
+        <PromptSetting />
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -414,6 +444,7 @@ import { Icon } from '@iconify/vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import NodeProperties from '@/components/workflow/NodeProperties.vue'
+import PromptSetting from '@/components/settings/PromptSetting.vue'
 import { useToast } from '@/components/ui/toast'
 
 const { t } = useI18n()
@@ -501,6 +532,12 @@ interface WorkflowNode {
     width: number
     height: number
   }
+  promptSelect?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
   textDisplayArea?: {
     x: number
     y: number
@@ -545,6 +582,9 @@ const availableServers = ref<{ id: string; name: string; provider: string; disab
 // MCP状态管理弹窗相关
 const showMcpStatusModal = ref(false)
 const serverSelectionLoading = ref(false)
+
+// 提示词管理弹窗相关
+const showPromptManagement = ref(false)
 
 // 独立的MCP节点状态管理
 interface McpNodeState {
@@ -1524,7 +1564,7 @@ const drawNode = (node: WorkflowNode) => {
   // 如果是模型服务节点，绘制模型选择区域
   if (node.type === 'model-service') {
     const serviceAreaWidth = width - 16 * scale.value
-    const serviceAreaHeight = 70 * scale.value  // 减少高度，只显示模型选择
+    const serviceAreaHeight = 130 * scale.value  // 增加高度，容纳模型选择和Prompt选择
     const serviceAreaX = x + 8 * scale.value
     const serviceAreaY = y + headerHeight + 8 * scale.value
     
@@ -1540,9 +1580,9 @@ const drawNode = (node: WorkflowNode) => {
     context.setLineDash([])
     context.stroke()
     
-    // 绘制模型选择区域（占据整个服务区域）
+    // 绘制模型选择区域（占据服务区域的上半部分）
     const modelSelectY = serviceAreaY + 8 * scale.value
-    const modelSelectHeight = serviceAreaHeight - 16 * scale.value
+    const modelSelectHeight = 55 * scale.value
     const modelSelectX = serviceAreaX + 8 * scale.value
     const modelSelectWidth = serviceAreaWidth - 16 * scale.value
     
@@ -1598,6 +1638,56 @@ const drawNode = (node: WorkflowNode) => {
       node.modelSelect.height = modelSelectHeight / scale.value
     }
     
+    // 绘制Prompt提示词选择区域
+    const promptSelectY = modelSelectY + modelSelectHeight + 8 * scale.value
+    const promptSelectHeight = 55 * scale.value
+    const promptSelectX = serviceAreaX + 8 * scale.value
+    const promptSelectWidth = serviceAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#0f172a'
+    context.beginPath()
+    context.roundRect(promptSelectX, promptSelectY, promptSelectWidth, promptSelectHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制Prompt选择标题
+    context.fillStyle = '#e2e8f0'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('选择Prompt:', promptSelectX + 8 * scale.value, promptSelectY + 8 * scale.value)
+    
+    // 绘制当前选择的Prompt或占位符
+    const selectedPromptName = (node.config?.selectedPromptName as string) || '请选择Prompt...'
+    
+    context.fillStyle = selectedPromptName === '请选择Prompt...' ? '#64748b' : '#cbd5e1'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(selectedPromptName, promptSelectX + 8 * scale.value, promptSelectY + 28 * scale.value)
+    
+    // 绘制下拉箭头
+    context.fillStyle = '#64748b'
+    context.font = `${12 * scale.value}px Arial`
+    context.textAlign = 'right'
+    context.fillText('▼', promptSelectX + promptSelectWidth - 8 * scale.value, promptSelectY + 32 * scale.value)
+    
+    // 存储Prompt选择区域位置信息
+    if (!node.promptSelect) {
+      node.promptSelect = {
+        x: promptSelectX / scale.value,
+        y: promptSelectY / scale.value,
+        width: promptSelectWidth / scale.value,
+        height: promptSelectHeight / scale.value
+      }
+    } else {
+      node.promptSelect.x = promptSelectX / scale.value
+      node.promptSelect.y = promptSelectY / scale.value
+      node.promptSelect.width = promptSelectWidth / scale.value
+      node.promptSelect.height = promptSelectHeight / scale.value
+    }
+
     // 存储整个服务区域位置信息
     if (!node.modelServiceArea) {
       node.modelServiceArea = {
@@ -2375,6 +2465,19 @@ const getModelServiceSelectAtPosition = (x: number, y: number): WorkflowNode | n
   for (const node of workflowNodes.value) {
     if (node.type === 'model-service' && node.modelSelect) {
       const area = node.modelSelect
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+const getPromptSelectAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'model-service' && node.promptSelect) {
+      const area = node.promptSelect
       if (x >= area.x && x <= area.x + area.width && 
           y >= area.y && y <= area.y + area.height) {
         return node
@@ -3852,6 +3955,360 @@ const handleMcpModelSelectClick = (node: WorkflowNode) => {
   }, 200)
 }
 
+// 处理Prompt选择点击
+const handlePromptSelectClick = (node: WorkflowNode) => {
+  console.log('点击Prompt选择，节点:', node.name)
+  
+  // 创建Prompt选择弹窗
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(8px);
+    animation: fadeIn 0.2s ease-out;
+  `
+  
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+    border-radius: 20px;
+    padding: 32px;
+    max-width: 600px;
+    width: 90vw;
+    max-height: 80vh;
+    overflow: hidden;
+    color: white;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    animation: slideIn 0.3s ease-out;
+    display: flex;
+    flex-direction: column;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '选择Prompt提示词'
+  title.style.cssText = `
+    margin: 0 0 24px 0;
+    color: #f1f5f9;
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  `
+  
+  // 搜索容器
+  const searchContainer = document.createElement('div')
+  searchContainer.style.cssText = `
+    position: relative;
+    margin-bottom: 20px;
+  `
+  
+  const searchInput = document.createElement('input')
+  searchInput.type = 'text'
+  searchInput.placeholder = '搜索Prompt...'
+  searchInput.style.cssText = `
+    width: 100%;
+    padding: 14px 20px 14px 50px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 12px;
+    color: #f1f5f9;
+    font-size: 16px;
+    outline: none;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    box-sizing: border-box;
+  `
+  
+  const searchIcon = document.createElement('div')
+  searchIcon.innerHTML = '🔍'
+  searchIcon.style.cssText = `
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
+    color: #94a3b8;
+    pointer-events: none;
+  `
+  
+  searchContainer.appendChild(searchInput)
+  searchContainer.appendChild(searchIcon)
+  
+  // Prompt列表容器
+  const promptList = document.createElement('div')
+  promptList.style.cssText = `
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 24px;
+    max-height: 400px;
+    padding-right: 8px;
+  `
+  
+  // 自定义滚动条样式
+  const scrollbarStyle = document.createElement('style')
+  scrollbarStyle.textContent = `
+    .prompt-list::-webkit-scrollbar {
+      width: 8px;
+    }
+    .prompt-list::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.3);
+      border-radius: 4px;
+    }
+    .prompt-list::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 4px;
+    }
+    .prompt-list::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.6);
+    }
+  `
+  document.head.appendChild(scrollbarStyle)
+  promptList.className = 'prompt-list'
+  
+  // 模拟Prompt数据（实际应用中应该从API获取）
+  const allPrompts = [
+    { id: 'creative-writing', name: '创意写作助手', description: '帮助用户进行创意写作，提供灵感和建议' },
+    { id: 'code-review', name: '代码审查专家', description: '专业的代码审查和优化建议' },
+    { id: 'data-analysis', name: '数据分析师', description: '数据分析和可视化专家' },
+    { id: 'translation', name: '翻译专家', description: '多语言翻译和本地化专家' },
+    { id: 'marketing', name: '营销策划师', description: '营销策略和内容创作专家' },
+    { id: 'technical-writer', name: '技术文档专家', description: '技术文档编写和API文档专家' },
+    { id: 'ui-designer', name: 'UI设计顾问', description: '用户界面设计和用户体验专家' },
+    { id: 'business-analyst', name: '商业分析师', description: '商业需求分析和流程优化专家' }
+  ]
+  
+  let filteredPrompts = [...allPrompts]
+  
+  const renderPromptList = (prompts: typeof allPrompts) => {
+    promptList.innerHTML = ''
+    
+    if (prompts.length === 0) {
+      const noResults = document.createElement('div')
+      noResults.textContent = '未找到匹配的Prompt'
+      noResults.style.cssText = `
+        text-align: center;
+        color: #94a3b8;
+        padding: 40px 20px;
+        font-size: 16px;
+      `
+      promptList.appendChild(noResults)
+      return
+    }
+    
+    prompts.forEach(prompt => {
+      const promptOption = document.createElement('div')
+      promptOption.style.cssText = `
+        padding: 16px 20px;
+        margin-bottom: 8px;
+        background: rgba(15, 23, 42, 0.4);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        backdrop-filter: blur(10px);
+        position: relative;
+        overflow: hidden;
+      `
+      
+      const promptName = document.createElement('div')
+      promptName.textContent = prompt.name
+      promptName.style.cssText = `
+        font-weight: 600;
+        font-size: 16px;
+        color: #f1f5f9;
+        margin-bottom: 6px;
+      `
+      
+      const promptDesc = document.createElement('div')
+      promptDesc.textContent = prompt.description
+      promptDesc.style.cssText = `
+        font-size: 14px;
+        color: #94a3b8;
+        line-height: 1.4;
+      `
+      
+      const selectIndicator = document.createElement('div')
+      selectIndicator.innerHTML = '✓'
+      selectIndicator.style.cssText = `
+        position: absolute;
+        right: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #10b981;
+        font-size: 18px;
+        font-weight: bold;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      `
+      
+      promptOption.appendChild(promptName)
+      promptOption.appendChild(promptDesc)
+      promptOption.appendChild(selectIndicator)
+      
+      promptOption.onmouseover = () => {
+        promptOption.style.background = 'rgba(99, 102, 241, 0.08)'
+        selectIndicator.style.opacity = '1'
+      }
+      
+      promptOption.onmouseout = () => {
+        promptOption.style.background = 'rgba(15, 23, 42, 0.4)'
+        selectIndicator.style.opacity = '0'
+      }
+      
+      promptOption.onclick = () => {
+        updateNode(node.id, {
+          config: {
+            ...node.config,
+            selectedPromptId: prompt.id,
+            selectedPromptName: prompt.name,
+            selectedPromptDescription: prompt.description
+          }
+        })
+        console.log('选择Prompt:', prompt)
+        document.body.removeChild(dialog)
+      }
+      
+      promptList.appendChild(promptOption)
+    })
+  }
+  
+  // 搜索功能
+  searchInput.oninput = (e) => {
+    const searchTerm = (e.target as HTMLInputElement).value.toLowerCase()
+    filteredPrompts = allPrompts.filter(prompt => 
+      prompt.name.toLowerCase().includes(searchTerm) ||
+      prompt.description.toLowerCase().includes(searchTerm) ||
+      prompt.id.toLowerCase().includes(searchTerm)
+    )
+    renderPromptList(filteredPrompts)
+  }
+  
+  // 初始渲染
+  renderPromptList(filteredPrompts)
+  
+  // 按钮容器
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    align-items: center;
+  `
+  
+  // 跳转到提示词管理页面按钮
+  const manageButton = document.createElement('button')
+  manageButton.textContent = '管理提示词'
+  manageButton.style.cssText = `
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 10px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+    flex-shrink: 0;
+  `
+  
+  manageButton.onmouseover = () => {
+    manageButton.style.background = 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)'
+    manageButton.style.transform = 'translateY(-1px)'
+    manageButton.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)'
+  }
+  
+  manageButton.onmouseout = () => {
+    manageButton.style.background = 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)'
+    manageButton.style.transform = 'translateY(0)'
+    manageButton.style.boxShadow = 'none'
+  }
+  
+  manageButton.onclick = () => {
+    // 显示提示词管理弹窗
+    console.log('打开提示词管理弹窗')
+    showPromptManagement.value = true
+    
+    // 关闭当前弹窗
+    dialog.style.animation = 'fadeOut 0.15s ease-in forwards'
+    setTimeout(() => {
+      document.body.removeChild(dialog)
+    }, 150)
+  }
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 12px 24px;
+    background: rgba(107, 114, 128, 0.8);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+    border-radius: 10px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+    flex-shrink: 0;
+  `
+  
+  cancelButton.onmouseover = () => {
+    cancelButton.style.background = 'rgba(107, 114, 128, 1)'
+    cancelButton.style.transform = 'translateY(-1px)'
+    cancelButton.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)'
+  }
+  
+  cancelButton.onmouseout = () => {
+    cancelButton.style.background = 'rgba(107, 114, 128, 0.8)'
+    cancelButton.style.transform = 'translateY(0)'
+    cancelButton.style.boxShadow = 'none'
+  }
+  
+  cancelButton.onclick = () => {
+    dialog.style.animation = 'fadeOut 0.15s ease-in forwards'
+    setTimeout(() => {
+      document.body.removeChild(dialog)
+    }, 150)
+  }
+  
+  buttonContainer.appendChild(manageButton)
+  buttonContainer.appendChild(cancelButton)
+  
+  dialogContent.appendChild(title)
+  dialogContent.appendChild(searchContainer)
+  dialogContent.appendChild(promptList)
+  dialogContent.appendChild(buttonContainer)
+  dialog.appendChild(dialogContent)
+  document.body.appendChild(dialog)
+  
+  // 点击背景关闭弹窗
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      dialog.style.animation = 'fadeOut 0.15s ease-in forwards'
+      setTimeout(() => {
+        document.body.removeChild(dialog)
+      }, 150)
+    }
+  }
+  
+  // 聚焦到搜索框
+  setTimeout(() => {
+    searchInput.focus()
+  }, 200)
+}
+
 // 处理MCP启用按钮点击
 const handleMcpServerSelectClick = (node: WorkflowNode) => {
   console.log('点击MCP服务器选择，节点:', node.name)
@@ -4633,6 +5090,7 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedMcpModelSelect = getMcpModelSelectAtPosition(pos.x, pos.y)
   const clickedMcpServerSelect = getMcpServerSelectAtPosition(pos.x, pos.y)
   const clickedModelServiceSelect = getModelServiceSelectAtPosition(pos.x, pos.y)
+  const clickedPromptSelect = getPromptSelectAtPosition(pos.x, pos.y)
   
   if (clickedUploadButton) {
     // 处理上传按钮点击
@@ -4652,6 +5110,9 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedModelServiceSelect) {
     // 处理模型服务模型选择点击
     handleModelServiceSelectClick(clickedModelServiceSelect)
+  } else if (clickedPromptSelect) {
+    // 处理Prompt选择点击
+    handlePromptSelectClick(clickedPromptSelect)
   } else if (clickedTextArea) {
     // 处理文本区域点击
     handleTextAreaClick(clickedTextArea)
@@ -5242,7 +5703,7 @@ const runWorkflow = async () => {
 }
 
 // 模拟节点执行过程，显示运行状态
-const simulateNodeExecution = async (workflowData: { nodes: WorkflowNode[], connections: Connection[] }) => {
+const simulateNodeExecution = async (workflowData: { nodes: WorkflowNode[], connections: { id: string; sourceNodeId: string; targetNodeId: string; sourceOutput: string; targetInput: string; }[] }) => {
   // 获取执行顺序
   const executionOrder = getExecutionOrder(workflowData)
   
@@ -5269,7 +5730,7 @@ const simulateNodeExecution = async (workflowData: { nodes: WorkflowNode[], conn
 }
 
 // 获取节点执行顺序（简单的拓扑排序）
-const getExecutionOrder = (workflowData: { nodes: WorkflowNode[], connections: Connection[] }): string[] => {
+const getExecutionOrder = (workflowData: { nodes: WorkflowNode[], connections: { id: string; sourceNodeId: string; targetNodeId: string; sourceOutput: string; targetInput: string; }[] }): string[] => {
   const nodes = workflowData.nodes
   const connections = workflowData.connections || []
   const visited = new Set<string>()
@@ -5279,10 +5740,10 @@ const getExecutionOrder = (workflowData: { nodes: WorkflowNode[], connections: C
   const dependencies = new Map<string, string[]>()
   nodes.forEach((node: WorkflowNode) => dependencies.set(node.id, []))
   
-  connections.forEach((conn: Connection) => {
-    const deps = dependencies.get(conn.to) || []
-    deps.push(conn.from)
-    dependencies.set(conn.to, deps)
+  connections.forEach((conn) => {
+    const deps = dependencies.get(conn.targetNodeId) || []
+    deps.push(conn.sourceNodeId)
+    dependencies.set(conn.targetNodeId, deps)
   })
   
   // DFS访问
@@ -5381,7 +5842,13 @@ const deployWorkflow = async () => {
     const workflowData = {
       name: currentWorkflow.name || `部署_${new Date().toLocaleString()}`,
       nodes: workflowNodes.value,
-      connections: connections.value,
+      connections: connections.value.map(conn => ({
+        id: conn.id,
+        sourceNodeId: conn.from,
+        targetNodeId: conn.to,
+        sourceOutput: conn.fromPort,
+        targetInput: conn.toPort
+      })),
       metadata: {
         nodeCount: workflowNodes.value.length,
         connectionCount: connections.value.length,
