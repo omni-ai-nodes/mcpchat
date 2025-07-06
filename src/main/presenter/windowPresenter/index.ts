@@ -102,15 +102,41 @@ function getExecutionOrder(workflowData: WorkflowData): string[] {
     return []
   }
   
-  // 构建依赖图
+  // 构建邻接表（双向图）
+  const adjacencyList = new Map<string, Set<string>>()
+  nodes.forEach(node => adjacencyList.set(node.id, new Set()))
+  
+  // 构建依赖图（用于拓扑排序）
   const dependencies = new Map<string, string[]>()
   nodes.forEach(node => dependencies.set(node.id, []))
   
   connections.forEach(conn => {
+    // 添加到邻接表（双向）
+    adjacencyList.get(conn.sourceNodeId)?.add(conn.targetNodeId)
+    adjacencyList.get(conn.targetNodeId)?.add(conn.sourceNodeId)
+    
+    // 添加到依赖图（单向）
     const deps = dependencies.get(conn.targetNodeId) || []
     deps.push(conn.sourceNodeId)
     dependencies.set(conn.targetNodeId, deps)
   })
+  
+  // 找到所有连通组件
+  const visitedForComponents = new Set<string>()
+  const connectedComponents: string[][] = []
+  
+  function dfsComponent(nodeId: string, component: string[]) {
+    if (visitedForComponents.has(nodeId)) return
+    visitedForComponents.add(nodeId)
+    component.push(nodeId)
+    
+    const neighbors = adjacencyList.get(nodeId) || new Set()
+    neighbors.forEach(neighborId => {
+      if (nodes.find(n => n.id === neighborId)) {
+        dfsComponent(neighborId, component)
+      }
+    })
+  }
   
   // 找到所有参与连接的节点
   const connectedNodes = new Set<string>()
@@ -119,19 +145,50 @@ function getExecutionOrder(workflowData: WorkflowData): string[] {
     connectedNodes.add(conn.targetNodeId)
   })
   
-  // DFS访问
+  // 为每个连通组件进行DFS
+  connectedNodes.forEach(nodeId => {
+    if (!visitedForComponents.has(nodeId) && nodes.find(n => n.id === nodeId)) {
+      const component: string[] = []
+      dfsComponent(nodeId, component)
+      if (component.length > 0) {
+        connectedComponents.push(component)
+      }
+    }
+  })
+  
+  // 如果有多个连通组件，只执行最大的那个
+  if (connectedComponents.length === 0) {
+    console.log('没有找到连通的节点组，跳过执行')
+    return []
+  }
+  
+  // 选择最大的连通组件
+  const largestComponent = connectedComponents.reduce((largest, current) => 
+    current.length > largest.length ? current : largest
+  )
+  
+  console.log(`找到 ${connectedComponents.length} 个连通组件，执行最大的组件（${largestComponent.length} 个节点）`)
+  
+  // 对选中的连通组件进行拓扑排序
+  const componentNodes = new Set(largestComponent)
+  
+  // DFS访问（拓扑排序）
   function visit(nodeId: string) {
-    if (visited.has(nodeId)) return
+    if (visited.has(nodeId) || !componentNodes.has(nodeId)) return
     visited.add(nodeId)
     
     const deps = dependencies.get(nodeId) || []
-    deps.forEach(depId => visit(depId))
+    deps.forEach(depId => {
+      if (componentNodes.has(depId)) {
+        visit(depId)
+      }
+    })
     
     order.push(nodeId)
   }
   
-  // 只访问参与连接的节点
-  connectedNodes.forEach(nodeId => {
+  // 只访问选中连通组件中的节点
+  largestComponent.forEach(nodeId => {
     if (nodes.find(n => n.id === nodeId)) {
       visit(nodeId)
     }

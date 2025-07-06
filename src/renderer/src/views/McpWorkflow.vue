@@ -5679,7 +5679,12 @@ const runWorkflow = async () => {
                 node.config.outputText = '未找到上游节点的执行结果'
               }
             } else {
-              node.config.outputText = '此输出节点没有连接到任何输入源'
+              // 只有当该输出节点实际被执行时才显示错误信息
+              // 检查该节点是否在执行结果中
+              if (result.results.nodeResults[node.id]) {
+                node.config.outputText = '此输出节点没有连接到任何输入源'
+              }
+              // 如果节点没有被执行，不更新其内容，保持原有状态
             }
           } else {
             // 如果没有详细的节点结果，显示基本的执行信息
@@ -5764,35 +5769,104 @@ const simulateNodeExecution = async (workflowData: { nodes: WorkflowNode[], conn
   redraw()
 }
 
-// 获取节点执行顺序（简单的拓扑排序）
+// 获取节点执行顺序（带连通性检查的拓扑排序）
 const getExecutionOrder = (workflowData: { nodes: WorkflowNode[], connections: { id: string; sourceNodeId: string; targetNodeId: string; sourceOutput: string; targetInput: string; }[] }): string[] => {
   const nodes = workflowData.nodes
   const connections = workflowData.connections || []
-  const visited = new Set<string>()
-  const order: string[] = []
   
-  // 构建依赖图
+  console.log('前端执行顺序计算 - 节点数:', nodes.length, '连接数:', connections.length)
+  
+  // 如果没有连接，只有一个节点时可以执行
+  if (connections.length === 0) {
+    if (nodes.length === 1) {
+      console.log('单节点无连接，允许执行:', nodes[0].id)
+      return [nodes[0].id]
+    } else {
+      console.log('多节点无连接，不执行任何节点')
+      return []
+    }
+  }
+  
+  // 构建双向邻接表（用于连通性检查）
+  const adjacencyList = new Map<string, Set<string>>()
+  nodes.forEach(node => adjacencyList.set(node.id, new Set()))
+  
+  connections.forEach(conn => {
+    // 双向连接
+    adjacencyList.get(conn.sourceNodeId)?.add(conn.targetNodeId)
+    adjacencyList.get(conn.targetNodeId)?.add(conn.sourceNodeId)
+  })
+  
+  // 构建单向依赖图（用于拓扑排序）
   const dependencies = new Map<string, string[]>()
-  nodes.forEach((node: WorkflowNode) => dependencies.set(node.id, []))
+  nodes.forEach(node => dependencies.set(node.id, []))
   
-  connections.forEach((conn) => {
+  connections.forEach(conn => {
     const deps = dependencies.get(conn.targetNodeId) || []
     deps.push(conn.sourceNodeId)
     dependencies.set(conn.targetNodeId, deps)
   })
   
-  // DFS访问
-  function visit(nodeId: string) {
+  // 使用DFS找到所有连通组件
+  const visited = new Set<string>()
+  const components: string[][] = []
+  
+  function dfsComponent(nodeId: string, component: string[]) {
     if (visited.has(nodeId)) return
     visited.add(nodeId)
+    component.push(nodeId)
+    
+    const neighbors = adjacencyList.get(nodeId) || new Set()
+    neighbors.forEach(neighborId => {
+      dfsComponent(neighborId, component)
+    })
+  }
+  
+  // 找到所有连通组件
+  nodes.forEach(node => {
+    if (!visited.has(node.id)) {
+      const component: string[] = []
+      dfsComponent(node.id, component)
+      if (component.length > 0) {
+        components.push(component)
+      }
+    }
+  })
+  
+  console.log('前端连通组件:', components.map(comp => ({ size: comp.length, nodes: comp })))
+  
+  // 如果有多个连通组件，选择最大的那个
+  if (components.length === 0) {
+    console.log('前端未找到连通组件')
+    return []
+  }
+  
+  const largestComponent = components.reduce((largest, current) => 
+    current.length > largest.length ? current : largest
+  )
+  
+  console.log('前端选择最大连通组件:', largestComponent)
+  
+  // 对选定的连通组件进行拓扑排序
+  const componentSet = new Set(largestComponent)
+  const componentVisited = new Set<string>()
+  const order: string[] = []
+  
+  function visit(nodeId: string) {
+    if (componentVisited.has(nodeId) || !componentSet.has(nodeId)) return
+    componentVisited.add(nodeId)
     
     const deps = dependencies.get(nodeId) || []
-    deps.forEach(depId => visit(depId))
+    // 只访问在同一连通组件中的依赖节点
+    deps.filter(depId => componentSet.has(depId)).forEach(depId => visit(depId))
     
     order.push(nodeId)
   }
   
-  nodes.forEach((node: WorkflowNode) => visit(node.id))
+  // 只对最大连通组件中的节点进行拓扑排序
+  largestComponent.forEach(nodeId => visit(nodeId))
+  
+  console.log('前端最终执行顺序:', order)
   return order
 }
 
