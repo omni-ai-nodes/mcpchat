@@ -846,31 +846,49 @@ const calculateTextOutputHeight = (text: string, containerWidth: number, context
   // 设置字体以便正确测量文本
   context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
   
-  // 处理文本换行
-  const words = text.split(' ')
+  // 优化的文本换行处理，支持中文和长单词
   const lines: string[] = []
-  let currentLine = ''
   const maxWidth = containerWidth - 32 * scale.value // 减去内边距
   
-  words.forEach(word => {
-    const testLine = currentLine + (currentLine ? ' ' : '') + word
-    const testWidth = context.measureText(testLine).width
+  // 按换行符分割文本
+  const paragraphs = text.split('\n')
+  
+  paragraphs.forEach(paragraph => {
+    if (!paragraph.trim()) {
+      lines.push('') // 保留空行
+      return
+    }
     
-    if (testWidth > maxWidth && currentLine) {
+    let currentLine = ''
+    
+    // 逐字符处理，支持更好的换行
+    for (let i = 0; i < paragraph.length; i++) {
+      const char = paragraph[i]
+      const testLine = currentLine + char
+      const testWidth = context.measureText(testLine).width
+      
+      if (testWidth > maxWidth && currentLine) {
+        // 如果当前字符是空格或标点，优先在此处换行
+        if (char === ' ' || /[，。！？；：、]/.test(char)) {
+          lines.push(currentLine + char)
+          currentLine = ''
+        } else {
+          lines.push(currentLine)
+          currentLine = char
+        }
+      } else {
+        currentLine = testLine
+      }
+    }
+    
+    if (currentLine) {
       lines.push(currentLine)
-      currentLine = word
-    } else {
-      currentLine = testLine
     }
   })
   
-  if (currentLine) {
-    lines.push(currentLine)
-  }
-  
   // 计算所需高度：标题高度 + 文本行数 * 行高 + 内边距
   const titleHeight = 28
-  const lineHeight = 12
+  const lineHeight = 14 // 稍微增加行高以提高可读性
   const padding = 16
   const minContentHeight = 32 // 最小内容高度
   
@@ -1791,31 +1809,49 @@ const drawNode = (node: WorkflowNode) => {
     context.textAlign = 'left'
     context.textBaseline = 'top'
     
-    // 处理文本换行
-    const words = outputText.split(' ')
+    // 优化的文本换行处理，支持中文和长单词
     const lines: string[] = []
-    let currentLine = ''
     const maxWidth = textAreaWidth - 8 * scale.value
     
-    words.forEach(word => {
-      const testLine = currentLine + (currentLine ? ' ' : '') + word
-      const testWidth = context.measureText(testLine).width
+    // 按换行符分割文本
+    const paragraphs = outputText.split('\n')
+    
+    paragraphs.forEach(paragraph => {
+      if (!paragraph.trim()) {
+        lines.push('') // 保留空行
+        return
+      }
       
-      if (testWidth > maxWidth && currentLine) {
+      let currentLine = ''
+      
+      // 逐字符处理，支持更好的换行
+      for (let i = 0; i < paragraph.length; i++) {
+        const char = paragraph[i]
+        const testLine = currentLine + char
+        const testWidth = context.measureText(testLine).width
+        
+        if (testWidth > maxWidth && currentLine) {
+          // 如果当前字符是空格或标点，优先在此处换行
+          if (char === ' ' || /[，。！？；：、]/.test(char)) {
+            lines.push(currentLine + char)
+            currentLine = ''
+          } else {
+            lines.push(currentLine)
+            currentLine = char
+          }
+        } else {
+          currentLine = testLine
+        }
+      }
+      
+      if (currentLine) {
         lines.push(currentLine)
-        currentLine = word
-      } else {
-        currentLine = testLine
       }
     })
     
-    if (currentLine) {
-      lines.push(currentLine)
-    }
-    
     // 绘制所有文本行（不再限制行数，因为容器高度已自适应）
     lines.forEach((line, index) => {
-      const lineY = textAreaY + index * 12 * scale.value
+      const lineY = textAreaY + index * 14 * scale.value // 使用与计算高度一致的行高
       context.fillText(line, textAreaX, lineY)
     })
     
