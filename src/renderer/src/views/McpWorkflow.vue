@@ -3131,6 +3131,63 @@ const showTextDisplayDialog = (node: WorkflowNode) => {
   `
   title.insertBefore(titleIcon, title.firstChild)
   
+  // 创建右侧按钮容器
+  const rightButtonsContainer = document.createElement('div')
+  rightButtonsContainer.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  `
+  
+  // 创建右上角复制按钮
+  const topCopyButton = document.createElement('button')
+  topCopyButton.innerHTML = '📋'
+  topCopyButton.title = '复制全部内容'
+  topCopyButton.style.cssText = `
+    background: none;
+    border: none;
+    color: #9ca3af;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `
+  topCopyButton.onmouseover = () => {
+    topCopyButton.style.background = '#374151'
+    topCopyButton.style.color = '#ffffff'
+    topCopyButton.style.transform = 'scale(1.1)'
+  }
+  topCopyButton.onmouseout = () => {
+    topCopyButton.style.background = 'none'
+    topCopyButton.style.color = '#9ca3af'
+    topCopyButton.style.transform = 'scale(1)'
+  }
+  topCopyButton.onclick = () => {
+    navigator.clipboard.writeText(currentText).then(() => {
+      const originalText = topCopyButton.innerHTML
+      topCopyButton.innerHTML = '✅'
+      topCopyButton.style.color = '#10b981'
+      setTimeout(() => {
+        topCopyButton.innerHTML = originalText
+        topCopyButton.style.color = '#9ca3af'
+      }, 1000)
+    }).catch(() => {
+      const originalText = topCopyButton.innerHTML
+      topCopyButton.innerHTML = '❌'
+      topCopyButton.style.color = '#ef4444'
+      setTimeout(() => {
+        topCopyButton.innerHTML = originalText
+        topCopyButton.style.color = '#9ca3af'
+      }, 1000)
+    })
+  }
+  
   // 创建关闭按钮
   const closeButton = document.createElement('button')
   closeButton.innerHTML = '✕'
@@ -3158,8 +3215,11 @@ const showTextDisplayDialog = (node: WorkflowNode) => {
     closeButton.style.color = '#9ca3af'
   }
   
+  rightButtonsContainer.appendChild(topCopyButton)
+  rightButtonsContainer.appendChild(closeButton)
+  
   titleContainer.appendChild(title)
-  titleContainer.appendChild(closeButton)
+  titleContainer.appendChild(rightButtonsContainer)
   
   // 创建文本显示区域容器
   const textContainer = document.createElement('div')
