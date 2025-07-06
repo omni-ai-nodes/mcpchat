@@ -1,7 +1,14 @@
 <template>
   <div 
     class="workflow-node"
-    :class="{ selected: isSelected }"
+    :class="{ 
+      selected: isSelected,
+      'node-idle': nodeStatus === 'idle',
+      'node-running': nodeStatus === 'running',
+      'node-completed': nodeStatus === 'completed',
+      'node-error': nodeStatus === 'error',
+      'node-flashing': isCurrentRunning
+    }"
     :style="{ left: node.x + 'px', top: node.y + 'px' }"
     @mousedown="startDrag"
     @click="selectNode"
@@ -119,6 +126,8 @@ interface Props {
   isSelected?: boolean
   isConnecting?: boolean
   connectionStart?: { nodeId: string, port: string, type: 'input' | 'output' } | null
+  nodeStatus?: 'idle' | 'running' | 'completed' | 'error'
+  isCurrentRunning?: boolean
 }
 
 const props = defineProps<Props>()
@@ -351,8 +360,44 @@ onUnmounted(() => {
   transition: all 0.2s;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   user-select: none;
-  z-index: 20; /* 确保节点在连接线之上 */
-  overflow: visible;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 节点状态样式 */
+.workflow-node.node-idle {
+  border-color: #404040;
+}
+
+.workflow-node.node-running {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.workflow-node.node-completed {
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.workflow-node.node-error {
+  border-color: #ef4444;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+/* 当前运行节点的闪光动画 */
+.workflow-node.node-flashing {
+  animation: nodeFlashing 1.5s ease-in-out infinite;
+}
+
+@keyframes nodeFlashing {
+  0%, 100% {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    border-color: #60a5fa;
+    box-shadow: 0 4px 20px rgba(96, 165, 250, 0.8), 0 0 30px rgba(96, 165, 250, 0.6);
+  }
 }
 
 .workflow-node:hover {

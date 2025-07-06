@@ -788,9 +788,57 @@ const drawNode = (node: WorkflowNode) => {
     ? (NODE_HEIGHT + 115) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
     : NODE_HEIGHT * scale.value
   
-  // 绘制节点阴影
-  context.shadowColor = 'rgba(0, 0, 0, 0.15)'
-  context.shadowBlur = 8 * scale.value
+  // 根据节点类型设置不同的背景色
+  let bgColor = '#2d2d2d'  // 默认深色背景
+  let borderColor = '#404040'
+  let shadowColor = 'rgba(0, 0, 0, 0.15)'
+  let shadowBlur = 8 * scale.value
+  
+  // 获取节点状态
+  const nodeStatus = nodeStatuses.value[node.id] || 'idle'
+  const isCurrentRunning = currentRunningNode.value === node.id
+  
+  // 根据节点状态设置颜色
+  if (nodeStatus === 'running' || isCurrentRunning) {
+    borderColor = '#3b82f6'  // 蓝色
+    shadowColor = 'rgba(59, 130, 246, 0.4)'
+    shadowBlur = 12 * scale.value
+    
+    // 闪光效果（通过时间变化的透明度）
+    if (isCurrentRunning) {
+      const time = Date.now() / 1000
+      const alpha = 0.4 + 0.4 * Math.sin(time * 4)  // 1.5秒周期的闪烁
+      shadowColor = `rgba(96, 165, 250, ${alpha})`
+      shadowBlur = (12 + 8 * Math.sin(time * 4)) * scale.value
+    }
+  } else if (nodeStatus === 'completed') {
+    borderColor = '#10b981'  // 绿色
+    shadowColor = 'rgba(16, 185, 129, 0.4)'
+    shadowBlur = 12 * scale.value
+  } else if (nodeStatus === 'error') {
+    borderColor = '#ef4444'  // 红色
+    shadowColor = 'rgba(239, 68, 68, 0.4)'
+    shadowBlur = 12 * scale.value
+  } else {
+    // idle 状态或默认状态
+    if (selectedNode.value?.id === node.id) {
+      bgColor = '#3d3d3d'
+      borderColor = '#0ea5e9'  // 蓝色边框表示选中
+    } else {
+      // 根据节点类型调整颜色
+      if (node.type.includes('input')) {
+        borderColor = '#10b981'  // 绿色
+      } else if (node.type.includes('output')) {
+        borderColor = '#8b5cf6'  // 紫色
+      } else {
+        borderColor = '#f59e0b'  // 橙色
+      }
+    }
+  }
+  
+  // 绘制节点阴影（使用状态相关的阴影）
+  context.shadowColor = shadowColor
+  context.shadowBlur = shadowBlur
   context.shadowOffsetX = 0
   context.shadowOffsetY = 2 * scale.value
   
@@ -807,24 +855,6 @@ const drawNode = (node: WorkflowNode) => {
   context.lineTo(x, y + radius)
   context.quadraticCurveTo(x, y, x + radius, y)
   context.closePath()
-  
-  // 根据节点类型设置不同的背景色
-  let bgColor = '#2d2d2d'  // 默认深色背景
-  let borderColor = '#404040'
-  
-  if (selectedNode.value?.id === node.id) {
-    bgColor = '#3d3d3d'
-    borderColor = '#0ea5e9'  // 蓝色边框表示选中
-  }
-  
-  // 根据节点类型调整颜色
-  if (node.type.includes('input')) {
-    borderColor = selectedNode.value?.id === node.id ? '#0ea5e9' : '#10b981'  // 绿色
-  } else if (node.type.includes('output')) {
-    borderColor = selectedNode.value?.id === node.id ? '#0ea5e9' : '#8b5cf6'  // 紫色
-  } else {
-    borderColor = selectedNode.value?.id === node.id ? '#0ea5e9' : '#f59e0b'  // 橙色
-  }
   
   context.fillStyle = bgColor
   context.fill()
@@ -4494,6 +4524,38 @@ const saveWorkflow = async () => {
   }
 }
 
+// 节点状态管理
+const nodeStatuses = ref<Record<string, 'idle' | 'running' | 'completed' | 'error'>>({})
+const isWorkflowRunning = ref(false)
+const currentRunningNode = ref<string | null>(null)
+
+// 动画定时器
+let animationTimer: number | null = null
+
+// 启动动画循环
+const startAnimation = () => {
+  if (animationTimer) return
+  
+  const animate = () => {
+    if (isWorkflowRunning.value && currentRunningNode.value) {
+      redraw()
+      animationTimer = requestAnimationFrame(animate)
+    } else {
+      animationTimer = null
+    }
+  }
+  
+  animationTimer = requestAnimationFrame(animate)
+}
+
+// 停止动画循环
+const stopAnimation = () => {
+  if (animationTimer) {
+    cancelAnimationFrame(animationTimer)
+    animationTimer = null
+  }
+}
+
 const runWorkflow = async () => {
   try {
     // 检查工作流是否为空
@@ -4549,6 +4611,14 @@ const runWorkflow = async () => {
       return
     }
 
+    // 初始化节点状态
+    isWorkflowRunning.value = true
+    nodeStatuses.value = {}
+    workflowNodes.value.forEach(node => {
+      nodeStatuses.value[node.id] = 'idle'
+    })
+    currentRunningNode.value = null
+
     toast({
       title: '信息',
       description: '开始运行工作流...',
@@ -4576,10 +4646,19 @@ const runWorkflow = async () => {
 
     console.log('运行工作流:', workflowData)
 
+    // 模拟节点执行过程
+    await simulateNodeExecution(workflowData)
+
     // 调用运行API
     const result = await window.api.runWorkflow(workflowData)
     
     if (result.success) {
+      // 标记所有节点为完成状态
+      workflowNodes.value.forEach(node => {
+        nodeStatuses.value[node.id] = 'completed'
+      })
+      currentRunningNode.value = null
+      
       toast({
         title: '成功',
         description: `工作流运行完成! 处理了 ${result.results.processedNodes} 个节点`,
@@ -4617,6 +4696,11 @@ const runWorkflow = async () => {
       // 重新绘制画布以显示更新的内容
       redraw()
     } else {
+      // 标记当前运行节点为错误状态
+      if (currentRunningNode.value) {
+        nodeStatuses.value[currentRunningNode.value] = 'error'
+      }
+      
       // 显示具体的错误信息
       const errorMessage = result.error || '运行工作流失败，原因未知'
       toast({
@@ -4628,6 +4712,11 @@ const runWorkflow = async () => {
     }
   } catch (error) {
     console.error('运行工作流时发生错误:', error)
+    
+    // 标记当前运行节点为错误状态
+    if (currentRunningNode.value) {
+      nodeStatuses.value[currentRunningNode.value] = 'error'
+    }
     
     // 提供更详细的错误信息
     let errorMessage = '运行工作流时发生未知错误'
@@ -4645,7 +4734,71 @@ const runWorkflow = async () => {
       description: `错误详情: ${errorMessage}`,
       variant: 'destructive'
     })
+  } finally {
+    isWorkflowRunning.value = false
+    currentRunningNode.value = null
+    stopAnimation()
+    redraw()
   }
+}
+
+// 模拟节点执行过程，显示运行状态
+const simulateNodeExecution = async (workflowData: { nodes: WorkflowNode[], connections: any[] }) => {
+  // 获取执行顺序
+  const executionOrder = getExecutionOrder(workflowData)
+  
+  for (const nodeId of executionOrder) {
+    // 设置当前节点为运行状态
+    nodeStatuses.value[nodeId] = 'running'
+    currentRunningNode.value = nodeId
+    
+    // 启动动画
+    startAnimation()
+    
+    // 模拟节点执行时间
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // 设置节点为完成状态
+    nodeStatuses.value[nodeId] = 'completed'
+  }
+  
+  currentRunningNode.value = null
+  // 停止动画
+  stopAnimation()
+  // 最后重绘一次以显示最终状态
+  redraw()
+}
+
+// 获取节点执行顺序（简单的拓扑排序）
+const getExecutionOrder = (workflowData: { nodes: WorkflowNode[], connections: any[] }): string[] => {
+  const nodes = workflowData.nodes
+  const connections = workflowData.connections || []
+  const visited = new Set<string>()
+  const order: string[] = []
+  
+  // 构建依赖图
+  const dependencies = new Map<string, string[]>()
+  nodes.forEach((node: WorkflowNode) => dependencies.set(node.id, []))
+  
+  connections.forEach((conn: { targetNodeId: string, sourceNodeId: string }) => {
+    const deps = dependencies.get(conn.targetNodeId) || []
+    deps.push(conn.sourceNodeId)
+    dependencies.set(conn.targetNodeId, deps)
+  })
+  
+  // DFS访问
+  function visit(nodeId: string) {
+    if (visited.has(nodeId)) return
+    visited.add(nodeId)
+    
+    const deps = dependencies.get(nodeId) || []
+    deps.forEach(depId => visit(depId))
+    
+    order.push(nodeId)
+  }
+  
+  nodes.forEach((node: WorkflowNode) => visit(node.id))
+  return order
 }
 
 const deployWorkflow = async () => {
@@ -4916,6 +5069,8 @@ onMounted(() => {
       cancelAnimationFrame(animationFrameId.value)
       animationFrameId.value = null
     }
+    // 清理节点状态动画定时器
+    stopAnimation()
     // 清理MCP状态更新定时器
     interface CustomWindow extends Window {
       mcpStatusUpdateInterval?: number
