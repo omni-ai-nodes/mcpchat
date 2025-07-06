@@ -1044,6 +1044,34 @@ const formatFileSize = (bytes: number) => {
 
 onMounted(async () => {
   await loadPrompts()
+  
+  // 检查并添加默认提示词
+  const defaultPromptName = 'Josn解析和翻译'
+  const hasDefaultPrompt = prompts.value.some(prompt => prompt.name === defaultPromptName)
+  
+  if (!hasDefaultPrompt) {
+    const timestamp = Date.now()
+    const defaultPrompt = {
+      id: timestamp.toString(),
+      name: defaultPromptName,
+      description: '大模型 Josn解析和翻译功能',
+      content: '解析josn内容并翻译成markdown文本',
+      parameters: [],
+      files: [],
+      enabled: true,
+      source: 'builtin' as const,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    }
+    
+    try {
+      await promptsStore.addPrompt(defaultPrompt)
+      await loadPrompts()
+    } catch (error) {
+      console.warn('Failed to add default prompt:', error)
+    }
+  }
+  
   // 加载默认系统提示词
   defaultSystemPrompt.value = await settingsStore.getDefaultSystemPrompt()
 })
