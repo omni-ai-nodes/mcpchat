@@ -5648,10 +5648,12 @@ const runWorkflow = async () => {
     const result = await window.api.runWorkflow(workflowData)
     
     if (result.success) {
-      // 标记所有节点为完成状态
-      workflowNodes.value.forEach(node => {
-        nodeStatuses.value[node.id] = 'completed'
-      })
+      // 只标记实际执行的节点为完成状态
+      if (result.results.nodeResults) {
+        Object.keys(result.results.nodeResults).forEach(nodeId => {
+          nodeStatuses.value[nodeId] = 'completed'
+        })
+      }
       currentRunningNode.value = null
       
       toast({
