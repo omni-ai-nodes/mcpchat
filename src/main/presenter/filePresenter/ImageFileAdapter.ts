@@ -79,14 +79,14 @@ export class ImageFileAdapter extends BaseFileAdapter {
 
     // 压缩图片并转换为JPG格式
     const compressedImage = await sharp(this.filePath)
-      .resize(256, 256, {
+      .resize(128, 128, {
         // 限制最大尺寸
         fit: 'inside',
         withoutEnlargement: true
       })
       .jpeg({
         // 统一转换为JPG
-        quality: 30, // 压缩质量
+        quality: 20, // 压缩质量
         mozjpeg: true // 使用mozjpeg优化
       })
     this.imageMetadata.compressWidth =
