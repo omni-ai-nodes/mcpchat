@@ -47,6 +47,9 @@ async function executeWorkflow(workflowData: WorkflowData) {
         case 'text-input':
           result = await executeTextInputNode(node)
           break
+        case 'model-service':
+          result = await executeModelServiceNode(node, inputData)
+          break
         case 'mcp-service':
           result = await executeMcpNode(node, inputData)
           break
@@ -141,6 +144,115 @@ async function executeTextInputNode(node: WorkflowNode): Promise<NodeResult> {
   const config = node.config || {}
   return {
     output: (config.textContent as string) || (config.text as string) || (config.content as string) || ''
+  }
+}
+
+// 执行模型服务节点
+async function executeModelServiceNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  const input = (inputData.input as string) || ''
+  const config = node.config || {}
+  
+  if (!input.trim()) {
+    throw new Error(`模型服务节点 "${node.name}" 没有接收到输入文本`)
+  }
+  
+  try {
+    // 获取presenter实例
+    const { presenter } = await import('@/presenter')
+    const llmproviderPresenter = presenter.llmproviderPresenter
+    const configPresenter = presenter.configPresenter
+    
+    if (!llmproviderPresenter || !configPresenter) {
+      throw new Error('必要的服务未初始化')
+    }
+    
+    console.log(`模型服务节点处理输入文本: ${input}`)
+    
+    // 获取节点配置的模型信息
+    const selectedProviderId = config.selectedProviderId as string
+    const selectedModelId = config.selectedModelId as string
+    const selectedPromptId = config.selectedPromptId as string
+    
+    // 获取当前LLM配置，优先使用节点配置的模型
+    let currentProvider = selectedProviderId ? 
+      llmproviderPresenter.getProviders().find(p => p.id === selectedProviderId) :
+      llmproviderPresenter.getCurrentProvider()
+      
+    if (!currentProvider) {
+      const availableProviders = llmproviderPresenter.getProviders().filter(p => p.enable)
+      if (availableProviders.length === 0) {
+        throw new Error('没有可用的LLM提供者，请先配置并启用至少一个LLM提供者')
+      }
+      currentProvider = availableProviders[0]
+      console.log(`自动选择LLM提供者: ${currentProvider.name}`)
+    }
+    
+    // 获取模型列表
+    const models = await llmproviderPresenter.getModelList(currentProvider.id)
+    if (!models || models.length === 0) {
+      throw new Error('未找到可用的模型')
+    }
+    
+    // 选择模型
+    let modelId = selectedModelId
+    if (!modelId || !models.find(m => m.id === modelId)) {
+      modelId = models[0].id // 使用第一个可用模型
+      console.log(`使用默认模型: ${modelId}`)
+    } else {
+      console.log(`使用配置的模型: ${modelId}`)
+    }
+    
+    // 构建消息内容
+    let messageContent = input
+    
+    // 如果配置了prompt，则应用prompt
+      if (selectedPromptId) {
+        try {
+          // 通过configPresenter获取prompt内容
+          const prompts = await configPresenter.getCustomPrompts()
+          const selectedPrompt = prompts.find(p => p.id === selectedPromptId)
+          
+          if (selectedPrompt && selectedPrompt.content) {
+            // 将prompt内容与输入文本结合
+            messageContent = `${selectedPrompt.content}\n\n用户输入: ${input}`
+            console.log(`应用了prompt: ${selectedPrompt.name}`)
+          } else {
+            console.warn(`未找到指定的prompt: ${selectedPromptId}`)
+          }
+        } catch (error) {
+          console.warn('获取prompt失败，使用原始输入:', error)
+        }
+      }
+     
+     // 构建消息
+     const messages = [
+       {
+         role: 'user' as const,
+         content: messageContent
+       }
+     ]
+     
+     console.log(`调用模型 ${modelId} 处理消息`)
+     
+     // 调用模型
+     const outputText = await llmproviderPresenter.generateCompletion(
+       currentProvider.id,
+       messages,
+       modelId
+     )
+     
+     if (!outputText || !outputText.trim()) {
+       throw new Error('模型返回了空响应')
+     }
+    console.log(`模型响应: ${outputText.substring(0, 100)}${outputText.length > 100 ? '...' : ''}`)
+    
+    return {
+      output: outputText
+    }
+    
+  } catch (error) {
+    console.error(`模型服务节点执行失败:`, error)
+    throw new Error(`模型服务节点 "${node.name}" 执行失败: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 

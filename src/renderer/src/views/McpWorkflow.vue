@@ -837,6 +837,47 @@ const drawNodes = () => {
   }
 }
 
+// 计算文本输出节点所需的高度
+const calculateTextOutputHeight = (text: string, containerWidth: number, context: CanvasRenderingContext2D): number => {
+  if (!text || text === '暂无输出内容...') {
+    return 60 // 最小高度
+  }
+  
+  // 设置字体以便正确测量文本
+  context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+  
+  // 处理文本换行
+  const words = text.split(' ')
+  const lines: string[] = []
+  let currentLine = ''
+  const maxWidth = containerWidth - 32 * scale.value // 减去内边距
+  
+  words.forEach(word => {
+    const testLine = currentLine + (currentLine ? ' ' : '') + word
+    const testWidth = context.measureText(testLine).width
+    
+    if (testWidth > maxWidth && currentLine) {
+      lines.push(currentLine)
+      currentLine = word
+    } else {
+      currentLine = testLine
+    }
+  })
+  
+  if (currentLine) {
+    lines.push(currentLine)
+  }
+  
+  // 计算所需高度：标题高度 + 文本行数 * 行高 + 内边距
+  const titleHeight = 28
+  const lineHeight = 12
+  const padding = 16
+  const minContentHeight = 32 // 最小内容高度
+  
+  const contentHeight = Math.max(lines.length * lineHeight, minContentHeight)
+  return titleHeight + contentHeight + padding
+}
+
 const drawNode = (node: WorkflowNode) => {
   if (!ctx.value) return
   
@@ -845,17 +886,23 @@ const drawNode = (node: WorkflowNode) => {
   const y = (node.y + offset.value.y) * scale.value
   const width = NODE_WIDTH * scale.value
   // 为file-input、text-input、text-output、mcp-service和model-service节点动态计算高度
-  const height = node.type === 'file-input' 
-    ? (NODE_HEIGHT + 226 ) * scale.value  // 基础高度 + 上传区域高度 + 间距
-    : node.type === 'text-input'
-    ? (NODE_HEIGHT + 96 ) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
-    : node.type === 'text-output'
-    ? (NODE_HEIGHT + 126 ) * scale.value  // 基础高度 + 文本显示区域高度 + 间距
-    : node.type === 'mcp-service'
-    ? (NODE_HEIGHT + 116) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
-    : node.type === 'model-service'
-    ? (NODE_HEIGHT + 106) * scale.value  // 基础高度 + 模型选择区域高度 + 间距
-    : NODE_HEIGHT * scale.value
+  let height: number
+  if (node.type === 'file-input') {
+    height = (NODE_HEIGHT + 226) * scale.value  // 基础高度 + 上传区域高度 + 间距
+  } else if (node.type === 'text-input') {
+    height = (NODE_HEIGHT + 96) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
+  } else if (node.type === 'text-output') {
+    // 计算文本输出节点的自适应高度
+    const outputText = (node.config?.outputText as string) || '暂无输出内容...'
+    const adaptiveHeight = calculateTextOutputHeight(outputText, width - 16 * scale.value, context)
+    height = (NODE_HEIGHT + adaptiveHeight + 16) * scale.value  // 基础高度 + 自适应文本区域高度 + 间距
+  } else if (node.type === 'mcp-service') {
+    height = (NODE_HEIGHT + 116) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
+  } else if (node.type === 'model-service') {
+    height = (NODE_HEIGHT + 106) * scale.value  // 基础高度 + 模型选择区域高度 + 间距
+  } else {
+    height = NODE_HEIGHT * scale.value
+  }
   
   // 根据节点类型设置不同的背景色
   let bgColor = '#2d2d2d'  // 默认深色背景
@@ -1709,7 +1756,9 @@ const drawNode = (node: WorkflowNode) => {
   // 如果是文本输出节点，绘制文本显示区域
   if (node.type === 'text-output') {
     const displayAreaWidth = width - 16 * scale.value
-    const displayAreaHeight = 150 * scale.value
+    const outputText = (node.config?.outputText as string) || '暂无输出内容...'
+    const adaptiveHeight = calculateTextOutputHeight(outputText, displayAreaWidth, context)
+    const displayAreaHeight = adaptiveHeight * scale.value
     const displayAreaX = x + 8 * scale.value
     const displayAreaY = y + headerHeight + 8 * scale.value
     
@@ -1732,14 +1781,10 @@ const drawNode = (node: WorkflowNode) => {
     context.textBaseline = 'top'
     context.fillText('输出内容:', displayAreaX + 8 * scale.value, displayAreaY + 8 * scale.value)
     
-    // 获取节点的输出文本内容
-    const outputText = (node.config?.outputText as string) || '暂无输出内容...'
-    
     // 绘制文本内容
     const textAreaX = displayAreaX + 8 * scale.value
     const textAreaY = displayAreaY + 28 * scale.value
     const textAreaWidth = displayAreaWidth - 16 * scale.value
-    const textAreaHeight = displayAreaHeight - 36 * scale.value
     
     context.fillStyle = outputText === '暂无输出内容...' ? '#94a3b8' : '#1e293b'
     context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
@@ -1768,21 +1813,11 @@ const drawNode = (node: WorkflowNode) => {
       lines.push(currentLine)
     }
     
-    // 限制显示行数
-    const maxLines = Math.floor(textAreaHeight / (12 * scale.value))
-    const displayLines = lines.slice(0, maxLines)
-    
-    // 绘制文本行
-    displayLines.forEach((line, index) => {
+    // 绘制所有文本行（不再限制行数，因为容器高度已自适应）
+    lines.forEach((line, index) => {
       const lineY = textAreaY + index * 12 * scale.value
       context.fillText(line, textAreaX, lineY)
     })
-    
-    // 如果文本被截断，显示省略号
-    if (lines.length > maxLines) {
-      context.fillStyle = '#64748b'
-      context.fillText('...', textAreaX, textAreaY + (maxLines - 1) * 12 * scale.value + 12 * scale.value)
-    }
     
     // 存储文本显示区域位置信息，用于点击检测
     if (!node.textDisplayArea) {
