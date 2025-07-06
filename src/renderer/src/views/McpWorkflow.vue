@@ -3086,10 +3086,10 @@ const showTextDisplayDialog = (node: WorkflowNode) => {
     padding: 28px;
     width: ${alignedWidth}px;
     height: ${alignedHeight}px;
-    min-width: 400px;
-    min-height: 300px;
-    max-width: 90vw;
-    max-height: 80vh;
+    min-width: 600px;  /* 从400px增加到600px */
+    min-height: 400px;  /* 从300px增加到400px */
+    max-width: 95vw;  /* 从90vw增加到95vw */
+    max-height: 85vh;  /* 从80vh增加到85vh */
     border: 1px solid #374151;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
     display: flex;
@@ -3459,14 +3459,14 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
     animation: fadeIn 0.2s ease-out;
   `
   
-  // 优化对话框尺寸计算
+  // 优化对话框尺寸计算 - 增加宽度以显示更多内容
   const nodeScale = scale.value || 1
-  const minWidth = 500
-  const maxWidth = Math.min(800, window.innerWidth * 0.9)
-  const alignedWidth = Math.max(minWidth, Math.min(maxWidth, 180 * nodeScale + 100))
-  const minHeight = 400
-  const maxHeight = Math.min(600, window.innerHeight * 0.8)
-  const alignedHeight = Math.max(minHeight, Math.min(maxHeight, 60 * nodeScale * 5 + 150))
+  const minWidth = 700  // 从500增加到700
+  const maxWidth = Math.min(1200, window.innerWidth * 0.95)  // 从800增加到1200，屏幕占比从90%增加到95%
+  const alignedWidth = Math.max(minWidth, Math.min(maxWidth, 180 * nodeScale + 200))  // 增加额外宽度
+  const minHeight = 500  // 从400增加到500
+  const maxHeight = Math.min(700, window.innerHeight * 0.85)  // 从600增加到700，屏幕占比从80%增加到85%
+  const alignedHeight = Math.max(minHeight, Math.min(maxHeight, 60 * nodeScale * 6 + 200))  // 增加额外高度
   
   // 创建对话框内容
   const dialogContent = document.createElement('div')
@@ -3476,10 +3476,10 @@ const handleTextEditButtonClick = (node: WorkflowNode) => {
     padding: 28px;
     width: ${alignedWidth}px;
     height: ${alignedHeight}px;
-    min-width: 400px;
-    min-height: 300px;
-    max-width: 90vw;
-    max-height: 80vh;
+    min-width: 600px;  /* 从400px增加到600px */
+    min-height: 400px;  /* 从300px增加到400px */
+    max-width: 95vw;  /* 从90vw增加到95vw */
+    max-height: 85vh;  /* 从80vh增加到85vh */
     border: 1px solid #374151;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
     display: flex;
