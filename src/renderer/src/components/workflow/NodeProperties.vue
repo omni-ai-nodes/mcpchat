@@ -160,6 +160,88 @@
       </div>
     </template>
 
+    <template v-else-if="node.type === 'model-service'">
+      <div class="property-group">
+        <label class="property-label">选择提供商</label>
+        <select 
+          v-model="localNode.config.selectedProvider"
+          class="property-input"
+          @change="updateConfig('selectedProvider', $event.target.value)"
+        >
+          <option value="">请选择提供商...</option>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="google">Google</option>
+          <option value="azure">Azure OpenAI</option>
+          <option value="ollama">Ollama</option>
+          <option value="deepseek">DeepSeek</option>
+        </select>
+      </div>
+      <div class="property-group">
+        <label class="property-label">选择模型</label>
+        <select 
+          v-model="localNode.config.selectedModel"
+          class="property-input"
+          @change="updateConfig('selectedModel', $event.target.value)"
+          :disabled="!localNode.config.selectedProvider"
+        >
+          <option value="">请选择模型...</option>
+          <template v-if="localNode.config.selectedProvider === 'openai'">
+            <option value="gpt-4">GPT-4</option>
+            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+          </template>
+          <template v-else-if="localNode.config.selectedProvider === 'anthropic'">
+            <option value="claude-3-opus">Claude 3 Opus</option>
+            <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+            <option value="claude-3-haiku">Claude 3 Haiku</option>
+          </template>
+          <template v-else-if="localNode.config.selectedProvider === 'google'">
+            <option value="gemini-pro">Gemini Pro</option>
+            <option value="gemini-pro-vision">Gemini Pro Vision</option>
+          </template>
+          <template v-else-if="localNode.config.selectedProvider === 'azure'">
+            <option value="gpt-4">GPT-4 (Azure)</option>
+            <option value="gpt-35-turbo">GPT-3.5 Turbo (Azure)</option>
+          </template>
+          <template v-else-if="localNode.config.selectedProvider === 'ollama'">
+            <option value="llama2">Llama 2</option>
+            <option value="codellama">Code Llama</option>
+            <option value="mistral">Mistral</option>
+          </template>
+          <template v-else-if="localNode.config.selectedProvider === 'deepseek'">
+            <option value="deepseek-chat">DeepSeek Chat</option>
+            <option value="deepseek-coder">DeepSeek Coder</option>
+          </template>
+        </select>
+      </div>
+      <div class="property-group">
+        <label class="property-label">温度参数</label>
+        <input 
+          v-model.number="localNode.config.temperature"
+          class="property-input"
+          type="number"
+          min="0"
+          max="2"
+          step="0.1"
+          placeholder="0.7"
+          @input="updateConfig('temperature', Number($event.target.value))"
+        />
+      </div>
+      <div class="property-group">
+        <label class="property-label">最大令牌数</label>
+        <input 
+          v-model.number="localNode.config.maxTokens"
+          class="property-input"
+          type="number"
+          min="1"
+          max="4096"
+          placeholder="2048"
+          @input="updateConfig('maxTokens', Number($event.target.value))"
+        />
+      </div>
+    </template>
+
     <div class="property-group">
       <label class="property-label">位置</label>
       <div class="position-inputs">

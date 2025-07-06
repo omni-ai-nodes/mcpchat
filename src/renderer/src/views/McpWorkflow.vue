@@ -483,6 +483,24 @@ interface WorkflowNode {
     width: number
     height: number
   }
+  providerSelect?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  modelSelect?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  modelServiceArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
   textDisplayArea?: {
     x: number
     y: number
@@ -601,6 +619,13 @@ const processNodes: NodeTemplate[] = [
     name: 'MCP服务',
     description: '连接MCP服务提供商',
     icon: 'lucide:server',
+    category: 'process'
+  },
+  {
+    type: 'model-service',
+    name: '模型服务',
+    description: '选择和配置AI模型',
+    icon: 'lucide:cpu',
     category: 'process'
   },
   {
@@ -777,7 +802,7 @@ const drawNode = (node: WorkflowNode) => {
   const x = (node.x + offset.value.x) * scale.value
   const y = (node.y + offset.value.y) * scale.value
   const width = NODE_WIDTH * scale.value
-  // 为file-input、text-input、text-output和mcp-service节点动态计算高度
+  // 为file-input、text-input、text-output、mcp-service和model-service节点动态计算高度
   const height = node.type === 'file-input' 
     ? (NODE_HEIGHT + 226 ) * scale.value  // 基础高度 + 上传区域高度 + 间距
     : node.type === 'text-input'
@@ -786,6 +811,8 @@ const drawNode = (node: WorkflowNode) => {
     ? (NODE_HEIGHT + 128 ) * scale.value  // 基础高度 + 文本显示区域高度 + 间距
     : node.type === 'mcp-service'
     ? (NODE_HEIGHT + 115) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
+    : node.type === 'model-service'
+    ? (NODE_HEIGHT + 70) * scale.value  // 基础高度 + 模型选择区域高度 + 间距
     : NODE_HEIGHT * scale.value
   
   // 根据节点类型设置不同的背景色
@@ -1491,6 +1518,99 @@ const drawNode = (node: WorkflowNode) => {
       node.mcpServiceArea.y = serviceAreaY
       node.mcpServiceArea.width = serviceAreaWidth
       node.mcpServiceArea.height = serviceAreaHeight
+    }
+  }
+
+  // 如果是模型服务节点，绘制模型选择区域
+  if (node.type === 'model-service') {
+    const serviceAreaWidth = width - 16 * scale.value
+    const serviceAreaHeight = 70 * scale.value  // 减少高度，只显示模型选择
+    const serviceAreaX = x + 8 * scale.value
+    const serviceAreaY = y + headerHeight + 8 * scale.value
+    
+    // 绘制整体背景
+    context.fillStyle = '#1e293b'  // 深蓝灰色背景
+    context.beginPath()
+    context.roundRect(serviceAreaX, serviceAreaY, serviceAreaWidth, serviceAreaHeight, 8 * scale.value)
+    context.fill()
+    
+    // 绘制边框
+    context.strokeStyle = '#334155'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+    
+    // 绘制模型选择区域（占据整个服务区域）
+    const modelSelectY = serviceAreaY + 8 * scale.value
+    const modelSelectHeight = serviceAreaHeight - 16 * scale.value
+    const modelSelectX = serviceAreaX + 8 * scale.value
+    const modelSelectWidth = serviceAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#0f172a'
+    context.beginPath()
+    context.roundRect(modelSelectX, modelSelectY, modelSelectWidth, modelSelectHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制模型选择标题
+    context.fillStyle = '#e2e8f0'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('选择模型:', modelSelectX + 8 * scale.value, modelSelectY + 8 * scale.value)
+    
+    // 绘制当前选择的模型或占位符
+    const selectedModelName = (node.config?.selectedModelName as string) || '请选择模型...'
+    const selectedModelProvider = (node.config?.selectedModelProvider as string)
+    
+    context.fillStyle = selectedModelName === '请选择模型...' ? '#64748b' : '#cbd5e1'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(selectedModelName, modelSelectX + 8 * scale.value, modelSelectY + 28 * scale.value)
+    
+    // 如果有提供商信息，显示在模型名称下方
+    if (selectedModelProvider && selectedModelName !== '请选择模型...') {
+      context.fillStyle = '#64748b'
+      context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.fillText(selectedModelProvider, modelSelectX + 8 * scale.value, modelSelectY + 42 * scale.value)
+    }
+    
+    // 绘制下拉箭头
+    context.fillStyle = '#64748b'
+    context.font = `${12 * scale.value}px Arial`
+    context.textAlign = 'right'
+    context.fillText('▼', modelSelectX + modelSelectWidth - 8 * scale.value, modelSelectY + 32 * scale.value)
+    
+    // 存储模型选择区域位置信息
+    if (!node.modelSelect) {
+      node.modelSelect = {
+        x: modelSelectX / scale.value,
+        y: modelSelectY / scale.value,
+        width: modelSelectWidth / scale.value,
+        height: modelSelectHeight / scale.value
+      }
+    } else {
+      node.modelSelect.x = modelSelectX / scale.value
+      node.modelSelect.y = modelSelectY / scale.value
+      node.modelSelect.width = modelSelectWidth / scale.value
+      node.modelSelect.height = modelSelectHeight / scale.value
+    }
+    
+    // 存储整个服务区域位置信息
+    if (!node.modelServiceArea) {
+      node.modelServiceArea = {
+        x: serviceAreaX,
+        y: serviceAreaY,
+        width: serviceAreaWidth,
+        height: serviceAreaHeight
+      }
+    } else {
+      node.modelServiceArea.x = serviceAreaX
+      node.modelServiceArea.y = serviceAreaY
+      node.modelServiceArea.width = serviceAreaWidth
+      node.modelServiceArea.height = serviceAreaHeight
     }
   }
 
@@ -2243,6 +2363,20 @@ const getMcpServerSelectAtPosition = (x: number, y: number): WorkflowNode | null
       const selectArea = node.mcpServerSelect
       if (x >= selectArea.x && x <= selectArea.x + selectArea.width && 
           y >= selectArea.y && y <= selectArea.y + selectArea.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取模型服务模型选择区域点击位置
+const getModelServiceSelectAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'model-service' && node.modelSelect) {
+      const area = node.modelSelect
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
         return node
       }
     }
@@ -4091,6 +4225,367 @@ const removeSelectedServer = async (serverName: string) => {
   }
 }
 
+
+
+// 处理model-service节点模型选择点击
+const handleModelServiceSelectClick = (node: WorkflowNode) => {
+  console.log('点击模型选择，节点:', node.name)
+  
+  // 创建模型选择对话框
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease-out;
+  `
+  
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(51, 65, 85, 0.95));
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 20px;
+    padding: 24px;
+    width: 420px;
+    max-width: 90vw;
+    max-height: 80vh;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(16px);
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.3s ease-out;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '选择模型'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f8fafc;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: 0.5px;
+  `
+  
+  // 创建搜索容器
+  const searchContainer = document.createElement('div')
+  searchContainer.style.cssText = `
+    position: relative;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+  `
+  
+  // 搜索图标
+  const searchIcon = document.createElement('div')
+  searchIcon.innerHTML = '🔍'
+  searchIcon.style.cssText = `
+    position: absolute;
+    left: 12px;
+    font-size: 14px;
+    z-index: 1;
+    opacity: 0.6;
+  `
+  
+  // 搜索输入框
+  const searchInput = document.createElement('input')
+  searchInput.type = 'text'
+  searchInput.placeholder = '搜索模型...'
+  searchInput.style.cssText = `
+    width: 100%;
+    padding: 12px 16px 12px 36px;
+    border: 1px solid rgba(75, 85, 99, 0.3);
+    border-radius: 12px;
+    background: rgba(55, 65, 81, 0.6);
+    color: #f8fafc;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+  `
+  
+  searchInput.onfocus = () => {
+    searchInput.style.borderColor = 'rgba(99, 102, 241, 0.5)'
+    searchInput.style.background = 'rgba(55, 65, 81, 0.8)'
+  }
+  
+  searchInput.onblur = () => {
+    searchInput.style.borderColor = 'rgba(75, 85, 99, 0.3)'
+    searchInput.style.background = 'rgba(55, 65, 81, 0.6)'
+  }
+  
+  searchContainer.appendChild(searchIcon)
+  searchContainer.appendChild(searchInput)
+  
+  // 获取可用模型列表
+  const getAvailableModels = () => {
+    const availableModels: { id: string; name: string; provider: string }[] = []
+    
+    // 遍历已启用的模型
+    settingsStore.enabledModels.forEach(providerModels => {
+      providerModels.models.forEach(model => {
+        if (model.enabled) {
+          availableModels.push({
+            id: model.id,
+            name: model.name || model.id,
+            provider: providerModels.providerId
+          })
+        }
+      })
+    })
+    
+    return availableModels
+  }
+  
+  const allModels = getAvailableModels()
+  let filteredModels = allModels
+  
+  const modelList = document.createElement('div')
+  modelList.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    max-height: 12rem;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    border: 1px solid rgba(75, 85, 99, 0.3);
+    border-radius: 12px;
+    background: rgba(31, 41, 55, 0.6);
+    backdrop-filter: blur(8px);
+    flex: 1;
+    min-height: 0;
+  `
+  
+  // 自定义滚动条样式
+  const style = document.createElement('style')
+  style.textContent = `
+    .model-list-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    .model-list-container::-webkit-scrollbar-track {
+      background: rgba(55, 65, 81, 0.3);
+      border-radius: 3px;
+    }
+    .model-list-container::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.6);
+      border-radius: 3px;
+    }
+    .model-list-container::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.8);
+    }
+  `
+  document.head.appendChild(style)
+  modelList.className = 'model-list-container'
+  
+  // 渲染模型列表的函数
+  const renderModelList = (models) => {
+    modelList.innerHTML = ''
+    
+    if (models.length === 0) {
+      const noResults = document.createElement('div')
+      noResults.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 12px;">🔍</div>
+        <div style="font-weight: 500; margin-bottom: 4px;">未找到匹配的模型</div>
+        <div style="font-size: 13px; opacity: 0.7;">请尝试其他搜索关键词</div>
+      `
+      noResults.style.cssText = `
+        padding: 40px 20px;
+        text-align: center;
+        color: #9ca3af;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 200px;
+      `
+      modelList.appendChild(noResults)
+      return
+    }
+    
+    models.forEach((model, index) => {
+      const modelOption = document.createElement('div')
+      
+      const modelInfo = document.createElement('div')
+      modelInfo.style.cssText = `
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      `
+      
+      const modelName = document.createElement('div')
+      modelName.textContent = model.name
+      modelName.style.cssText = `
+        font-weight: 500;
+        color: #f8fafc;
+        font-size: 14px;
+        margin-bottom: 2px;
+      `
+      
+      const modelProvider = document.createElement('div')
+      modelProvider.textContent = model.provider
+      modelProvider.style.cssText = `
+        font-size: 12px;
+        color: #94a3b8;
+        opacity: 0.8;
+      `
+      
+      modelInfo.appendChild(modelName)
+      modelInfo.appendChild(modelProvider)
+      
+      // 创建选择指示器
+      const selectIndicator = document.createElement('div')
+      selectIndicator.innerHTML = '→'
+      selectIndicator.style.cssText = `
+        color: #6366f1;
+        font-weight: bold;
+        font-size: 14px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        margin-left: 8px;
+      `
+      
+      modelOption.appendChild(modelInfo)
+      modelOption.appendChild(selectIndicator)
+      
+      modelOption.style.cssText = `
+        padding: 12px 16px;
+        ${index !== models.length - 1 ? 'border-bottom: 1px solid rgba(55, 65, 81, 0.3);' : ''}
+        background: transparent;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        position: relative;
+        border-radius: ${index === 0 ? '12px 12px 0 0' : index === models.length - 1 ? '0 0 12px 12px' : '0'};
+      `
+      
+      modelOption.onmouseover = () => {
+        modelOption.style.background = 'rgba(99, 102, 241, 0.08)'
+        selectIndicator.style.opacity = '1'
+      }
+      
+      modelOption.onmouseout = () => {
+        modelOption.style.background = 'transparent'
+        selectIndicator.style.opacity = '0'
+      }
+      
+      modelOption.onclick = () => {
+        updateNode(node.id, {
+          config: {
+            ...node.config,
+            selectedModel: model.id,
+            selectedModelName: model.name,
+            selectedModelProvider: model.provider
+          }
+        })
+        console.log('选择模型:', model)
+        dialog.style.animation = 'fadeOut 0.15s ease-in forwards'
+        setTimeout(() => {
+          document.body.removeChild(dialog)
+        }, 150)
+      }
+      
+      modelList.appendChild(modelOption)
+    })
+  }
+  
+  // 搜索功能
+  searchInput.oninput = (e) => {
+    const searchTerm = (e.target as HTMLInputElement).value.toLowerCase()
+    filteredModels = allModels.filter(model => 
+      model.name.toLowerCase().includes(searchTerm) ||
+      model.provider.toLowerCase().includes(searchTerm) ||
+      model.id.toLowerCase().includes(searchTerm)
+    )
+    renderModelList(filteredModels)
+  }
+  
+  // 初始渲染
+  renderModelList(filteredModels)
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 12px 24px;
+    background: rgba(107, 114, 128, 0.8);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+    border-radius: 10px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+    flex-shrink: 0;
+  `
+  
+  cancelButton.onmouseover = () => {
+    cancelButton.style.background = 'rgba(107, 114, 128, 1)'
+    cancelButton.style.transform = 'translateY(-1px)'
+    cancelButton.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)'
+  }
+  
+  cancelButton.onmouseout = () => {
+    cancelButton.style.background = 'rgba(107, 114, 128, 0.8)'
+    cancelButton.style.transform = 'translateY(0)'
+    cancelButton.style.boxShadow = 'none'
+  }
+  
+  cancelButton.onclick = () => {
+    dialog.style.animation = 'fadeOut 0.15s ease-in forwards'
+    setTimeout(() => {
+      document.body.removeChild(dialog)
+    }, 150)
+  }
+  
+  // 添加CSS动画
+  const animationStyle = document.createElement('style')
+  animationStyle.textContent = `
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideIn {
+      from { transform: scale(0.9) translateY(-10px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+  `
+  document.head.appendChild(animationStyle)
+  
+  dialogContent.appendChild(title)
+  dialogContent.appendChild(searchContainer)
+  dialogContent.appendChild(modelList)
+  dialogContent.appendChild(cancelButton)
+  dialog.appendChild(dialogContent)
+  document.body.appendChild(dialog)
+  
+  // 点击背景关闭弹窗
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      dialog.style.animation = 'fadeOut 0.15s ease-in forwards'
+      setTimeout(() => {
+        document.body.removeChild(dialog)
+      }, 150)
+    }
+  }
+  
+  // 聚焦到搜索框
+  setTimeout(() => {
+    searchInput.focus()
+  }, 200)
+}
+
 const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, port: string, type: 'input' | 'output' } | null => {
   for (const node of workflowNodes.value) {
     // 检查输入端口
@@ -4137,6 +4632,7 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedEditButton = getEditButtonAtPosition(pos.x, pos.y)
   const clickedMcpModelSelect = getMcpModelSelectAtPosition(pos.x, pos.y)
   const clickedMcpServerSelect = getMcpServerSelectAtPosition(pos.x, pos.y)
+  const clickedModelServiceSelect = getModelServiceSelectAtPosition(pos.x, pos.y)
   
   if (clickedUploadButton) {
     // 处理上传按钮点击
@@ -4153,6 +4649,9 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedMcpServerSelect) {
     // 处理MCP服务器选择点击
     handleMcpServerSelectClick(clickedMcpServerSelect)
+  } else if (clickedModelServiceSelect) {
+    // 处理模型服务模型选择点击
+    handleModelServiceSelectClick(clickedModelServiceSelect)
   } else if (clickedTextArea) {
     // 处理文本区域点击
     handleTextAreaClick(clickedTextArea)
@@ -4630,12 +5129,12 @@ const runWorkflow = async () => {
       name: `运行_${new Date().toLocaleString()}`,
       nodes: JSON.parse(JSON.stringify(workflowNodes.value)),
       connections: connections.value.map(conn => ({
-      id: conn.id,
-      sourceNodeId: conn.from,
-      targetNodeId: conn.to,
-      sourceOutput: conn.fromPort,
-      targetInput: conn.toPort
-    })),
+        id: conn.id,
+        sourceNodeId: conn.from,
+        targetNodeId: conn.to,
+        sourceOutput: conn.fromPort,
+        targetInput: conn.toPort
+      })),
       metadata: {
         nodeCount: workflowNodes.value.length,
         connectionCount: connections.value.length,
@@ -4743,7 +5242,7 @@ const runWorkflow = async () => {
 }
 
 // 模拟节点执行过程，显示运行状态
-const simulateNodeExecution = async (workflowData: { nodes: WorkflowNode[], connections: any[] }) => {
+const simulateNodeExecution = async (workflowData: { nodes: WorkflowNode[], connections: Connection[] }) => {
   // 获取执行顺序
   const executionOrder = getExecutionOrder(workflowData)
   
@@ -4770,7 +5269,7 @@ const simulateNodeExecution = async (workflowData: { nodes: WorkflowNode[], conn
 }
 
 // 获取节点执行顺序（简单的拓扑排序）
-const getExecutionOrder = (workflowData: { nodes: WorkflowNode[], connections: any[] }): string[] => {
+const getExecutionOrder = (workflowData: { nodes: WorkflowNode[], connections: Connection[] }): string[] => {
   const nodes = workflowData.nodes
   const connections = workflowData.connections || []
   const visited = new Set<string>()
@@ -4780,10 +5279,10 @@ const getExecutionOrder = (workflowData: { nodes: WorkflowNode[], connections: a
   const dependencies = new Map<string, string[]>()
   nodes.forEach((node: WorkflowNode) => dependencies.set(node.id, []))
   
-  connections.forEach((conn: { targetNodeId: string, sourceNodeId: string }) => {
-    const deps = dependencies.get(conn.targetNodeId) || []
-    deps.push(conn.sourceNodeId)
-    dependencies.set(conn.targetNodeId, deps)
+  connections.forEach((conn: Connection) => {
+    const deps = dependencies.get(conn.to) || []
+    deps.push(conn.from)
+    dependencies.set(conn.to, deps)
   })
   
   // DFS访问
@@ -4882,13 +5381,7 @@ const deployWorkflow = async () => {
     const workflowData = {
       name: currentWorkflow.name || `部署_${new Date().toLocaleString()}`,
       nodes: workflowNodes.value,
-      connections: connections.value.map(conn => ({
-      id: conn.id,
-      sourceNodeId: conn.from,
-      targetNodeId: conn.to,
-      sourceOutput: conn.fromPort,
-      targetInput: conn.toPort
-    })),
+      connections: connections.value,
       metadata: {
         nodeCount: workflowNodes.value.length,
         connectionCount: connections.value.length,
