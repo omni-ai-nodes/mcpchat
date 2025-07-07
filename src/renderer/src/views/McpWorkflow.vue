@@ -174,7 +174,18 @@
           <div class="text-center text-muted-foreground">
             <Icon icon="lucide:workflow" class="w-16 h-16 mx-auto mb-4 opacity-50" />
             <h3 class="text-lg font-medium mb-2">{{ t('common.mcp.workflow.emptyCanvas') }}</h3>
-            <p class="text-sm">{{ t('common.mcp.workflow.emptyCanvasDesc') }}</p>
+            <p class="text-sm mb-4">{{ t('common.mcp.workflow.emptyCanvasDesc') }}</p>
+            <div class="flex items-center justify-center gap-4 text-xs opacity-75">
+              <div class="flex items-center gap-2">
+                <Icon icon="lucide:mouse-pointer-click" class="w-4 h-4" />
+                <span>拖拽节点到画布</span>
+              </div>
+              <div class="w-px h-4 bg-border"></div>
+              <div class="flex items-center gap-2">
+                <Icon icon="lucide:file-json" class="w-4 h-4" />
+                <span>拖拽JSON文件导入工作流</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -5880,8 +5891,57 @@ const onDragStart = (template: NodeTemplate, event: DragEvent) => {
   }
 }
 
-const onDrop = (event: DragEvent) => {
+const onDrop = async (event: DragEvent) => {
   event.preventDefault()
+  
+  // 检查是否是文件拖拽
+  const files = event.dataTransfer?.files
+  if (files && files.length > 0) {
+    const file = files[0]
+    
+    // 检查文件类型是否为JSON
+    if (file.type === 'application/json' || file.name.endsWith('.json')) {
+      try {
+        const fileContent = await file.text()
+        const workflowData = JSON.parse(fileContent)
+        
+        // 验证是否为有效的工作流文件
+        if (workflowData.nodes && Array.isArray(workflowData.nodes)) {
+          await loadWorkflowFromData(workflowData)
+          toast({
+            title: '成功',
+            description: `工作流 "${workflowData.name || '未命名'}" 已成功加载`,
+            variant: 'default'
+          })
+          return
+        } else {
+          toast({
+            title: '错误',
+            description: '文件格式不正确，不是有效的工作流文件',
+            variant: 'destructive'
+          })
+          return
+        }
+      } catch (error) {
+        console.error('解析工作流文件失败:', error)
+        toast({
+          title: '错误',
+          description: '无法解析工作流文件，请检查文件格式',
+          variant: 'destructive'
+        })
+        return
+      }
+    } else {
+      toast({
+        title: '提示',
+        description: '请拖拽JSON格式的工作流文件',
+        variant: 'default'
+      })
+      return
+    }
+  }
+  
+  // 原有的节点拖拽逻辑
   const nodeType = event.dataTransfer?.getData('text/plain')
   if (nodeType) {
     const template = [...inputNodes, ...processNodes, ...outputNodes].find(n => n.type === nodeType)
@@ -5940,6 +6000,10 @@ const onDrop = (event: DragEvent) => {
 
 const onDragOver = (event: DragEvent) => {
   event.preventDefault()
+  // 设置拖拽效果
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'copy'
+  }
 }
 
 // 加载工作流时恢复MCP状态
@@ -6248,6 +6312,45 @@ const loadWorkflowList = async () => {
   }
 }
 
+// 从数据对象加载工作流
+const loadWorkflowFromData = async (workflowData: WorkflowData & { description?: string }) => {
+  try {
+    // 清空当前工作流
+    workflowNodes.value = []
+    connections.value = []
+    
+    // 加载工作流数据
+    currentWorkflow.name = workflowData.name || ''
+    currentWorkflow.description = workflowData.description || ''
+    workflowNodes.value = workflowData.nodes || []
+    
+    // 转换连接数据格式
+    connections.value = (workflowData.connections || []).map((conn: WorkflowConnection) => ({
+      id: conn.id,
+      from: conn.sourceNodeId,
+      to: conn.targetNodeId,
+      fromPort: conn.sourceOutput,
+      toPort: conn.targetInput
+    }))
+    
+    // 清空选中的工作流路径，因为这是新导入的
+    selectedWorkflowPath.value = ''
+    
+    // 恢复MCP状态
+    if (workflowData.nodes) {
+      restoreWorkflowMcpState(workflowData.nodes)
+    }
+    
+    // 重新绘制画布
+    redraw()
+    
+    console.log('从数据加载工作流成功:', workflowData.name)
+  } catch (error) {
+    console.error('从数据加载工作流时发生错误:', error)
+    throw error
+  }
+}
+
 // 加载选中的工作流
 const loadSelectedWorkflow = async () => {
   if (!selectedWorkflowPath.value) return
@@ -6257,30 +6360,8 @@ const loadSelectedWorkflow = async () => {
     if (result.success && result.workflowData) {
       const workflow = result.workflowData
       
-      // 清空当前工作流
-      workflowNodes.value = []
-      connections.value = []
-      
-      // 加载工作流数据
-      currentWorkflow.name = workflow.name || ''
-      currentWorkflow.description = ''
-      workflowNodes.value = workflow.nodes || []
-      // 转换连接数据格式
-      connections.value = (workflow.connections || []).map(conn => ({
-        id: conn.id,
-        from: conn.sourceNodeId,
-        to: conn.targetNodeId,
-        fromPort: conn.sourceOutput,
-        toPort: conn.targetInput
-      }))
-      
-      // 恢复MCP状态
-      if (workflow.nodes) {
-        restoreWorkflowMcpState(workflow.nodes)
-      }
-      
-      // 重新绘制画布
-      redraw()
+      // 使用统一的加载函数
+      await loadWorkflowFromData(workflow)
       
       toast({
         title: '成功',
