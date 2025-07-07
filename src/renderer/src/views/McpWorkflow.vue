@@ -2885,6 +2885,8 @@ const handleFileNameAreaClick = async (node: WorkflowNode) => {
                ...node.config,
                imageData: fileData,
                fileName: file.name.replace(/^\d+_/, ''), // 移除时间戳前缀
+               filePath: file.path, // 添加filePath字段
+               fileType: 'image', // 添加fileType字段
                fileSize: file.size,
                savedFileName: file.name
              }
@@ -3068,11 +3070,13 @@ const handleUploadButtonClick = (node: WorkflowNode) => {
                 ...node.config,
                 imageData: dataUrl,
                 fileName: file.name,
+                filePath: saveResult.filePath || saveResult.fileName, // 添加filePath字段
+                fileType: file.type,
                 fileSize: file.size,
                 savedFileName: saveResult.fileName // 保存实际文件名
               }
             })
-            console.log('图片上传并保存成功:', file.name, '保存为:', saveResult.fileName)
+            console.log('图片上传并保存成功:', file.name, '保存为:', saveResult.fileName, '路径:', saveResult.filePath)
           } catch (error) {
             console.error('保存图片失败:', error)
             // 即使保存失败，也显示图片预览
@@ -3083,6 +3087,8 @@ const handleUploadButtonClick = (node: WorkflowNode) => {
                 ...node.config,
                 imageData: dataUrl,
                 fileName: file.name,
+                filePath: '', // 保存失败时设置为空字符串
+                fileType: file.type,
                 fileSize: file.size
               }
             })
@@ -3092,18 +3098,41 @@ const handleUploadButtonClick = (node: WorkflowNode) => {
       } else {
         // 处理文本文件
         const reader = new FileReader()
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           const content = e.target?.result as string
-          updateNode(node.id, {
-            config: {
-              ...node.config,
-              defaultText: content,
-              fileName: file.name,
-              fileSize: file.size,
-              fileType: file.type || 'text/plain'
-            }
-          })
-          console.log('文件上传成功:', file.name, '大小:', file.size, '内容长度:', content.length)
+          
+          try {
+            // 保存文本文件到 APP/inputs 目录
+            const saveResult = await window.api.saveUploadedFile(file.name, content)
+            
+            updateNode(node.id, {
+              config: {
+                ...node.config,
+                defaultText: content,
+                fileContent: content, // 添加fileContent字段
+                fileName: file.name,
+                filePath: saveResult.filePath || saveResult.fileName, // 添加filePath字段
+                fileSize: file.size,
+                fileType: file.type || 'text/plain',
+                savedFileName: saveResult.fileName
+              }
+            })
+            console.log('文本文件上传并保存成功:', file.name, '保存为:', saveResult.fileName, '路径:', saveResult.filePath)
+          } catch (error) {
+            console.error('保存文本文件失败:', error)
+            // 即使保存失败，也保存内容
+            updateNode(node.id, {
+              config: {
+                ...node.config,
+                defaultText: content,
+                fileContent: content,
+                fileName: file.name,
+                filePath: '', // 保存失败时设置为空字符串
+                fileSize: file.size,
+                fileType: file.type || 'text/plain'
+              }
+            })
+          }
         }
         reader.readAsText(file)
       }
