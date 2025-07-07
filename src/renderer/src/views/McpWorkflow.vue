@@ -135,6 +135,10 @@
             <Icon icon="lucide:save" class="w-4 h-4 mr-2" />
             {{ t('common.mcp.workflow.save') }}
           </Button>
+          <Button variant="outline" size="sm" @click="exportWorkflowAsJson">
+            <Icon icon="lucide:download" class="w-4 h-4 mr-2" />
+            导出JSON
+          </Button>
           <Button variant="outline" size="sm" @click="runWorkflow">
             <Icon icon="lucide:play" class="w-4 h-4 mr-2" />
             {{ t('common.mcp.workflow.run') }}
@@ -6048,15 +6052,69 @@ const saveWorkflow = async () => {
     
     // 清理节点数据，移除不可序列化的属性
     const cleanNodes = currentWorkflow.nodes.map(node => {
+      // 深度清理 config 对象，只保留可序列化的属性
+      const cleanConfig: Record<string, unknown> = {}
+      if (node.config) {
+        Object.keys(node.config).forEach(key => {
+          const value = node.config[key]
+          // 只保留基本类型和可序列化的对象
+          if (value !== null && value !== undefined) {
+            const valueType = typeof value
+            if (valueType === 'string' || valueType === 'number' || valueType === 'boolean') {
+              cleanConfig[key] = value
+            } else if (Array.isArray(value)) {
+              // 清理数组，只保留基本类型元素
+              cleanConfig[key] = value.filter(item => {
+                const itemType = typeof item
+                return itemType === 'string' || itemType === 'number' || itemType === 'boolean'
+              })
+            } else if (valueType === 'object' && value.constructor === Object) {
+              // 对于普通对象，进行浅层清理
+              try {
+                cleanConfig[key] = JSON.parse(JSON.stringify(value))
+              } catch {
+                // 如果无法序列化，跳过该属性
+                console.warn(`跳过不可序列化的配置属性: ${key}`)
+              }
+            }
+          }
+        })
+      }
+      
+      // 清理inputs和outputs，确保完全可序列化
+       const cleanInputs = Array.isArray(node.inputs) ? node.inputs.map(input => {
+          if (typeof input === 'object' && input !== null) {
+            try {
+              return JSON.parse(JSON.stringify(input))
+            } catch {
+              const inputObj = input as Record<string, unknown>
+              return { name: inputObj?.name || 'unknown', type: inputObj?.type || 'any' }
+            }
+          }
+          return input
+        }) : []
+        
+        const cleanOutputs = Array.isArray(node.outputs) ? node.outputs.map(output => {
+          if (typeof output === 'object' && output !== null) {
+            try {
+              return JSON.parse(JSON.stringify(output))
+            } catch {
+              const outputObj = output as Record<string, unknown>
+              return { name: outputObj?.name || 'unknown', type: outputObj?.type || 'any' }
+            }
+          }
+          return output
+        }) : []
+      
       const cleanNode = {
         id: node.id,
         type: node.type,
         name: node.name,
         x: node.x,
         y: node.y,
-        config: { ...node.config },
-        inputs: node.inputs,
-        outputs: node.outputs
+        config: cleanConfig,
+        inputs: cleanInputs,
+        outputs: cleanOutputs
       }
       
       // 移除不可序列化的属性
@@ -6106,6 +6164,23 @@ const saveWorkflow = async () => {
     }
     
     console.log('保存工作流:', workflowData)
+    
+    // 确保数据完全可序列化
+    let serializedData: string
+    try {
+      serializedData = JSON.stringify(workflowData)
+      // 验证序列化结果
+      JSON.parse(serializedData)
+      console.log('工作流数据序列化成功')
+    } catch (serializeError) {
+      console.error('工作流数据序列化失败:', serializeError)
+      toast({
+        title: '错误',
+        description: '工作流数据包含不可序列化的内容，请检查节点配置',
+        variant: 'destructive'
+      })
+      return
+    }
     
     // 调用保存API
     const result = await window.api.saveWorkflow(workflowData)
@@ -6234,6 +6309,175 @@ const newWorkflow = () => {
     description: '已创建新的工作流',
     variant: 'default'
   })
+}
+
+// 导出工作流为JSON文本格式
+const exportWorkflowAsJson = async () => {
+  try {
+    // 验证工作流是否为空
+    if (workflowNodes.value.length === 0) {
+      toast({
+        title: '警告',
+        description: '工作流为空，无法导出',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // 检查工作流名称
+    if (!currentWorkflow.name || currentWorkflow.name.trim() === '') {
+      const workflowName = await showWorkflowNamePrompt('请为工作流设置名称：')
+      if (!workflowName || workflowName.trim() === '') {
+        toast({
+          title: '提示',
+          description: '导出已取消，请设置工作流名称',
+          variant: 'default'
+        })
+        return
+      }
+      currentWorkflow.name = workflowName.trim()
+    }
+
+    // 使用相同的清理逻辑
+    const cleanNodes = workflowNodes.value.map(node => {
+      // 深度清理 config 对象，只保留可序列化的属性
+      const cleanConfig: Record<string, unknown> = {}
+      if (node.config) {
+        Object.keys(node.config).forEach(key => {
+          const value = node.config[key]
+          // 只保留基本类型和可序列化的对象
+          if (value !== null && value !== undefined) {
+            const valueType = typeof value
+            if (valueType === 'string' || valueType === 'number' || valueType === 'boolean') {
+              cleanConfig[key] = value
+            } else if (Array.isArray(value)) {
+              // 清理数组，只保留基本类型元素
+              cleanConfig[key] = value.filter(item => {
+                const itemType = typeof item
+                return itemType === 'string' || itemType === 'number' || itemType === 'boolean'
+              })
+            } else if (valueType === 'object' && value.constructor === Object) {
+              // 对于普通对象，进行浅层清理
+              try {
+                cleanConfig[key] = JSON.parse(JSON.stringify(value))
+              } catch {
+                // 如果无法序列化，跳过该属性
+                console.warn(`跳过不可序列化的配置属性: ${key}`)
+              }
+            }
+          }
+        })
+      }
+      
+      // 清理inputs和outputs，确保完全可序列化
+      const cleanInputs = Array.isArray(node.inputs) ? node.inputs.map(input => {
+        if (typeof input === 'object' && input !== null) {
+          try {
+            return JSON.parse(JSON.stringify(input))
+          } catch {
+            const inputObj = input as Record<string, unknown>
+            return { name: inputObj?.name || 'unknown', type: inputObj?.type || 'any' }
+          }
+        }
+        return input
+      }) : []
+      
+      const cleanOutputs = Array.isArray(node.outputs) ? node.outputs.map(output => {
+        if (typeof output === 'object' && output !== null) {
+          try {
+            return JSON.parse(JSON.stringify(output))
+          } catch {
+            const outputObj = output as Record<string, unknown>
+            return { name: outputObj?.name || 'unknown', type: outputObj?.type || 'any' }
+          }
+        }
+        return output
+      }) : []
+      
+      const cleanNode = {
+        id: node.id,
+        type: node.type,
+        name: node.name,
+        x: node.x,
+        y: node.y,
+        config: cleanConfig,
+        inputs: cleanInputs,
+        outputs: cleanOutputs
+      }
+      
+      // 移除不可序列化的属性
+      const nodeWithUIProps = cleanNode as WorkflowNode
+      delete nodeWithUIProps.cachedImage
+      delete nodeWithUIProps.imageLoadError
+      delete nodeWithUIProps.uploadButton
+      delete nodeWithUIProps.fileNameArea
+      delete nodeWithUIProps.textArea
+      delete nodeWithUIProps.editButton
+      delete nodeWithUIProps.mcpServiceArea
+      delete nodeWithUIProps.mcpModelSelect
+      delete nodeWithUIProps.mcpServerSelect
+      delete nodeWithUIProps.providerSelect
+      delete nodeWithUIProps.modelSelect
+      delete nodeWithUIProps.modelServiceArea
+      delete nodeWithUIProps.promptSelect
+      delete nodeWithUIProps.textDisplayArea
+      
+      return cleanNode
+    })
+
+    // 清理连接数据
+    const cleanConnections = connections.value.map(conn => ({
+      id: conn.id,
+      sourceNodeId: conn.from,
+      targetNodeId: conn.to,
+      sourceOutput: conn.fromPort,
+      targetInput: conn.toPort
+    }))
+
+    // 准备导出数据
+    const exportData = {
+      name: currentWorkflow.name,
+      version: '1.0.0',
+      description: currentWorkflow.description || '',
+      exportedAt: new Date().toISOString(),
+      nodes: cleanNodes,
+      connections: cleanConnections,
+      metadata: {
+        nodeCount: cleanNodes.length,
+        connectionCount: cleanConnections.length,
+        mcpNodeCount: cleanNodes.filter(node => node.type === 'mcp-service').length,
+        exportFormat: 'json'
+      }
+    }
+
+    // 生成格式化的JSON字符串
+    const jsonString = JSON.stringify(exportData, null, 2)
+    
+    // 创建下载链接
+    const blob = new Blob([jsonString], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${currentWorkflow.name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}_workflow.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    toast({
+      title: '成功',
+      description: `工作流已导出为JSON文件: ${link.download}`,
+      variant: 'default'
+    })
+
+  } catch (error) {
+    console.error('导出工作流JSON时发生错误:', error)
+    toast({
+      title: '错误',
+      description: '导出工作流JSON时发生错误',
+      variant: 'destructive'
+    })
+  }
 }
 
 // 格式化日期

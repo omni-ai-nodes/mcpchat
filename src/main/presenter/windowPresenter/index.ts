@@ -696,6 +696,7 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
 
 // 执行文本输出节点
 async function executeTextOutputNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  console.log(`执行文本输出节点: ${node.name || node.id}`)
   return {
     output: (inputData.input as string) || ''
   }
