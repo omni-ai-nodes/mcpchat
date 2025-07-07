@@ -6,7 +6,7 @@ import fs from 'fs'
 import { presenter } from '@/presenter'
 import { eventBus } from '@/eventbus'
 import { WINDOW_EVENTS } from '@/events'
-import { IWindowPresenter } from '@shared/presenter'
+import { IWindowPresenter, ChatMessage } from '@shared/presenter'
 import { join } from 'path'
 import icon from '../../../../resources/icon.png?asset' // 应用图标 (macOS/Linux)
 import iconWin from '../../../../resources/icon.ico?asset' // 应用图标 (Windows)
@@ -468,13 +468,10 @@ async function executeModelServiceNode(node: WorkflowNode, inputData: Record<str
      
      console.log(`调用模型 ${modelId} 处理消息`)
      
-     // 调用模型
-     const outputText = await llmproviderPresenter.generateCompletion(
+     // 调用模型 - 使用 generateCompletionStandalone 支持多模态消息
+     const outputText = await llmproviderPresenter.generateCompletionStandalone(
        currentProvider.id,
-       messages as Array<{
-         role: 'user' | 'system' | 'assistant';
-         content: string;
-       }>,
+       messages as ChatMessage[],
        modelId
      )
      
