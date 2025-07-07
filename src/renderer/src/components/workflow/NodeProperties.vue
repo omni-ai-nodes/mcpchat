@@ -166,15 +166,16 @@
         <select 
           v-model="localNode.config.selectedProvider"
           class="property-input"
-          @change="updateConfig('selectedProvider', $event.target.value)"
+          @change="updateConfig('selectedProvider', ($event.target as HTMLSelectElement).value)"
         >
           <option value="">请选择提供商...</option>
-          <option value="openai">OpenAI</option>
-          <option value="anthropic">Anthropic</option>
-          <option value="google">Google</option>
-          <option value="azure">Azure OpenAI</option>
-          <option value="ollama">Ollama</option>
-          <option value="deepseek">DeepSeek</option>
+          <option 
+            v-for="provider in availableProviders.filter(p => p.enable)"
+            :key="provider.id"
+            :value="provider.id"
+          >
+            {{ provider.name }}
+          </option>
         </select>
       </div>
       <div class="property-group">
@@ -182,37 +183,17 @@
         <select 
           v-model="localNode.config.selectedModel"
           class="property-input"
-          @change="updateConfig('selectedModel', $event.target.value)"
+          @change="updateConfig('selectedModel', ($event.target as HTMLSelectElement).value)"
           :disabled="!localNode.config.selectedProvider"
         >
           <option value="">请选择模型...</option>
-          <template v-if="localNode.config.selectedProvider === 'openai'">
-            <option value="gpt-4">GPT-4</option>
-            <option value="gpt-4-turbo">GPT-4 Turbo</option>
-            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-          </template>
-          <template v-else-if="localNode.config.selectedProvider === 'anthropic'">
-            <option value="claude-3-opus">Claude 3 Opus</option>
-            <option value="claude-3-sonnet">Claude 3 Sonnet</option>
-            <option value="claude-3-haiku">Claude 3 Haiku</option>
-          </template>
-          <template v-else-if="localNode.config.selectedProvider === 'google'">
-            <option value="gemini-pro">Gemini Pro</option>
-            <option value="gemini-pro-vision">Gemini Pro Vision</option>
-          </template>
-          <template v-else-if="localNode.config.selectedProvider === 'azure'">
-            <option value="gpt-4">GPT-4 (Azure)</option>
-            <option value="gpt-35-turbo">GPT-3.5 Turbo (Azure)</option>
-          </template>
-          <template v-else-if="localNode.config.selectedProvider === 'ollama'">
-            <option value="llama2">Llama 2</option>
-            <option value="codellama">Code Llama</option>
-            <option value="mistral">Mistral</option>
-          </template>
-          <template v-else-if="localNode.config.selectedProvider === 'deepseek'">
-            <option value="deepseek-chat">DeepSeek Chat</option>
-            <option value="deepseek-coder">DeepSeek Coder</option>
-          </template>
+          <option 
+            v-for="model in availableModels"
+            :key="model.id"
+            :value="model.id"
+          >
+            {{ model.name || model.id }}
+          </option>
         </select>
       </div>
       <div class="property-group">
@@ -281,8 +262,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, reactive } from 'vue'
+import { ref, watch, reactive, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
+import type { LLM_PROVIDER, MODEL_META } from '@shared/presenter'
 
 interface WorkflowNode {
   id: string
@@ -309,6 +291,53 @@ const emit = defineEmits<Emits>()
 
 const localNode = reactive({ ...props.node })
 
+// 动态获取的提供者和模型数据
+const availableProviders = ref<LLM_PROVIDER[]>([])
+const availableModels = ref<MODEL_META[]>([])
+
+// 获取提供者列表
+const loadProviders = async () => {
+  try {
+    if (window.electron?.ipcRenderer) {
+      const providers = await window.electron.ipcRenderer.invoke('get-llm-providers')
+      availableProviders.value = providers || []
+    }
+  } catch (error) {
+    console.error('获取提供者列表失败:', error)
+  }
+}
+
+// 获取指定提供者的模型列表
+const loadModels = async (providerId: string) => {
+  try {
+    if (window.electron?.ipcRenderer && providerId) {
+      const models = await window.electron.ipcRenderer.invoke('get-provider-models', providerId)
+      availableModels.value = models || []
+    }
+  } catch (error) {
+    console.error('获取模型列表失败:', error)
+    availableModels.value = []
+  }
+}
+
+// 监听提供者选择变化，自动加载对应的模型
+watch(() => localNode.config.selectedProvider, (newProviderId) => {
+  if (newProviderId) {
+    loadModels(newProviderId as string)
+  } else {
+    availableModels.value = []
+  }
+})
+
+// 组件挂载时加载提供者列表
+onMounted(() => {
+  loadProviders()
+  // 如果已经选择了提供者，加载对应的模型
+  if (localNode.config.selectedProvider) {
+    loadModels(localNode.config.selectedProvider as string)
+  }
+})
+
 // 监听props变化，更新本地数据
 watch(() => props.node, (newNode) => {
   Object.assign(localNode, newNode)
@@ -333,11 +362,11 @@ const getNodeTypeLabel = () => {
   return labelMap[props.node.type] || props.node.type
 }
 
-const updateProperty = (key: string, value: any) => {
+const updateProperty = (key: string, value: string | number) => {
   emit('update', { [key]: value })
 }
 
-const updateConfig = (key: string, value: any) => {
+const updateConfig = (key: string, value: string | number) => {
   const newConfig = { ...localNode.config, [key]: value }
   emit('update', { config: newConfig })
 }

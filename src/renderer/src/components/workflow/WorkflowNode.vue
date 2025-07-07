@@ -317,11 +317,40 @@ const handleFileUpload = async (event: Event) => {
       originalPath: savedPath
     }
 
+    // 读取文件内容用于base64编码（如果是图片）
+    let imageData = ''
+    let fileContent = ''
+    
+    if (isImageFile(file.name)) {
+      // 对于图片文件，转换为base64
+      const reader = new FileReader()
+      imageData = await new Promise<string>((resolve) => {
+        reader.onload = (e) => {
+          resolve(e.target?.result as string || '')
+        }
+        reader.readAsDataURL(file)
+      })
+    } else {
+      // 对于文本文件，读取文本内容
+      try {
+        fileContent = await file.text()
+      } catch (error) {
+        console.warn('无法读取文件文本内容:', error)
+      }
+    }
+
     // 更新节点配置
     emit('update', props.node.id, {
       config: {
         ...props.node.config,
-        uploadedFile: uploadedFile.value
+        uploadedFile: uploadedFile.value,
+        // 添加executeFileInputNode需要的字段
+        fileName: file.name,
+        filePath: savedPath,
+        fileType: file.type,
+        fileSize: file.size,
+        imageData: imageData,
+        fileContent: fileContent
       }
     })
 

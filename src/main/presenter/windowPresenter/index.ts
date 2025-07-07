@@ -334,8 +334,8 @@ async function executeModelServiceNode(node: WorkflowNode, inputData: Record<str
     console.log(`模型服务节点处理输入 - 文本: ${textInput.substring(0, 100)}${textInput.length > 100 ? '...' : ''}, 文件: ${fileInfo ? fileInfo.fileName || '未知文件' : '无'}`)
     
     // 获取节点配置的模型信息
-    const selectedProviderId = config.selectedProviderId as string
-    const selectedModelId = config.selectedModelId as string
+    const selectedProviderId = (config.selectedProviderId as string) || (config.selectedProvider as string)
+    const selectedModelId = (config.selectedModelId as string) || (config.selectedModel as string)
     const selectedPromptId = config.selectedPromptId as string
     
     // 获取当前LLM配置，优先使用节点配置的模型
@@ -1022,6 +1022,26 @@ export class WindowPresenter implements IWindowPresenter {
          throw error
        }
      })
+
+    // 获取LLM提供者列表
+    ipcMain.handle('get-llm-providers', async () => {
+      try {
+        return await presenter.llmproviderPresenter.getProviders()
+      } catch (error) {
+        console.error('获取LLM提供者失败:', error)
+        throw error
+      }
+    })
+
+    // 获取指定提供者的模型列表
+    ipcMain.handle('get-provider-models', async (_event, providerId: string) => {
+      try {
+        return await presenter.llmproviderPresenter.getModelList(providerId)
+      } catch (error) {
+        console.error('获取提供者模型失败:', error)
+        throw error
+      }
+    })
 
     // 监听应用即将退出的事件，设置退出标志，避免窗口关闭时触发隐藏逻辑
     app.on('before-quit', () => {
