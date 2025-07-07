@@ -1229,17 +1229,17 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText(displayFileName, uploadAreaX + 16 * scale.value, fileNameAreaY + fileNameAreaHeight / 2)
     
     // 存储文件名区域位置信息，用于点击检测
-    // 注意：存储未缩放的坐标，因为getCanvasPosition已经处理了缩放转换
+    // 存储画布坐标系中的位置（已考虑offset但未考虑scale）
     if (!node.fileNameArea) {
       node.fileNameArea = {
-        x: fileNameAreaX / scale.value,
-        y: fileNameAreaY / scale.value,
+        x: (fileNameAreaX / scale.value) + offset.value.x,
+        y: (fileNameAreaY / scale.value) + offset.value.y,
         width: fileNameAreaWidth / scale.value,
         height: fileNameAreaHeight / scale.value
       }
     } else {
-      node.fileNameArea.x = fileNameAreaX / scale.value
-      node.fileNameArea.y = fileNameAreaY / scale.value
+      node.fileNameArea.x = (fileNameAreaX / scale.value) + offset.value.x
+      node.fileNameArea.y = (fileNameAreaY / scale.value) + offset.value.y
       node.fileNameArea.width = fileNameAreaWidth / scale.value
       node.fileNameArea.height = fileNameAreaHeight / scale.value
     }
@@ -1397,17 +1397,17 @@ const drawNode = (node: WorkflowNode) => {
     }
     
     // 存储上传按钮位置信息，用于点击检测（只有按钮区域可点击）
-    // 注意：存储未缩放的坐标，因为getCanvasPosition已经处理了缩放转换
+    // 存储画布坐标系中的位置（已考虑offset但未考虑scale）
     if (!node.uploadButton) {
       node.uploadButton = {
-        x: buttonX / scale.value,
-        y: buttonY / scale.value,
+        x: (buttonX / scale.value) + offset.value.x,
+        y: (buttonY / scale.value) + offset.value.y,
         width: buttonWidth / scale.value,
         height: buttonHeight / scale.value
       }
     } else {
-      node.uploadButton.x = buttonX / scale.value
-      node.uploadButton.y = buttonY / scale.value
+      node.uploadButton.x = (buttonX / scale.value) + offset.value.x
+      node.uploadButton.y = (buttonY / scale.value) + offset.value.y
       node.uploadButton.width = buttonWidth / scale.value
       node.uploadButton.height = buttonHeight / scale.value
     }
@@ -1468,17 +1468,17 @@ const drawNode = (node: WorkflowNode) => {
     })
     
     // 存储文本区域位置信息，用于点击检测
-    // 注意：存储未缩放的坐标，因为getCanvasPosition已经处理了缩放转换
+    // 存储画布坐标系中的位置（已考虑offset但未考虑scale）
     if (!node.textArea) {
       node.textArea = {
-        x: textAreaX / scale.value,
-        y: textAreaY / scale.value,
+        x: (textAreaX / scale.value) + offset.value.x,
+        y: (textAreaY / scale.value) + offset.value.y,
         width: textAreaWidth / scale.value,
         height: textAreaHeight / scale.value
       }
     } else {
-      node.textArea.x = textAreaX / scale.value
-      node.textArea.y = textAreaY / scale.value
+      node.textArea.x = (textAreaX / scale.value) + offset.value.x
+      node.textArea.y = (textAreaY / scale.value) + offset.value.y
       node.textArea.width = textAreaWidth / scale.value
       node.textArea.height = textAreaHeight / scale.value
     }
@@ -1507,17 +1507,17 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText('✏️ 编辑', buttonX + buttonWidth / 2, buttonY + buttonHeight / 2)
     
     // 存储按钮位置信息，用于点击检测
-    // 注意：存储未缩放的坐标，因为getCanvasPosition已经处理了缩放转换
+    // 存储画布坐标系中的位置（已考虑offset但未考虑scale）
     if (!node.editButton) {
       node.editButton = {
-        x: buttonX / scale.value,
-        y: buttonY / scale.value,
+        x: (buttonX / scale.value) + offset.value.x,
+        y: (buttonY / scale.value) + offset.value.y,
         width: buttonWidth / scale.value,
         height: buttonHeight / scale.value
       }
     } else {
-      node.editButton.x = buttonX / scale.value
-      node.editButton.y = buttonY / scale.value
+      node.editButton.x = (buttonX / scale.value) + offset.value.x
+      node.editButton.y = (buttonY / scale.value) + offset.value.y
       node.editButton.width = buttonWidth / scale.value
       node.editButton.height = buttonHeight / scale.value
     }
@@ -1587,17 +1587,17 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText('▼', modelSelectX + modelSelectWidth - 8 * scale.value, modelSelectY + 32 * scale.value)
     
     // 存储模型选择区域位置信息
-    // 注意：存储未缩放的坐标，因为getCanvasPosition已经处理了缩放转换
+    // 存储画布坐标系中的位置（已考虑offset但未考虑scale）
     if (!node.mcpModelSelect) {
       node.mcpModelSelect = {
-        x: modelSelectX / scale.value,
-        y: modelSelectY / scale.value,
+        x: (modelSelectX / scale.value) + offset.value.x,
+        y: (modelSelectY / scale.value) + offset.value.y,
         width: modelSelectWidth / scale.value,
         height: modelSelectHeight / scale.value
       }
     } else {
-      node.mcpModelSelect.x = modelSelectX / scale.value
-      node.mcpModelSelect.y = modelSelectY / scale.value
+      node.mcpModelSelect.x = (modelSelectX / scale.value) + offset.value.x
+      node.mcpModelSelect.y = (modelSelectY / scale.value) + offset.value.y
       node.mcpModelSelect.width = modelSelectWidth / scale.value
       node.mcpModelSelect.height = modelSelectHeight / scale.value
     }
@@ -1689,17 +1689,17 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText('▼', serverSelectX + serverSelectWidth - 8 * scale.value, serverSelectY + 32 * scale.value)
     
     // 存储服务器选择区域位置信息
-    // 注意：存储未缩放的坐标，因为getCanvasPosition已经处理了缩放转换
+    // 存储画布坐标系中的位置（已考虑offset但未考虑scale）
     if (!node.mcpServerSelect) {
       node.mcpServerSelect = {
-        x: serverSelectX / scale.value,
-        y: serverSelectY / scale.value,
+        x: (serverSelectX / scale.value) + offset.value.x,
+        y: (serverSelectY / scale.value) + offset.value.y,
         width: serverSelectWidth / scale.value,
         height: serverSelectHeight / scale.value
       }
     } else {
-      node.mcpServerSelect.x = serverSelectX / scale.value
-      node.mcpServerSelect.y = serverSelectY / scale.value
+      node.mcpServerSelect.x = (serverSelectX / scale.value) + offset.value.x
+      node.mcpServerSelect.y = (serverSelectY / scale.value) + offset.value.y
       node.mcpServerSelect.width = serverSelectWidth / scale.value
       node.mcpServerSelect.height = serverSelectHeight / scale.value
     }
@@ -1783,16 +1783,17 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText('▼', modelSelectX + modelSelectWidth - 8 * scale.value, modelSelectY + 32 * scale.value)
     
     // 存储模型选择区域位置信息
+    // 存储画布坐标系中的位置（已考虑offset但未考虑scale）
     if (!node.modelSelect) {
       node.modelSelect = {
-        x: modelSelectX / scale.value,
-        y: modelSelectY / scale.value,
+        x: (modelSelectX / scale.value) + offset.value.x,
+        y: (modelSelectY / scale.value) + offset.value.y,
         width: modelSelectWidth / scale.value,
         height: modelSelectHeight / scale.value
       }
     } else {
-      node.modelSelect.x = modelSelectX / scale.value
-      node.modelSelect.y = modelSelectY / scale.value
+      node.modelSelect.x = (modelSelectX / scale.value) + offset.value.x
+      node.modelSelect.y = (modelSelectY / scale.value) + offset.value.y
       node.modelSelect.width = modelSelectWidth / scale.value
       node.modelSelect.height = modelSelectHeight / scale.value
     }
@@ -1833,16 +1834,17 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText('▼', promptSelectX + promptSelectWidth - 8 * scale.value, promptSelectY + 32 * scale.value)
     
     // 存储Prompt选择区域位置信息
+    // 存储画布坐标系中的位置（已考虑offset但未考虑scale）
     if (!node.promptSelect) {
       node.promptSelect = {
-        x: promptSelectX / scale.value,
-        y: promptSelectY / scale.value,
+        x: (promptSelectX / scale.value) + offset.value.x,
+        y: (promptSelectY / scale.value) + offset.value.y,
         width: promptSelectWidth / scale.value,
         height: promptSelectHeight / scale.value
       }
     } else {
-      node.promptSelect.x = promptSelectX / scale.value
-      node.promptSelect.y = promptSelectY / scale.value
+      node.promptSelect.x = (promptSelectX / scale.value) + offset.value.x
+      node.promptSelect.y = (promptSelectY / scale.value) + offset.value.y
       node.promptSelect.width = promptSelectWidth / scale.value
       node.promptSelect.height = promptSelectHeight / scale.value
     }
@@ -1948,16 +1950,17 @@ const drawNode = (node: WorkflowNode) => {
     })
     
     // 存储文本显示区域位置信息，用于点击检测
+    // 存储画布坐标系中的位置（已考虑offset但未考虑scale）
     if (!node.textDisplayArea) {
       node.textDisplayArea = {
-        x: displayAreaX / scale.value,
-        y: displayAreaY / scale.value,
+        x: (displayAreaX / scale.value) + offset.value.x,
+        y: (displayAreaY / scale.value) + offset.value.y,
         width: displayAreaWidth / scale.value,
         height: displayAreaHeight / scale.value
       }
     } else {
-      node.textDisplayArea.x = displayAreaX / scale.value
-      node.textDisplayArea.y = displayAreaY / scale.value
+      node.textDisplayArea.x = (displayAreaX / scale.value) + offset.value.x
+      node.textDisplayArea.y = (displayAreaY / scale.value) + offset.value.y
       node.textDisplayArea.width = displayAreaWidth / scale.value
       node.textDisplayArea.height = displayAreaHeight / scale.value
     }
