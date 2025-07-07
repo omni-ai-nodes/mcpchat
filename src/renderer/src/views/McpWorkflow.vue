@@ -2689,6 +2689,7 @@ interface WindowAPI {
   readUploadedFile: (filePath: string) => Promise<string>
   saveUploadedFile: (fileName: string, fileData: string) => Promise<{ success: boolean; filePath: string; fileName: string }>
   saveWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; filePath: string; fileName: string }>
+  updateWorkflow: (filePath: string, workflowData: WorkflowData) => Promise<{ success: boolean; filePath: string; fileName: string }>
   getWorkflows: () => Promise<Array<{ name: string; filePath: string; savedAt: string }>>
   loadWorkflow: (filePath: string) => Promise<{ success: boolean; workflowData: WorkflowData }>
   runWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; executionId: string; startTime: string; results: { processedNodes: number; processedConnections: number; nodeResults: Record<string, { output: string }> }; error?: string }>
@@ -6182,18 +6183,32 @@ const saveWorkflow = async () => {
       return
     }
     
-    // 调用保存API
-    const result = await window.api.saveWorkflow(workflowData)
+    // 调用保存API - 区分新建和编辑模式
+    let result
+    if (selectedWorkflowPath.value) {
+      // 编辑模式：更新现有工作流
+      result = await window.api.updateWorkflow(selectedWorkflowPath.value, workflowData)
+    } else {
+      // 新建模式：创建新工作流
+      result = await window.api.saveWorkflow(workflowData)
+    }
     
     if (result.success) {
       // 从文件路径中提取文件名
       const fileName = result.fileName || result.filePath?.split('/').pop() || '未知文件'
+      const actionText = selectedWorkflowPath.value ? '更新' : '保存'
+      
+      // 如果是新建模式且保存成功，更新selectedWorkflowPath
+      if (!selectedWorkflowPath.value && result.filePath) {
+        selectedWorkflowPath.value = result.filePath
+      }
+      
       toast({
         title: '成功',
-        description: `工作流保存成功: ${fileName}`,
+        description: `工作流${actionText}成功: ${fileName}`,
         variant: 'default'
       })
-      console.log('工作流保存成功:', result)
+      console.log(`工作流${actionText}成功:`, result)
       // 刷新工作流列表
       await loadWorkflowList()
     } else {

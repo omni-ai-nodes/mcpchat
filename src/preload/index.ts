@@ -70,6 +70,9 @@ const api = {
   saveWorkflow: (workflowData: WorkflowData) => {
     return ipcRenderer.invoke('save-workflow', workflowData)
   },
+  updateWorkflow: (filePath: string, workflowData: WorkflowData) => {
+    return ipcRenderer.invoke('update-workflow', filePath, workflowData)
+  },
   getWorkflows: () => {
     return ipcRenderer.invoke('get-workflows')
   },

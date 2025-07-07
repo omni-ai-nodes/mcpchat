@@ -847,6 +847,47 @@ export class WindowPresenter implements IWindowPresenter {
       }
     })
 
+    // 更新工作流
+    ipcMain.handle('update-workflow', async (_event, filePath: string, workflowData: WorkflowData) => {
+      try {
+        // 检查文件是否存在
+        if (!fs.existsSync(filePath)) {
+          return { success: false, error: 'FILE_NOT_FOUND', message: '工作流文件不存在' }
+        }
+        
+        // 检查工作流名称
+        if (!workflowData.name || workflowData.name.trim() === '') {
+          return { success: false, error: 'MISSING_NAME', message: '请为工作流设置名称' }
+        }
+        
+        // 读取原有数据以保留创建时间等信息
+        let originalData = {}
+        try {
+          const originalContent = fs.readFileSync(filePath, 'utf8')
+          originalData = JSON.parse(originalContent)
+        } catch (error) {
+          console.warn('无法读取原有工作流数据，将创建新的:', error)
+        }
+        
+        // 更新工作流数据
+        const workflowContent = {
+          ...originalData,
+          ...workflowData,
+          updatedAt: new Date().toISOString(),
+          version: '1.0'
+        }
+        
+        fs.writeFileSync(filePath, JSON.stringify(workflowContent, null, 2), 'utf8')
+        
+        const fileName = path.basename(filePath)
+        console.log('工作流已更新:', filePath)
+        return { success: true, filePath, fileName }
+      } catch (error) {
+        console.error('更新工作流失败:', error)
+        throw error
+      }
+    })
+
     // 获取已保存的工作流列表
     ipcMain.handle('get-workflows', async () => {
       try {
