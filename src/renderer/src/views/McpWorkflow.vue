@@ -533,6 +533,13 @@ const mcpStore = useMcpStore()
 const promptsStore = usePromptsStore()
 const { toast } = useToast()
 
+// 类型定义
+interface RequestInit {
+  method?: string
+  headers?: Record<string, string>
+  body?: string
+}
+
 // 节点类型定义
 interface NodeTemplate {
   type: string
@@ -620,6 +627,30 @@ interface WorkflowNode {
     height: number
   }
   textDisplayArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  apiMethodArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  apiUrlArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  apiJsonArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  apiTestButton?: {
     x: number
     y: number
     width: number
@@ -1002,7 +1033,7 @@ const drawNode = (node: WorkflowNode) => {
   } else if (node.type === 'text-input') {
     height = (NODE_HEIGHT + 96) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
   } else if (node.type === 'api-input') {
-    height = (NODE_HEIGHT + 180) * scale.value  // 基础高度 + API配置区域高度 + 间距
+    height = (NODE_HEIGHT + 216) * scale.value  // 基础高度 + API配置区域高度 + 间距
   } else if (node.type === 'text-output') {
     // 计算文本输出节点的自适应高度
     const outputText = (node.config?.outputText as string) || '暂无输出内容...'
@@ -1870,7 +1901,7 @@ const drawNode = (node: WorkflowNode) => {
   // 如果是API输入节点，绘制API配置区域
   if (node.type === 'api-input') {
     const apiAreaWidth = width - 16 * scale.value
-    const apiAreaHeight = 180 * scale.value  // API配置区域高度
+    const apiAreaHeight = 240 * scale.value  // API配置区域高度
     const apiAreaX = x + 8 * scale.value
     const apiAreaY = y + headerHeight + 8 * scale.value
     
@@ -1902,7 +1933,7 @@ const drawNode = (node: WorkflowNode) => {
     context.stroke()
     
     // 绘制HTTP方法文本
-    const method = (node.config?.method as string) || 'GET'
+    const method = (node.config?.method as string) || (node.config?.httpMethod as string) || 'GET'
     const methodColor = method === 'GET' ? '#10b981' : method === 'POST' ? '#3b82f6' : method === 'PUT' ? '#f59e0b' : '#ef4444'
     context.fillStyle = methodColor
     context.font = `bold ${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
@@ -1950,7 +1981,7 @@ const drawNode = (node: WorkflowNode) => {
     // 绘制JSON参数区域（仅在POST/PUT时显示）
     if (method === 'POST' || method === 'PUT') {
       const jsonAreaHeight = 60 * scale.value
-      const jsonAreaY = methodAreaY + methodAreaHeight + 8 * scale.value
+      const jsonAreaY = urlAreaY + urlAreaHeight + 8 * scale.value
       const jsonAreaX = apiAreaX + 8 * scale.value
       const jsonAreaWidth = apiAreaWidth - 16 * scale.value
       
@@ -2025,13 +2056,13 @@ const drawNode = (node: WorkflowNode) => {
     context.fillText(buttonText, buttonX + buttonWidth / 2, buttonY + buttonHeight / 2)
     
     // 绘制测试结果状态指示器
-    const testResult = node.config?.testResult as any
+    const testResult = node.config?.testResult
     if (testResult) {
       const indicatorSize = 8 * scale.value
       const indicatorX = buttonX - indicatorSize - 8 * scale.value
       const indicatorY = buttonY + (buttonHeight - indicatorSize) / 2
       
-      const isSuccess = testResult.success
+      const isSuccess = (testResult as { success: boolean }).success
       const indicatorColor = isSuccess ? '#10b981' : '#ef4444'
       
       context.fillStyle = indicatorColor
@@ -2077,6 +2108,31 @@ const drawNode = (node: WorkflowNode) => {
       node.apiUrlArea.y = (urlAreaY / scale.value) + offset.value.y
       node.apiUrlArea.width = urlAreaWidth / scale.value
       node.apiUrlArea.height = urlAreaHeight / scale.value
+    }
+    
+    // JSON参数区域位置存储（仅在POST/PUT时显示）
+    if (method === 'POST' || method === 'PUT') {
+      const jsonAreaHeight = 60 * scale.value
+      const jsonAreaY = urlAreaY + urlAreaHeight + 8 * scale.value
+      const jsonAreaX = apiAreaX + 8 * scale.value
+      const jsonAreaWidth = apiAreaWidth - 16 * scale.value
+      
+      if (!node.apiJsonArea) {
+        node.apiJsonArea = {
+          x: (jsonAreaX / scale.value) + offset.value.x,
+          y: (jsonAreaY / scale.value) + offset.value.y,
+          width: jsonAreaWidth / scale.value,
+          height: jsonAreaHeight / scale.value
+        }
+      } else {
+        node.apiJsonArea.x = (jsonAreaX / scale.value) + offset.value.x
+        node.apiJsonArea.y = (jsonAreaY / scale.value) + offset.value.y
+        node.apiJsonArea.width = jsonAreaWidth / scale.value
+        node.apiJsonArea.height = jsonAreaHeight / scale.value
+      }
+    } else {
+      // 清除JSON参数区域（当方法不是POST/PUT时）
+      node.apiJsonArea = undefined
     }
     
     // 测试按钮区域
@@ -2326,6 +2382,14 @@ const addNode = (template: NodeTemplate) => {
   
   if (template.type === 'file-input') {
     initialConfig = { fileName: '' }
+  } else if (template.type === 'api-input') {
+    // API输入节点的初始配置，默认使用POST方法以显示JSON参数区域
+    initialConfig = {
+      method: 'POST',
+      apiUrl: '',
+      jsonParams: '',
+      headers: ''
+    }
   } else if (template.type === 'mcp-service') {
     // MCP节点的初始状态：完全独立，无任何选择
     initialConfig = {
@@ -2940,6 +3004,20 @@ const getApiTestButtonAtPosition = (x: number, y: number): WorkflowNode | null =
       const button = node.apiTestButton
       if (x >= button.x && x <= button.x + button.width && 
           y >= button.y && y <= button.y + button.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取API输入节点JSON参数区域点击位置
+const getApiJsonAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'api-input' && node.apiJsonArea) {
+      const area = node.apiJsonArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
         return node
       }
     }
@@ -5237,7 +5315,7 @@ const handleApiMethodAreaClick = (node: WorkflowNode) => {
   console.log('点击API方法选择，节点:', node.name)
   
   const methods = ['GET', 'POST', 'PUT', 'DELETE']
-  const currentMethod = node.config?.httpMethod || 'GET'
+  const currentMethod = node.config?.method || 'GET'
   
   // 创建方法选择弹窗
   const dialog = document.createElement('div')
@@ -5315,7 +5393,7 @@ const handleApiMethodAreaClick = (node: WorkflowNode) => {
       updateNode(node.id, {
         config: {
           ...node.config,
-          httpMethod: method
+          method: method
         }
       })
       console.log('选择HTTP方法:', method)
@@ -5453,7 +5531,7 @@ const handleApiUrlAreaClick = (node: WorkflowNode) => {
     updateNode(node.id, {
       config: {
         ...node.config,
-        url: url
+        apiUrl: url
       }
     })
     console.log('保存API URL:', url)
@@ -5505,9 +5583,9 @@ const handleApiTestButtonClick = async (node: WorkflowNode) => {
   console.log('点击API测试按钮，节点:', node.name)
   
   const config = node.config || {}
-  const method = config.httpMethod || 'GET'
-  const url = config.url || ''
-  const jsonParams = config.jsonParams || ''
+  const method = config.method || 'GET'
+  const url = (config.apiUrl as string) || ''
+  const jsonParams = (config.jsonParams as string) || ''
   
   if (!url.trim()) {
     // 显示错误提示
@@ -5554,7 +5632,7 @@ const handleApiTestButtonClick = async (node: WorkflowNode) => {
       try {
         JSON.parse(jsonParams) // 验证JSON格式
         requestOptions.body = jsonParams
-      } catch (e) {
+      } catch {
         throw new Error('JSON参数格式错误')
       }
     }
@@ -5605,6 +5683,8 @@ const handleApiTestButtonClick = async (node: WorkflowNode) => {
   } catch (error) {
     console.error('API测试失败:', error)
     
+    const errorMessage = error instanceof Error ? error.message : '未知错误'
+    
     // 更新节点状态为测试失败
     updateNode(node.id, {
       config: {
@@ -5612,14 +5692,14 @@ const handleApiTestButtonClick = async (node: WorkflowNode) => {
         isTesting: false,
         testResult: {
           success: false,
-          error: error.message
+          error: errorMessage
         }
       }
     })
     
     // 显示错误提示
     const toast = document.createElement('div')
-    toast.textContent = `API测试失败: ${error.message}`
+    toast.textContent = `API测试失败: ${errorMessage}`
     toast.style.cssText = `
       position: fixed;
       top: 20px;
@@ -5637,6 +5717,245 @@ const handleApiTestButtonClick = async (node: WorkflowNode) => {
       document.body.removeChild(toast)
     }, 3000)
   }
+}
+
+// 处理API JSON参数区域点击
+const handleApiJsonAreaClick = (node: WorkflowNode) => {
+  console.log('点击API JSON参数区域，节点:', node.name)
+  
+  const config = node.config || {}
+  const currentJsonParams = (config.jsonParams as string) || ''
+  
+  // 创建JSON参数编辑对话框
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const content = document.createElement('div')
+  content.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 600px;
+    width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    color: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = 'JSON参数设置'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    border-bottom: 1px solid #374151;
+    padding-bottom: 12px;
+  `
+  content.appendChild(title)
+  
+  const description = document.createElement('p')
+  description.textContent = '请输入有效的JSON格式参数，用于POST/PUT请求的请求体：'
+  description.style.cssText = `
+    margin: 0 0 16px 0;
+    color: #d1d5db;
+    font-size: 14px;
+    line-height: 1.5;
+  `
+  content.appendChild(description)
+  
+  const textarea = document.createElement('textarea')
+  textarea.value = currentJsonParams
+  textarea.placeholder = '{\n  "key": "value",\n  "number": 123,\n  "boolean": true\n}'
+  textarea.style.cssText = `
+    width: 100%;
+    height: 200px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    padding: 12px;
+    color: #f9fafb;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+  `
+  
+  // JSON验证提示
+  const validationMessage = document.createElement('div')
+  validationMessage.style.cssText = `
+    margin: 8px 0 16px 0;
+    font-size: 12px;
+    min-height: 16px;
+  `
+  
+  // 实时JSON验证
+  const validateJson = () => {
+    const value = textarea.value.trim()
+    if (!value) {
+      validationMessage.textContent = ''
+      validationMessage.style.color = '#9ca3af'
+      textarea.style.borderColor = '#374151'
+      return true
+    }
+    
+    try {
+      JSON.parse(value)
+      validationMessage.textContent = '✓ JSON格式正确'
+      validationMessage.style.color = '#10b981'
+      textarea.style.borderColor = '#10b981'
+      return true
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : '格式错误'
+        validationMessage.textContent = `JSON格式错误: ${errorMessage}`
+      validationMessage.style.color = '#ef4444'
+      textarea.style.borderColor = '#ef4444'
+      return false
+    }
+  }
+  
+  textarea.addEventListener('input', validateJson)
+  
+  content.appendChild(textarea)
+  content.appendChild(validationMessage)
+  
+  // 按钮容器
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 20px;
+  `
+  
+  // 取消按钮
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 8px 16px;
+    background: #374151;
+    color: #d1d5db;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  `
+  
+  cancelButton.addEventListener('mouseenter', () => {
+    cancelButton.style.backgroundColor = '#4b5563'
+  })
+  
+  cancelButton.addEventListener('mouseleave', () => {
+    cancelButton.style.backgroundColor = '#374151'
+  })
+  
+  cancelButton.addEventListener('click', () => {
+    document.body.removeChild(dialog)
+  })
+  
+  // 保存按钮
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    padding: 8px 16px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  `
+  
+  saveButton.addEventListener('mouseenter', () => {
+    saveButton.style.backgroundColor = '#2563eb'
+  })
+  
+  saveButton.addEventListener('mouseleave', () => {
+    saveButton.style.backgroundColor = '#3b82f6'
+  })
+  
+  saveButton.addEventListener('click', () => {
+    const value = textarea.value.trim()
+    
+    // 如果有内容，验证JSON格式
+    if (value && !validateJson()) {
+      return // 如果JSON格式错误，不保存
+    }
+    
+    // 更新节点配置
+    updateNode(node.id, {
+      config: {
+        ...config,
+        jsonParams: value
+      }
+    })
+    
+    console.log('已保存JSON参数:', value)
+    document.body.removeChild(dialog)
+    
+    // 显示保存成功提示
+    const toast = document.createElement('div')
+    toast.textContent = 'JSON参数已保存'
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10001;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 2000)
+  })
+  
+  buttonContainer.appendChild(cancelButton)
+  buttonContainer.appendChild(saveButton)
+  content.appendChild(buttonContainer)
+  
+  dialog.appendChild(content)
+  document.body.appendChild(dialog)
+  
+  // 点击对话框外部关闭
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  })
+  
+  // 初始验证
+  validateJson()
+  
+  // 聚焦到文本框
+  setTimeout(() => {
+    textarea.focus()
+  }, 100)
 }
 
  // 处理服务器选择
@@ -6387,6 +6706,7 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedPromptSelect = getPromptSelectAtPosition(pos.x, pos.y)
   const clickedApiMethodArea = getApiMethodAreaAtPosition(pos.x, pos.y)
   const clickedApiUrlArea = getApiUrlAreaAtPosition(pos.x, pos.y)
+  const clickedApiJsonArea = getApiJsonAreaAtPosition(pos.x, pos.y)
   const clickedApiTestButton = getApiTestButtonAtPosition(pos.x, pos.y)
   
   if (clickedUploadButton) {
@@ -6416,6 +6736,9 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedApiUrlArea) {
     // 处理API URL区域点击
     handleApiUrlAreaClick(clickedApiUrlArea)
+  } else if (clickedApiJsonArea) {
+    // 处理API JSON参数区域点击
+    handleApiJsonAreaClick(clickedApiJsonArea)
   } else if (clickedApiTestButton) {
     // 处理API测试按钮点击
     handleApiTestButtonClick(clickedApiTestButton)
