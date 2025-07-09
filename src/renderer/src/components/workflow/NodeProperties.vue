@@ -97,6 +97,32 @@
           @input="updateConfig('headers', $event.target.value)"
         />
       </div>
+      <div v-if="localNode.config.method === 'POST' || localNode.config.method === 'PUT'" class="property-group">
+        <label class="property-label">JSON参数</label>
+        <textarea 
+          v-model="localNode.config.jsonParams"
+          class="property-input property-textarea"
+          placeholder='{"key": "value", "param": "data"}'
+          rows="6"
+          @input="updateConfig('jsonParams', $event.target.value)"
+        />
+        <div class="property-hint">请输入有效的JSON格式参数</div>
+      </div>
+      <div class="property-group">
+        <button 
+          class="test-button"
+          @click="testApiRequest"
+          :disabled="!localNode.config.apiUrl || isTestingApi"
+          title="测试API请求"
+        >
+          <Icon v-if="isTestingApi" icon="mdi:loading" class="animate-spin" />
+          <Icon v-else icon="mdi:send" />
+          {{ isTestingApi ? '测试中...' : '测试请求' }}
+        </button>
+        <div v-if="apiTestResult" class="test-result" :class="{ 'success': apiTestResult.success, 'error': !apiTestResult.success }">
+          {{ apiTestResult.message }}
+        </div>
+      </div>
     </template>
 
     <template v-else-if="node.type === 'text-transform'">
@@ -295,6 +321,10 @@ const localNode = reactive({ ...props.node })
 const availableProviders = ref<LLM_PROVIDER[]>([])
 const availableModels = ref<MODEL_META[]>([])
 
+// API测试相关状态
+const isTestingApi = ref(false)
+const apiTestResult = ref<{ success: boolean; message: string } | null>(null)
+
 // 获取提供者列表
 const loadProviders = async () => {
   try {
@@ -374,6 +404,80 @@ const updateConfig = (key: string, value: string | number) => {
 const deleteNode = () => {
   if (confirm('确定要删除这个节点吗？此操作无法撤销。')) {
     emit('delete', props.node.id)
+  }
+}
+
+// API测试方法
+const testApiRequest = async () => {
+  if (!localNode.config.apiUrl) {
+    apiTestResult.value = { success: false, message: '请先输入API URL' }
+    return
+  }
+
+  isTestingApi.value = true
+  apiTestResult.value = null
+
+  try {
+    const url = localNode.config.apiUrl as string
+    const method = (localNode.config.method as string) || 'GET'
+    
+    // 解析请求头
+    let headers: Record<string, string> = {}
+    if (localNode.config.headers) {
+      try {
+        headers = JSON.parse(localNode.config.headers as string)
+      } catch {
+        apiTestResult.value = { success: false, message: '请求头JSON格式错误' }
+        return
+      }
+    }
+
+    // 准备请求配置
+    const requestConfig: {
+      method: string
+      headers: Record<string, string>
+      body?: string
+    } = {
+      method,
+      headers
+    }
+
+    // 如果是POST、PUT请求且有JSON参数，添加到请求体
+    if ((method === 'POST' || method === 'PUT') && localNode.config.jsonParams) {
+      try {
+        const jsonData = JSON.parse(localNode.config.jsonParams as string)
+        requestConfig.body = JSON.stringify(jsonData)
+        if (!headers['Content-Type']) {
+          headers['Content-Type'] = 'application/json'
+        }
+      } catch {
+        apiTestResult.value = { success: false, message: 'JSON参数格式错误' }
+        return
+      }
+    }
+
+    // 发送请求
+    const response = await fetch(url, requestConfig)
+    const responseText = await response.text()
+    
+    if (response.ok) {
+      apiTestResult.value = {
+        success: true,
+        message: `状态码: ${response.status}\n响应: ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`
+      }
+    } else {
+      apiTestResult.value = {
+        success: false,
+        message: `请求失败 (${response.status}): ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`
+      }
+    }
+  } catch (error) {
+    apiTestResult.value = {
+      success: false,
+      message: `网络错误: ${error instanceof Error ? error.message : '未知错误'}`
+    }
+  } finally {
+    isTestingApi.value = false
   }
 }
 </script>
@@ -500,5 +604,64 @@ select.property-input option {
 .delete-icon {
   width: 16px;
   height: 16px;
+}
+
+.test-button {
+  width: 100%;
+  padding: 8px 16px;
+  background: #059669;
+  border: 1px solid #047857;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.test-button:hover {
+  background: #047857;
+  border-color: #065f46;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+}
+
+.test-button:active {
+  background: #065f46;
+  transform: translateY(1px);
+}
+
+.test-button:disabled {
+  background: #374151;
+  border-color: #4b5563;
+  color: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.test-result {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.test-result.success {
+  background: rgba(5, 150, 105, 0.1);
+  border: 1px solid #059669;
+  color: #10b981;
+}
+
+.test-result.error {
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid #dc2626;
+  color: #ef4444;
 }
 </style>

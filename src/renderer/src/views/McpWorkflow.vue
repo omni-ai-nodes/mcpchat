@@ -995,12 +995,14 @@ const drawNode = (node: WorkflowNode) => {
   const x = (node.x + offset.value.x) * scale.value
   const y = (node.y + offset.value.y) * scale.value
   const width = NODE_WIDTH * scale.value
-  // 为file-input、text-input、text-output、mcp-service和model-service节点动态计算高度
+  // 为file-input、text-input、api-input、text-output、mcp-service和model-service节点动态计算高度
   let height: number
   if (node.type === 'file-input') {
     height = (NODE_HEIGHT + 226) * scale.value  // 基础高度 + 上传区域高度 + 间距
   } else if (node.type === 'text-input') {
     height = (NODE_HEIGHT + 96) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
+  } else if (node.type === 'api-input') {
+    height = (NODE_HEIGHT + 180) * scale.value  // 基础高度 + API配置区域高度 + 间距
   } else if (node.type === 'text-output') {
     // 计算文本输出节点的自适应高度
     const outputText = (node.config?.outputText as string) || '暂无输出内容...'
@@ -1865,6 +1867,234 @@ const drawNode = (node: WorkflowNode) => {
     }
   }
 
+  // 如果是API输入节点，绘制API配置区域
+  if (node.type === 'api-input') {
+    const apiAreaWidth = width - 16 * scale.value
+    const apiAreaHeight = 180 * scale.value  // API配置区域高度
+    const apiAreaX = x + 8 * scale.value
+    const apiAreaY = y + headerHeight + 8 * scale.value
+    
+    // 绘制整体背景
+    context.fillStyle = '#1e293b'  // 深蓝灰色背景
+    context.beginPath()
+    context.roundRect(apiAreaX, apiAreaY, apiAreaWidth, apiAreaHeight, 8 * scale.value)
+    context.fill()
+    
+    // 绘制边框
+    context.strokeStyle = '#334155'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+    
+    // 绘制HTTP方法选择区域
+    const methodAreaHeight = 30 * scale.value
+    const methodAreaY = apiAreaY + 8 * scale.value
+    const methodAreaX = apiAreaX + 8 * scale.value
+    const methodAreaWidth = 80 * scale.value
+    
+    context.fillStyle = '#0f172a'
+    context.beginPath()
+    context.roundRect(methodAreaX, methodAreaY, methodAreaWidth, methodAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制HTTP方法文本
+    const method = (node.config?.method as string) || 'GET'
+    const methodColor = method === 'GET' ? '#10b981' : method === 'POST' ? '#3b82f6' : method === 'PUT' ? '#f59e0b' : '#ef4444'
+    context.fillStyle = methodColor
+    context.font = `bold ${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'center'
+    context.textBaseline = 'middle'
+    context.fillText(method, methodAreaX + methodAreaWidth / 2, methodAreaY + methodAreaHeight / 2)
+    
+    // 绘制URL输入区域
+    const urlAreaHeight = 30 * scale.value
+    const urlAreaY = methodAreaY
+    const urlAreaX = methodAreaX + methodAreaWidth + 8 * scale.value
+    const urlAreaWidth = apiAreaWidth - methodAreaWidth - 24 * scale.value
+    
+    context.fillStyle = '#0f172a'
+    context.beginPath()
+    context.roundRect(urlAreaX, urlAreaY, urlAreaWidth, urlAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制URL文本或占位符
+    const apiUrl = (node.config?.apiUrl as string) || ''
+    const urlDisplayText = apiUrl || 'https://api.example.com/endpoint'
+    const urlTextColor = apiUrl ? '#cbd5e1' : '#64748b'
+    
+    context.fillStyle = urlTextColor
+    context.font = `${9 * scale.value}px 'SF Mono', Monaco, 'Cascadia Code', monospace`
+    context.textAlign = 'left'
+    context.textBaseline = 'middle'
+    
+    // 截断过长的URL
+    const maxUrlWidth = urlAreaWidth - 16 * scale.value
+    let displayUrl = urlDisplayText
+    if (context.measureText(displayUrl).width > maxUrlWidth) {
+      while (context.measureText(displayUrl + '...').width > maxUrlWidth && displayUrl.length > 10) {
+        displayUrl = displayUrl.substring(0, displayUrl.length - 1)
+      }
+      displayUrl += '...'
+    }
+    
+    context.fillText(displayUrl, urlAreaX + 8 * scale.value, urlAreaY + urlAreaHeight / 2)
+    
+    // 绘制JSON参数区域（仅在POST/PUT时显示）
+    if (method === 'POST' || method === 'PUT') {
+      const jsonAreaHeight = 60 * scale.value
+      const jsonAreaY = methodAreaY + methodAreaHeight + 8 * scale.value
+      const jsonAreaX = apiAreaX + 8 * scale.value
+      const jsonAreaWidth = apiAreaWidth - 16 * scale.value
+      
+      context.fillStyle = '#0f172a'
+      context.beginPath()
+      context.roundRect(jsonAreaX, jsonAreaY, jsonAreaWidth, jsonAreaHeight, 4 * scale.value)
+      context.fill()
+      
+      context.strokeStyle = '#1e293b'
+      context.lineWidth = 1 * scale.value
+      context.stroke()
+      
+      // 绘制JSON标题
+      context.fillStyle = '#e2e8f0'
+      context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'left'
+      context.textBaseline = 'top'
+      context.fillText('JSON参数:', jsonAreaX + 8 * scale.value, jsonAreaY + 8 * scale.value)
+      
+      // 绘制JSON内容或占位符
+      const jsonParams = (node.config?.jsonParams as string) || ''
+      const jsonDisplayText = jsonParams || '{"key": "value"}'
+      const jsonTextColor = jsonParams ? '#cbd5e1' : '#64748b'
+      
+      context.fillStyle = jsonTextColor
+      context.font = `${9 * scale.value}px 'SF Mono', Monaco, 'Cascadia Code', monospace`
+      context.textAlign = 'left'
+      context.textBaseline = 'top'
+      
+      // 简单的JSON文本显示（最多3行）
+      const jsonLines = jsonDisplayText.split('\n').slice(0, 3)
+      jsonLines.forEach((line, index) => {
+        const maxLineWidth = jsonAreaWidth - 16 * scale.value
+        let displayLine = line
+        if (context.measureText(displayLine).width > maxLineWidth) {
+          while (context.measureText(displayLine + '...').width > maxLineWidth && displayLine.length > 5) {
+            displayLine = displayLine.substring(0, displayLine.length - 1)
+          }
+          displayLine += '...'
+        }
+        context.fillText(displayLine, jsonAreaX + 8 * scale.value, jsonAreaY + 25 * scale.value + index * 12 * scale.value)
+      })
+    }
+    
+    // 绘制测试按钮
+    const buttonWidth = 80 * scale.value
+    const buttonHeight = 24 * scale.value
+    const buttonX = apiAreaX + apiAreaWidth - buttonWidth - 8 * scale.value
+    const buttonY = apiAreaY + apiAreaHeight - buttonHeight - 8 * scale.value
+    
+    // 检查是否正在测试
+    const isTesting = node.config?.isTesting as boolean
+    const buttonColor = isTesting ? '#6b7280' : '#3b82f6'
+    const buttonTextColor = '#ffffff'
+    
+    context.fillStyle = buttonColor
+    context.beginPath()
+    context.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 4 * scale.value)
+    context.fill()
+    
+    // 按钮边框
+    context.strokeStyle = isTesting ? '#9ca3af' : '#60a5fa'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 按钮文字
+    context.fillStyle = buttonTextColor
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'center'
+    context.textBaseline = 'middle'
+    const buttonText = isTesting ? '测试中...' : '🚀 测试'
+    context.fillText(buttonText, buttonX + buttonWidth / 2, buttonY + buttonHeight / 2)
+    
+    // 绘制测试结果状态指示器
+    const testResult = node.config?.testResult as any
+    if (testResult) {
+      const indicatorSize = 8 * scale.value
+      const indicatorX = buttonX - indicatorSize - 8 * scale.value
+      const indicatorY = buttonY + (buttonHeight - indicatorSize) / 2
+      
+      const isSuccess = testResult.success
+      const indicatorColor = isSuccess ? '#10b981' : '#ef4444'
+      
+      context.fillStyle = indicatorColor
+      context.beginPath()
+      context.arc(indicatorX + indicatorSize / 2, indicatorY + indicatorSize / 2, indicatorSize / 2, 0, Math.PI * 2)
+      context.fill()
+      
+      // 状态文字
+      context.fillStyle = indicatorColor
+      context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'right'
+      context.textBaseline = 'middle'
+      const statusText = isSuccess ? '成功' : '失败'
+      context.fillText(statusText, indicatorX - 4 * scale.value, indicatorY + indicatorSize / 2)
+    }
+    
+    // 存储各个区域的位置信息，用于点击检测
+    // HTTP方法选择区域
+    if (!node.apiMethodArea) {
+      node.apiMethodArea = {
+        x: (methodAreaX / scale.value) + offset.value.x,
+        y: (methodAreaY / scale.value) + offset.value.y,
+        width: methodAreaWidth / scale.value,
+        height: methodAreaHeight / scale.value
+      }
+    } else {
+      node.apiMethodArea.x = (methodAreaX / scale.value) + offset.value.x
+      node.apiMethodArea.y = (methodAreaY / scale.value) + offset.value.y
+      node.apiMethodArea.width = methodAreaWidth / scale.value
+      node.apiMethodArea.height = methodAreaHeight / scale.value
+    }
+    
+    // URL输入区域
+    if (!node.apiUrlArea) {
+      node.apiUrlArea = {
+        x: (urlAreaX / scale.value) + offset.value.x,
+        y: (urlAreaY / scale.value) + offset.value.y,
+        width: urlAreaWidth / scale.value,
+        height: urlAreaHeight / scale.value
+      }
+    } else {
+      node.apiUrlArea.x = (urlAreaX / scale.value) + offset.value.x
+      node.apiUrlArea.y = (urlAreaY / scale.value) + offset.value.y
+      node.apiUrlArea.width = urlAreaWidth / scale.value
+      node.apiUrlArea.height = urlAreaHeight / scale.value
+    }
+    
+    // 测试按钮区域
+    if (!node.apiTestButton) {
+      node.apiTestButton = {
+        x: (buttonX / scale.value) + offset.value.x,
+        y: (buttonY / scale.value) + offset.value.y,
+        width: buttonWidth / scale.value,
+        height: buttonHeight / scale.value
+      }
+    } else {
+      node.apiTestButton.x = (buttonX / scale.value) + offset.value.x
+      node.apiTestButton.y = (buttonY / scale.value) + offset.value.y
+      node.apiTestButton.width = buttonWidth / scale.value
+      node.apiTestButton.height = buttonHeight / scale.value
+    }
+  }
+
   // 如果是文本输出节点，绘制文本显示区域
   if (node.type === 'text-output') {
     const displayAreaWidth = width - 16 * scale.value
@@ -2668,6 +2898,48 @@ const getTextDisplayAreaAtPosition = (x: number, y: number): WorkflowNode | null
       const area = node.textDisplayArea
       if (x >= area.x && x <= area.x + area.width && 
           y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取API输入节点HTTP方法区域点击位置
+const getApiMethodAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'api-input' && node.apiMethodArea) {
+      const area = node.apiMethodArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取API输入节点URL区域点击位置
+const getApiUrlAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'api-input' && node.apiUrlArea) {
+      const area = node.apiUrlArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取API输入节点测试按钮点击位置
+const getApiTestButtonAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'api-input' && node.apiTestButton) {
+      const button = node.apiTestButton
+      if (x >= button.x && x <= button.x + button.width && 
+          y >= button.y && y <= button.y + button.height) {
         return node
       }
     }
@@ -4960,6 +5232,413 @@ const handleMcpServerSelectClick = (node: WorkflowNode) => {
    })
  }
  
+// 处理API方法选择点击
+const handleApiMethodAreaClick = (node: WorkflowNode) => {
+  console.log('点击API方法选择，节点:', node.name)
+  
+  const methods = ['GET', 'POST', 'PUT', 'DELETE']
+  const currentMethod = node.config?.httpMethod || 'GET'
+  
+  // 创建方法选择弹窗
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: linear-gradient(145deg, #1f2937, #111827);
+    border-radius: 16px;
+    padding: 24px;
+    width: 300px;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '选择HTTP方法'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f8fafc;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+  `
+  
+  const methodList = document.createElement('div')
+  methodList.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  `
+  
+  methods.forEach(method => {
+    const methodOption = document.createElement('div')
+    methodOption.textContent = method
+    methodOption.style.cssText = `
+      padding: 12px 16px;
+      background: ${method === currentMethod ? 'rgba(99, 102, 241, 0.2)' : 'rgba(55, 65, 81, 0.8)'};
+      border: 1px solid ${method === currentMethod ? '#6366f1' : 'rgba(75, 85, 99, 0.6)'};
+      border-radius: 8px;
+      color: #ffffff;
+      cursor: pointer;
+      text-align: center;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    `
+    
+    methodOption.onmouseover = () => {
+      if (method !== currentMethod) {
+        methodOption.style.background = 'rgba(99, 102, 241, 0.1)'
+        methodOption.style.borderColor = '#6366f1'
+      }
+    }
+    
+    methodOption.onmouseout = () => {
+      if (method !== currentMethod) {
+        methodOption.style.background = 'rgba(55, 65, 81, 0.8)'
+        methodOption.style.borderColor = 'rgba(75, 85, 99, 0.6)'
+      }
+    }
+    
+    methodOption.onclick = () => {
+      updateNode(node.id, {
+        config: {
+          ...node.config,
+          httpMethod: method
+        }
+      })
+      console.log('选择HTTP方法:', method)
+      document.body.removeChild(dialog)
+    }
+    
+    methodList.appendChild(methodOption)
+  })
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    width: 100%;
+    padding: 12px;
+    margin-top: 16px;
+    background: rgba(107, 114, 128, 0.8);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  cancelButton.onclick = () => {
+    document.body.removeChild(dialog)
+  }
+  
+  dialogContent.appendChild(title)
+  dialogContent.appendChild(methodList)
+  dialogContent.appendChild(cancelButton)
+  dialog.appendChild(dialogContent)
+  document.body.appendChild(dialog)
+  
+  // 点击背景关闭弹窗
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  }
+}
+
+// 处理API URL区域点击
+const handleApiUrlAreaClick = (node: WorkflowNode) => {
+  console.log('点击API URL区域，节点:', node.name)
+  
+  const currentUrl = node.config?.url || ''
+  
+  // 创建URL输入弹窗
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: linear-gradient(145deg, #1f2937, #111827);
+    border-radius: 16px;
+    padding: 24px;
+    width: 500px;
+    max-width: 90vw;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '设置API URL'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f8fafc;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+  `
+  
+  const urlInput = document.createElement('input')
+  urlInput.type = 'url'
+  urlInput.value = currentUrl
+  urlInput.placeholder = 'https://api.example.com/endpoint'
+  urlInput.style.cssText = `
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(55, 65, 81, 0.8);
+    border: 1px solid rgba(75, 85, 99, 0.6);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+  `
+  
+  urlInput.onfocus = () => {
+    urlInput.style.borderColor = '#6366f1'
+    urlInput.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)'
+  }
+  
+  urlInput.onblur = () => {
+    urlInput.style.borderColor = 'rgba(75, 85, 99, 0.6)'
+    urlInput.style.boxShadow = 'none'
+  }
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  `
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  saveButton.onclick = () => {
+    const url = urlInput.value.trim()
+    updateNode(node.id, {
+      config: {
+        ...node.config,
+        url: url
+      }
+    })
+    console.log('保存API URL:', url)
+    document.body.removeChild(dialog)
+  }
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 12px 24px;
+    background: rgba(107, 114, 128, 0.8);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  cancelButton.onclick = () => {
+    document.body.removeChild(dialog)
+  }
+  
+  buttonContainer.appendChild(saveButton)
+  buttonContainer.appendChild(cancelButton)
+  
+  dialogContent.appendChild(title)
+  dialogContent.appendChild(urlInput)
+  dialogContent.appendChild(buttonContainer)
+  dialog.appendChild(dialogContent)
+  document.body.appendChild(dialog)
+  
+  // 点击背景关闭弹窗
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  }
+  
+  // 聚焦到输入框
+  setTimeout(() => {
+    urlInput.focus()
+    urlInput.select()
+  }, 100)
+}
+
+// 处理API测试按钮点击
+const handleApiTestButtonClick = async (node: WorkflowNode) => {
+  console.log('点击API测试按钮，节点:', node.name)
+  
+  const config = node.config || {}
+  const method = config.httpMethod || 'GET'
+  const url = config.url || ''
+  const jsonParams = config.jsonParams || ''
+  
+  if (!url.trim()) {
+    // 显示错误提示
+    const toast = document.createElement('div')
+    toast.textContent = '请先设置API URL'
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #ef4444;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10001;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 3000)
+    return
+  }
+  
+  // 更新节点状态为测试中
+  updateNode(node.id, {
+    config: {
+      ...config,
+      isTesting: true,
+      testResult: null
+    }
+  })
+  
+  try {
+    const requestOptions: RequestInit = {
+      method: method,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+    
+    // 如果是POST或PUT请求且有JSON参数，添加到请求体
+    if ((method === 'POST' || method === 'PUT') && jsonParams.trim()) {
+      try {
+        JSON.parse(jsonParams) // 验证JSON格式
+        requestOptions.body = jsonParams
+      } catch (e) {
+        throw new Error('JSON参数格式错误')
+      }
+    }
+    
+    const response = await fetch(url, requestOptions)
+    const responseText = await response.text()
+    
+    let responseData
+    try {
+      responseData = JSON.parse(responseText)
+    } catch {
+      responseData = responseText
+    }
+    
+    // 更新节点状态为测试成功
+    updateNode(node.id, {
+      config: {
+        ...config,
+        isTesting: false,
+        testResult: {
+          success: response.ok,
+          status: response.status,
+          data: responseData
+        }
+      }
+    })
+    
+    // 显示成功提示
+    const toast = document.createElement('div')
+    toast.textContent = `API测试${response.ok ? '成功' : '失败'} (${response.status})` 
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: ${response.ok ? '#10b981' : '#ef4444'};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10001;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 3000)
+    
+  } catch (error) {
+    console.error('API测试失败:', error)
+    
+    // 更新节点状态为测试失败
+    updateNode(node.id, {
+      config: {
+        ...config,
+        isTesting: false,
+        testResult: {
+          success: false,
+          error: error.message
+        }
+      }
+    })
+    
+    // 显示错误提示
+    const toast = document.createElement('div')
+    toast.textContent = `API测试失败: ${error.message}`
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #ef4444;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10001;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 3000)
+  }
+}
+
  // 处理服务器选择
  const handleServerSelection = async (serverId: string) => {
    if (!currentSelectingNode.value || serverId === 'no-servers') return
@@ -5706,6 +6385,9 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedMcpServerSelect = getMcpServerSelectAtPosition(pos.x, pos.y)
   const clickedModelServiceSelect = getModelServiceSelectAtPosition(pos.x, pos.y)
   const clickedPromptSelect = getPromptSelectAtPosition(pos.x, pos.y)
+  const clickedApiMethodArea = getApiMethodAreaAtPosition(pos.x, pos.y)
+  const clickedApiUrlArea = getApiUrlAreaAtPosition(pos.x, pos.y)
+  const clickedApiTestButton = getApiTestButtonAtPosition(pos.x, pos.y)
   
   if (clickedUploadButton) {
     // 处理上传按钮点击
@@ -5728,6 +6410,15 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedPromptSelect) {
     // 处理Prompt选择点击
     handlePromptSelectClick(clickedPromptSelect)
+  } else if (clickedApiMethodArea) {
+    // 处理API方法选择点击
+    handleApiMethodAreaClick(clickedApiMethodArea)
+  } else if (clickedApiUrlArea) {
+    // 处理API URL区域点击
+    handleApiUrlAreaClick(clickedApiUrlArea)
+  } else if (clickedApiTestButton) {
+    // 处理API测试按钮点击
+    handleApiTestButtonClick(clickedApiTestButton)
   } else if (clickedTextArea) {
     // 处理文本区域点击
     handleTextAreaClick(clickedTextArea)
