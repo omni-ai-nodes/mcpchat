@@ -1,5 +1,5 @@
 <p align='center'>
-<img src='./build/icon.png' width="150" height="150" alt="McpChat AI Assistant Icon" />
+<img src='./build/logo.png' width="150" height="150" alt="McpChat AI Assistant Icon" />
 </p>
 
 <h1 align="center">McpChat - Powerful Open-Source Multi-Model AI Chat Platform</h1>

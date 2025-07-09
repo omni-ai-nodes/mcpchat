@@ -52,7 +52,7 @@ import grokColorIcon from '@/assets/llm-icons/grok.svg?url'
 import hunyuanColorIcon from '@/assets/llm-icons/hunyuan-color.svg?url'
 import dashscopeColorIcon from '@/assets/llm-icons/alibabacloud-color.svg?url'
 import aihubmixColorIcon from '@/assets/llm-icons/aihubmix.png?url'
-import defaultIcon from '@/assets/logo.png?url'
+import defaultIcon from '@/assets/logo.png'
 import metaColorIcon from '@/assets/llm-icons/meta.svg?url'
 import lmstudioColorIcon from '@/assets/llm-icons/lmstudio.svg?url'
 // 导入所有图标

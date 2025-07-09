@@ -345,21 +345,21 @@ const scrollTabContainer = (direction: 'left' | 'right') => {
 
 const minimizeWindow = () => {
   const id = window.api.getWindowId()
-  if (id != null) {
+  if (id !== undefined) {
     windowPresenter.minimize(id)
   }
 }
 
 const toggleMaximize = () => {
   const id = window.api.getWindowId()
-  if (id != null) {
+  if (id !== undefined) {
     windowPresenter.maximize(id)
   }
 }
 
 const closeWindow = () => {
   const id = window.api.getWindowId()
-  if (id != null) {
+  if (id !== undefined) {
     windowPresenter.close(id)
   }
 }

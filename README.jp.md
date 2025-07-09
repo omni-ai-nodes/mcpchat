@@ -1,5 +1,5 @@
 <p align='center'>
-<img src='./build/icon.png' width="150" height="150" alt="McpChat AI アシスタントアイコン" />
+<img src='./build/logo.png' width="150" height="150" alt="McpChat AI アシスタントアイコン" />
 </p>
 
 <h1 align="center">McpChat - 強力なオープンソースマルチモデルAIチャットプラットフォーム</h1>
