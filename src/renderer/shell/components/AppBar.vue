@@ -67,7 +67,7 @@
         class="flex-shrink-0 text-xs ml-1 font-medium px-2 h-6 bg-transparent rounded-md flex items-center justify-center hover:bg-zinc-500/20"
         @click="openMcpTab"
       >
-        <Icon icon="lucide:fingerprint" class="w-4 h-4 mr-1" />
+        <img src="@/assets/mcp-icons/mcp.svg?url" class="w-4 h-4 mr-1" alt="MCP" />
         <span>{{ t('common.appBar.mcpGallery') }}</span>
       </Button>
       <Button
@@ -344,22 +344,22 @@ const scrollTabContainer = (direction: 'left' | 'right') => {
 // }
 
 const minimizeWindow = () => {
-  const id = window.api.getWindowId()
-  if (id !== undefined) {
+  const id = window.api?.getWindowId?.()
+  if (id !== undefined && id !== null) {
     windowPresenter.minimize(id)
   }
 }
 
 const toggleMaximize = () => {
-  const id = window.api.getWindowId()
-  if (id !== undefined) {
+  const id = window.api?.getWindowId?.()
+  if (id !== undefined && id !== null) {
     windowPresenter.maximize(id)
   }
 }
 
 const closeWindow = () => {
-  const id = window.api.getWindowId()
-  if (id !== undefined) {
+  const id = window.api?.getWindowId?.()
+  if (id !== undefined && id !== null) {
     windowPresenter.close(id)
   }
 }
