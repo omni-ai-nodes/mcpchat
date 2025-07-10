@@ -252,6 +252,47 @@ app.whenReady().then(() => {
       })
     }
   })
+
+  // 注册 'api' 协议，用于处理内部API请求
+  protocol.handle('api', async (request) => {
+    try {
+      const url = new URL(request.url)
+      const pathname = url.pathname
+      
+      // 处理数据库测试API
+      if (pathname === '/database/test' && request.method === 'POST') {
+        const body = await request.text()
+        const config = JSON.parse(body)
+        
+        const result = await presenter.databasePresenter.testConnection(config)
+        
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+      
+      // 未找到的API路径
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'API路径不存在' 
+      }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+    } catch (error: unknown) {
+      console.error('处理API请求时出错:', error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: `服务器错误: ${errorMessage}` 
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+  })
 }) // app.whenReady().then 结束
 
 // 当所有窗口都关闭时，不退出应用。macOS 平台会保留在 Dock 中，Windows 会保留在托盘。

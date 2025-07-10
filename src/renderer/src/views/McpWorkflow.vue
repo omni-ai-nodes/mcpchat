@@ -656,6 +656,54 @@ interface WorkflowNode {
     width: number
     height: number
   }
+  dbHostArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  dbPortArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  dbNameArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  dbUsernameArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  dbPasswordArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  dbSqlArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  dbTestButton?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  dbTypeSelector?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 }
 
 interface Connection {
@@ -1034,6 +1082,8 @@ const drawNode = (node: WorkflowNode) => {
     height = (NODE_HEIGHT + 96) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
   } else if (node.type === 'api-input') {
     height = (NODE_HEIGHT + 256) * scale.value  // 基础高度 + API配置区域高度 + 间距
+  } else if (node.type === 'mysql-input' || node.type === 'postgresql-input' || node.type === 'database-input') {
+    height = (NODE_HEIGHT + 316) * scale.value  // 基础高度 + 数据库配置区域高度 + 间距
   } else if (node.type === 'text-output') {
     // 计算文本输出节点的自适应高度
     const outputText = (node.config?.outputText as string) || '暂无输出内容...'
@@ -2150,6 +2200,464 @@ const drawNode = (node: WorkflowNode) => {
     }
   }
 
+  // 如果是数据库节点，绘制数据库配置区域
+  if (node.type === 'mysql-input' || node.type === 'postgresql-input' || node.type === 'database-input') {
+    const dbAreaWidth = width - 16 * scale.value
+    const dbAreaHeight = 340 * scale.value  // 数据库配置区域高度
+    const dbAreaX = x + 8 * scale.value
+    const dbAreaY = y + headerHeight + 8 * scale.value
+    
+    // 绘制整体背景
+    context.fillStyle = '#1e293b'  // 深蓝灰色背景
+    context.beginPath()
+    context.roundRect(dbAreaX, dbAreaY, dbAreaWidth, dbAreaHeight, 8 * scale.value)
+    context.fill()
+    
+    // 绘制边框
+    context.strokeStyle = '#334155'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+    
+    // 绘制数据库类型标识
+    let dbType, dbTypeColor
+    if (node.type === 'database-input') {
+      // 统一的database-input节点，根据配置中的dbType确定类型
+      const configDbType = (node.config?.dbType as string) || 'mysql'
+      dbType = configDbType === 'mysql' ? 'MySQL' : 'PostgreSQL'
+      dbTypeColor = configDbType === 'mysql' ? '#f59e0b' : '#3b82f6'
+    } else {
+      // 向后兼容的mysql-input和postgresql-input节点
+      dbType = node.type === 'mysql-input' ? 'MySQL' : 'PostgreSQL'
+      dbTypeColor = node.type === 'mysql-input' ? '#f59e0b' : '#3b82f6'
+    }
+    
+    context.fillStyle = dbTypeColor
+    context.font = `bold ${12 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText(dbType, dbAreaX + 12 * scale.value, dbAreaY + 12 * scale.value)
+    
+    // 为database-input节点添加数据库类型选择器
+    if (node.type === 'database-input') {
+      const selectorWidth = 80 * scale.value
+      const selectorHeight = 20 * scale.value
+      const selectorX = dbAreaX + dbAreaWidth - selectorWidth - 12 * scale.value
+      const selectorY = dbAreaY + 8 * scale.value
+      
+      // 绘制选择器背景
+      context.fillStyle = '#374151'
+      context.beginPath()
+      context.roundRect(selectorX, selectorY, selectorWidth, selectorHeight, 4 * scale.value)
+      context.fill()
+      
+      // 绘制选择器边框
+      context.strokeStyle = '#4b5563'
+      context.lineWidth = 1 * scale.value
+      context.stroke()
+      
+      // 绘制选择器文本
+      const configDbType = (node.config?.dbType as string) || 'mysql'
+      const selectorText = configDbType === 'mysql' ? 'MySQL' : 'PostgreSQL'
+      context.fillStyle = '#f9fafb'
+      context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText(selectorText, selectorX + selectorWidth / 2, selectorY + selectorHeight / 2)
+      
+      // 绘制下拉箭头
+      context.fillStyle = '#9ca3af'
+      context.font = `${8 * scale.value}px Arial`
+      context.fillText('▼', selectorX + selectorWidth - 8 * scale.value, selectorY + selectorHeight / 2)
+      
+      // 存储选择器区域位置信息，用于点击检测
+      if (!node.dbTypeSelector) {
+        node.dbTypeSelector = {
+          x: (selectorX / scale.value) + offset.value.x,
+          y: (selectorY / scale.value) + offset.value.y,
+          width: selectorWidth / scale.value,
+          height: selectorHeight / scale.value
+        }
+      } else {
+        node.dbTypeSelector.x = (selectorX / scale.value) + offset.value.x
+        node.dbTypeSelector.y = (selectorY / scale.value) + offset.value.y
+        node.dbTypeSelector.width = selectorWidth / scale.value
+        node.dbTypeSelector.height = selectorHeight / scale.value
+      }
+    }
+    
+    // 绘制主机和端口输入区域
+    const hostPortY = dbAreaY + 35 * scale.value
+    const hostWidth = 120 * scale.value
+    const portWidth = 60 * scale.value
+    const inputHeight = 28 * scale.value
+    
+    // 主机输入框
+    const hostX = dbAreaX + 12 * scale.value
+    context.fillStyle = '#0f172a'
+    context.beginPath()
+    context.roundRect(hostX, hostPortY, hostWidth, inputHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 主机标签和值
+    context.fillStyle = '#64748b'
+    context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('主机:', hostX, hostPortY - 12 * scale.value)
+    
+    const host = (node.config?.host as string) || 'localhost'
+    context.fillStyle = '#cbd5e1'
+    context.font = `${9 * scale.value}px 'SF Mono', Monaco, 'Cascadia Code', monospace`
+    context.textBaseline = 'middle'
+    context.fillText(host, hostX + 6 * scale.value, hostPortY + inputHeight / 2)
+    
+    // 端口输入框
+    const portX = hostX + hostWidth + 8 * scale.value
+    context.fillStyle = '#0f172a'
+    context.beginPath()
+    context.roundRect(portX, hostPortY, portWidth, inputHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 端口标签和值
+    context.fillStyle = '#64748b'
+    context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('端口:', portX, hostPortY - 12 * scale.value)
+    
+    let defaultPort
+    if (node.type === 'database-input') {
+      const configDbType = (node.config?.dbType as string) || 'mysql'
+      defaultPort = configDbType === 'mysql' ? '3306' : '5432'
+    } else {
+      defaultPort = node.type === 'mysql-input' ? '3306' : '5432'
+    }
+    const port = (node.config?.port as string) || defaultPort
+    context.fillStyle = '#cbd5e1'
+    context.font = `${9 * scale.value}px 'SF Mono', Monaco, 'Cascadia Code', monospace`
+    context.textBaseline = 'middle'
+    context.fillText(port, portX + 6 * scale.value, hostPortY + inputHeight / 2)
+    
+    // 绘制数据库名称输入区域
+    const dbNameY = hostPortY + inputHeight + 12 * scale.value
+    const dbNameWidth = dbAreaWidth - 24 * scale.value
+    const dbNameX = dbAreaX + 12 * scale.value
+    
+    context.fillStyle = '#0f172a'
+    context.beginPath()
+    context.roundRect(dbNameX, dbNameY, dbNameWidth, inputHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 数据库名称标签和值
+    context.fillStyle = '#64748b'
+    context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('数据库名称:', dbNameX, dbNameY - 12 * scale.value)
+    
+    const database = (node.config?.database as string) || ''
+    const dbDisplayText = database || 'database_name'
+    const dbTextColor = database ? '#cbd5e1' : '#64748b'
+    
+    context.fillStyle = dbTextColor
+    context.font = `${9 * scale.value}px 'SF Mono', Monaco, 'Cascadia Code', monospace`
+    context.textBaseline = 'middle'
+    context.fillText(dbDisplayText, dbNameX + 6 * scale.value, dbNameY + inputHeight / 2)
+    
+    // 绘制用户名和密码输入区域
+    const credentialsY = dbNameY + inputHeight + 12 * scale.value
+    const usernameWidth = 100 * scale.value
+    const passwordWidth = dbAreaWidth - usernameWidth - 32 * scale.value
+    
+    // 用户名输入框
+    const usernameX = dbAreaX + 12 * scale.value
+    context.fillStyle = '#0f172a'
+    context.beginPath()
+    context.roundRect(usernameX, credentialsY, usernameWidth, inputHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 用户名标签和值
+    context.fillStyle = '#64748b'
+    context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('用户名:', usernameX, credentialsY - 12 * scale.value)
+    
+    const username = (node.config?.username as string) || ''
+    const usernameDisplayText = username || 'username'
+    const usernameTextColor = username ? '#cbd5e1' : '#64748b'
+    
+    context.fillStyle = usernameTextColor
+    context.font = `${9 * scale.value}px 'SF Mono', Monaco, 'Cascadia Code', monospace`
+    context.textBaseline = 'middle'
+    context.fillText(usernameDisplayText, usernameX + 6 * scale.value, credentialsY + inputHeight / 2)
+    
+    // 密码输入框
+    const passwordX = usernameX + usernameWidth + 8 * scale.value
+    context.fillStyle = '#0f172a'
+    context.beginPath()
+    context.roundRect(passwordX, credentialsY, passwordWidth, inputHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 密码标签和值
+    context.fillStyle = '#64748b'
+    context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('密码:', passwordX, credentialsY - 12 * scale.value)
+    
+    const password = (node.config?.password as string) || ''
+    const passwordDisplay = password ? '●'.repeat(Math.min(password.length, 8)) : 'password'
+    const passwordTextColor = password ? '#cbd5e1' : '#64748b'
+    
+    context.fillStyle = passwordTextColor
+    context.font = `${9 * scale.value}px 'SF Mono', Monaco, 'Cascadia Code', monospace`
+    context.textBaseline = 'middle'
+    context.fillText(passwordDisplay, passwordX + 6 * scale.value, credentialsY + inputHeight / 2)
+    
+    // 绘制SQL查询区域
+    const sqlAreaHeight = 120 * scale.value
+    const sqlAreaY = credentialsY + inputHeight + 12 * scale.value
+    const sqlAreaX = dbAreaX + 12 * scale.value
+    const sqlAreaWidth = dbAreaWidth - 24 * scale.value
+    
+    context.fillStyle = '#0f172a'
+    context.beginPath()
+    context.roundRect(sqlAreaX, sqlAreaY, sqlAreaWidth, sqlAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // SQL查询标签
+    context.fillStyle = '#64748b'
+    context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('SQL查询:', sqlAreaX, sqlAreaY - 12 * scale.value)
+    
+    // 绘制SQL查询内容
+    const sqlQuery = (node.config?.sql as string) || 'SELECT * FROM table_name LIMIT 10'
+    const sqlTextColor = (node.config?.sql as string) ? '#cbd5e1' : '#64748b'
+    
+    context.fillStyle = sqlTextColor
+    context.font = `${9 * scale.value}px 'SF Mono', Monaco, 'Cascadia Code', monospace`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    
+    // 简单的SQL文本显示（最多4行）
+    const sqlLines = sqlQuery.split('\n').slice(0, 4)
+    sqlLines.forEach((line, index) => {
+      const maxLineWidth = sqlAreaWidth - 16 * scale.value
+      let displayLine = line
+      if (context.measureText(displayLine).width > maxLineWidth) {
+        while (context.measureText(displayLine + '...').width > maxLineWidth && displayLine.length > 5) {
+          displayLine = displayLine.substring(0, displayLine.length - 1)
+        }
+        displayLine += '...'
+      }
+      context.fillText(displayLine, sqlAreaX + 8 * scale.value, sqlAreaY + 12 * scale.value + index * 14 * scale.value)
+    })
+    
+    // 绘制测试连接按钮
+    const testButtonWidth = 80 * scale.value
+    const testButtonHeight = 24 * scale.value
+    const testButtonX = dbAreaX + dbAreaWidth - testButtonWidth - 12 * scale.value
+    const testButtonY = dbAreaY + dbAreaHeight - testButtonHeight - 12 * scale.value
+    
+    // 检查是否正在测试
+    const isTesting = node.config?.isTesting as boolean
+    let buttonColor
+    if (isTesting) {
+      buttonColor = '#6b7280'
+    } else if (node.type === 'database-input') {
+      const configDbType = (node.config?.dbType as string) || 'mysql'
+      buttonColor = configDbType === 'mysql' ? '#f59e0b' : '#3b82f6'
+    } else {
+      buttonColor = node.type === 'mysql-input' ? '#f59e0b' : '#3b82f6'
+    }
+    const buttonTextColor = '#ffffff'
+    
+    context.fillStyle = buttonColor
+    context.beginPath()
+    context.roundRect(testButtonX, testButtonY, testButtonWidth, testButtonHeight, 4 * scale.value)
+    context.fill()
+    
+    // 按钮边框
+    let borderColor
+    if (isTesting) {
+      borderColor = '#9ca3af'
+    } else if (node.type === 'database-input') {
+      const configDbType = (node.config?.dbType as string) || 'mysql'
+      borderColor = configDbType === 'mysql' ? '#fbbf24' : '#60a5fa'
+    } else {
+      borderColor = node.type === 'mysql-input' ? '#fbbf24' : '#60a5fa'
+    }
+    context.strokeStyle = borderColor
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 按钮文字
+    context.fillStyle = buttonTextColor
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'center'
+    context.textBaseline = 'middle'
+    const buttonText = isTesting ? '连接中...' : '🔗 测试'
+    context.fillText(buttonText, testButtonX + testButtonWidth / 2, testButtonY + testButtonHeight / 2)
+    
+    // 绘制测试结果状态指示器
+    const testResult = node.config?.testResult
+    if (testResult) {
+      const indicatorSize = 8 * scale.value
+      const indicatorX = testButtonX - indicatorSize - 8 * scale.value
+      const indicatorY = testButtonY + (testButtonHeight - indicatorSize) / 2
+      
+      const isSuccess = (testResult as { success: boolean }).success
+      const indicatorColor = isSuccess ? '#10b981' : '#ef4444'
+      
+      context.fillStyle = indicatorColor
+      context.beginPath()
+      context.arc(indicatorX + indicatorSize / 2, indicatorY + indicatorSize / 2, indicatorSize / 2, 0, Math.PI * 2)
+      context.fill()
+      
+      // 状态文字
+      context.fillStyle = indicatorColor
+      context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'right'
+      context.textBaseline = 'middle'
+      const statusText = isSuccess ? '成功' : '失败'
+      context.fillText(statusText, indicatorX - 4 * scale.value, indicatorY + indicatorSize / 2)
+    }
+    
+    // 存储各个区域的位置信息，用于点击检测
+    // 主机输入区域
+    if (!node.dbHostArea) {
+      node.dbHostArea = {
+        x: (hostX / scale.value) + offset.value.x,
+        y: (hostPortY / scale.value) + offset.value.y,
+        width: hostWidth / scale.value,
+        height: inputHeight / scale.value
+      }
+    } else {
+      node.dbHostArea.x = (hostX / scale.value) + offset.value.x
+      node.dbHostArea.y = (hostPortY / scale.value) + offset.value.y
+      node.dbHostArea.width = hostWidth / scale.value
+      node.dbHostArea.height = inputHeight / scale.value
+    }
+    
+    // 端口输入区域
+    if (!node.dbPortArea) {
+      node.dbPortArea = {
+        x: (portX / scale.value) + offset.value.x,
+        y: (hostPortY / scale.value) + offset.value.y,
+        width: portWidth / scale.value,
+        height: inputHeight / scale.value
+      }
+    } else {
+      node.dbPortArea.x = (portX / scale.value) + offset.value.x
+      node.dbPortArea.y = (hostPortY / scale.value) + offset.value.y
+      node.dbPortArea.width = portWidth / scale.value
+      node.dbPortArea.height = inputHeight / scale.value
+    }
+    
+    // 数据库名称输入区域
+    if (!node.dbNameArea) {
+      node.dbNameArea = {
+        x: (dbNameX / scale.value) + offset.value.x,
+        y: (dbNameY / scale.value) + offset.value.y,
+        width: dbNameWidth / scale.value,
+        height: inputHeight / scale.value
+      }
+    } else {
+      node.dbNameArea.x = (dbNameX / scale.value) + offset.value.x
+      node.dbNameArea.y = (dbNameY / scale.value) + offset.value.y
+      node.dbNameArea.width = dbNameWidth / scale.value
+      node.dbNameArea.height = inputHeight / scale.value
+    }
+    
+    // 用户名输入区域
+    if (!node.dbUsernameArea) {
+      node.dbUsernameArea = {
+        x: (usernameX / scale.value) + offset.value.x,
+        y: (credentialsY / scale.value) + offset.value.y,
+        width: usernameWidth / scale.value,
+        height: inputHeight / scale.value
+      }
+    } else {
+      node.dbUsernameArea.x = (usernameX / scale.value) + offset.value.x
+      node.dbUsernameArea.y = (credentialsY / scale.value) + offset.value.y
+      node.dbUsernameArea.width = usernameWidth / scale.value
+      node.dbUsernameArea.height = inputHeight / scale.value
+    }
+    
+    // 密码输入区域
+    if (!node.dbPasswordArea) {
+      node.dbPasswordArea = {
+        x: (passwordX / scale.value) + offset.value.x,
+        y: (credentialsY / scale.value) + offset.value.y,
+        width: passwordWidth / scale.value,
+        height: inputHeight / scale.value
+      }
+    } else {
+      node.dbPasswordArea.x = (passwordX / scale.value) + offset.value.x
+      node.dbPasswordArea.y = (credentialsY / scale.value) + offset.value.y
+      node.dbPasswordArea.width = passwordWidth / scale.value
+      node.dbPasswordArea.height = inputHeight / scale.value
+    }
+    
+    // SQL查询区域
+    if (!node.dbSqlArea) {
+      node.dbSqlArea = {
+        x: (sqlAreaX / scale.value) + offset.value.x,
+        y: (sqlAreaY / scale.value) + offset.value.y,
+        width: sqlAreaWidth / scale.value,
+        height: sqlAreaHeight / scale.value
+      }
+    } else {
+      node.dbSqlArea.x = (sqlAreaX / scale.value) + offset.value.x
+      node.dbSqlArea.y = (sqlAreaY / scale.value) + offset.value.y
+      node.dbSqlArea.width = sqlAreaWidth / scale.value
+      node.dbSqlArea.height = sqlAreaHeight / scale.value
+    }
+    
+    // 测试按钮区域
+    if (!node.dbTestButton) {
+      node.dbTestButton = {
+        x: (testButtonX / scale.value) + offset.value.x,
+        y: (testButtonY / scale.value) + offset.value.y,
+        width: testButtonWidth / scale.value,
+        height: testButtonHeight / scale.value
+      }
+    } else {
+      node.dbTestButton.x = (testButtonX / scale.value) + offset.value.x
+      node.dbTestButton.y = (testButtonY / scale.value) + offset.value.y
+      node.dbTestButton.width = testButtonWidth / scale.value
+      node.dbTestButton.height = testButtonHeight / scale.value
+    }
+  }
+
   // 如果是文本输出节点，绘制文本显示区域
   if (node.type === 'text-output') {
     const displayAreaWidth = width - 16 * scale.value
@@ -2388,6 +2896,39 @@ const addNode = (template: NodeTemplate) => {
       apiUrl: '',
       jsonParams: '',
       headers: ''
+    }
+  } else if (template.type === 'database-input') {
+    // 数据库节点的初始配置
+    initialConfig = {
+      dbType: 'mysql', // 默认为MySQL，可选值：mysql, postgresql
+      host: 'localhost',
+      port: '3306',
+      database: '',
+      username: '',
+      password: '',
+      sql: 'SELECT * FROM table_name LIMIT 10'
+    }
+  } else if (template.type === 'mysql-input') {
+    // MySQL数据库节点的初始配置（保持向后兼容）
+    initialConfig = {
+      dbType: 'mysql',
+      host: 'localhost',
+      port: '3306',
+      database: '',
+      username: '',
+      password: '',
+      sql: 'SELECT * FROM table_name LIMIT 10'
+    }
+  } else if (template.type === 'postgresql-input') {
+    // PostgreSQL数据库节点的初始配置（保持向后兼容）
+    initialConfig = {
+      dbType: 'postgresql',
+      host: 'localhost',
+      port: '5432',
+      database: '',
+      username: '',
+      password: '',
+      sql: 'SELECT * FROM table_name LIMIT 10'
     }
   } else if (template.type === 'mcp-service') {
     // MCP节点的初始状态：完全独立，无任何选择
@@ -3017,6 +3558,118 @@ const getApiJsonAreaAtPosition = (x: number, y: number): WorkflowNode | null => 
       const area = node.apiJsonArea
       if (x >= area.x && x <= area.x + area.width && 
           y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取数据库节点主机区域点击位置
+const getDbHostAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if ((node.type === 'mysql-input' || node.type === 'postgresql-input' || node.type === 'database-input') && node.dbHostArea) {
+      const area = node.dbHostArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取数据库节点端口区域点击位置
+const getDbPortAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if ((node.type === 'mysql-input' || node.type === 'postgresql-input' || node.type === 'database-input') && node.dbPortArea) {
+      const area = node.dbPortArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取数据库节点数据库名区域点击位置
+const getDbNameAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if ((node.type === 'mysql-input' || node.type === 'postgresql-input' || node.type === 'database-input') && node.dbNameArea) {
+      const area = node.dbNameArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取数据库节点用户名区域点击位置
+const getDbUsernameAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if ((node.type === 'mysql-input' || node.type === 'postgresql-input' || node.type === 'database-input') && node.dbUsernameArea) {
+      const area = node.dbUsernameArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取数据库节点密码区域点击位置
+const getDbPasswordAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if ((node.type === 'mysql-input' || node.type === 'postgresql-input' || node.type === 'database-input') && node.dbPasswordArea) {
+      const area = node.dbPasswordArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取数据库节点SQL查询区域点击位置
+const getDbSqlAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if ((node.type === 'mysql-input' || node.type === 'postgresql-input' || node.type === 'database-input') && node.dbSqlArea) {
+      const area = node.dbSqlArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取数据库节点测试按钮点击位置
+const getDbTestButtonAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if ((node.type === 'mysql-input' || node.type === 'postgresql-input' || node.type === 'database-input') && node.dbTestButton) {
+      const button = node.dbTestButton
+      if (x >= button.x && x <= button.x + button.width && 
+          y >= button.y && y <= button.y + button.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取数据库类型选择器点击位置
+const getDbTypeSelectorAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'database-input' && node.dbTypeSelector) {
+      const selector = node.dbTypeSelector
+      if (x >= selector.x && x <= selector.x + selector.width && 
+          y >= selector.y && y <= selector.y + selector.height) {
         return node
       }
     }
@@ -5439,7 +6092,7 @@ const handleApiMethodAreaClick = (node: WorkflowNode) => {
 const handleApiUrlAreaClick = (node: WorkflowNode) => {
   console.log('点击API URL区域，节点:', node.name)
   
-  const currentUrl = node.config?.url || ''
+  const currentUrl = (node.config?.apiUrl as string) || ''
   
   // 创建URL输入弹窗
   const dialog = document.createElement('div')
@@ -6099,6 +6752,1051 @@ const syncNodeMcpState = (nodeId: string) => {
   }
 }
 
+// 数据库节点点击处理函数
+
+// 处理数据库主机点击
+const handleDbHostClick = (node: WorkflowNode) => {
+  console.log('点击数据库主机区域，节点:', node.name)
+  
+  const config = node.config || {}
+  const currentHost = (config.host as string) || ''
+  
+  // 创建主机输入对话框
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 400px;
+    color: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '数据库主机设置'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+  `
+  
+  const hostInput = document.createElement('input')
+  hostInput.type = 'text'
+  hostInput.value = currentHost
+  hostInput.placeholder = '例如: localhost 或 192.168.1.100'
+  hostInput.style.cssText = `
+    width: 100%;
+    padding: 12px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    color: #f9fafb;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+  `
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  `
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+  `
+  
+  saveButton.onclick = () => {
+    const host = hostInput.value.trim()
+    updateNode(node.id, {
+      config: {
+        ...node.config,
+        host: host
+      }
+    })
+    console.log('保存数据库主机:', host)
+    document.body.removeChild(dialog)
+  }
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 12px 24px;
+    background: rgba(107, 114, 128, 0.8);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+  `
+  
+  cancelButton.onclick = () => {
+    document.body.removeChild(dialog)
+  }
+  
+  buttonContainer.appendChild(saveButton)
+  buttonContainer.appendChild(cancelButton)
+  
+  dialogContent.appendChild(title)
+  dialogContent.appendChild(hostInput)
+  dialogContent.appendChild(buttonContainer)
+  dialog.appendChild(dialogContent)
+  document.body.appendChild(dialog)
+  
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  }
+  
+  setTimeout(() => {
+    hostInput.focus()
+    hostInput.select()
+  }, 100)
+}
+
+// 处理数据库端口点击
+const handleDbPortClick = (node: WorkflowNode) => {
+  console.log('点击数据库端口区域，节点:', node.name)
+  
+  const config = node.config || {}
+  const currentPort = (config.port as string) || ''
+  
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 400px;
+    color: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '数据库端口设置'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+  `
+  
+  const portInput = document.createElement('input')
+  portInput.type = 'number'
+  portInput.value = currentPort
+  let defaultPortPlaceholder
+  if (node.type === 'database-input') {
+    const configDbType = (node.config?.dbType as string) || 'mysql'
+    defaultPortPlaceholder = configDbType === 'mysql' ? '3306' : '5432'
+  } else {
+    defaultPortPlaceholder = node.type === 'mysql-input' ? '3306' : '5432'
+  }
+  portInput.placeholder = defaultPortPlaceholder
+  portInput.style.cssText = `
+    width: 100%;
+    padding: 12px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    color: #f9fafb;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+  `
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  `
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+  `
+  
+  saveButton.onclick = () => {
+    const port = portInput.value.trim()
+    updateNode(node.id, {
+      config: {
+        ...node.config,
+        port: port
+      }
+    })
+    console.log('保存数据库端口:', port)
+    document.body.removeChild(dialog)
+  }
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 12px 24px;
+    background: rgba(107, 114, 128, 0.8);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+  `
+  
+  cancelButton.onclick = () => {
+    document.body.removeChild(dialog)
+  }
+  
+  buttonContainer.appendChild(saveButton)
+  buttonContainer.appendChild(cancelButton)
+  
+  dialogContent.appendChild(title)
+  dialogContent.appendChild(portInput)
+  dialogContent.appendChild(buttonContainer)
+  dialog.appendChild(dialogContent)
+  document.body.appendChild(dialog)
+  
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  }
+  
+  setTimeout(() => {
+    portInput.focus()
+    portInput.select()
+  }, 100)
+}
+
+// 处理数据库名点击
+const handleDbNameClick = (node: WorkflowNode) => {
+  console.log('点击数据库名区域，节点:', node.name)
+  
+  const config = node.config || {}
+  const currentDatabase = (config.database as string) || ''
+  
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 400px;
+    color: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '数据库名设置'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+  `
+  
+  const dbInput = document.createElement('input')
+  dbInput.type = 'text'
+  dbInput.value = currentDatabase
+  dbInput.placeholder = '例如: myapp_db'
+  dbInput.style.cssText = `
+    width: 100%;
+    padding: 12px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    color: #f9fafb;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+  `
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  `
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+  `
+  
+  saveButton.onclick = () => {
+    const database = dbInput.value.trim()
+    updateNode(node.id, {
+      config: {
+        ...node.config,
+        database: database
+      }
+    })
+    console.log('保存数据库名:', database)
+    document.body.removeChild(dialog)
+  }
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 12px 24px;
+    background: rgba(107, 114, 128, 0.8);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+  `
+  
+  cancelButton.onclick = () => {
+    document.body.removeChild(dialog)
+  }
+  
+  buttonContainer.appendChild(saveButton)
+  buttonContainer.appendChild(cancelButton)
+  
+  dialogContent.appendChild(title)
+  dialogContent.appendChild(dbInput)
+  dialogContent.appendChild(buttonContainer)
+  dialog.appendChild(dialogContent)
+  document.body.appendChild(dialog)
+  
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  }
+  
+  setTimeout(() => {
+    dbInput.focus()
+    dbInput.select()
+  }, 100)
+}
+
+// 处理数据库用户名点击
+const handleDbUsernameClick = (node: WorkflowNode) => {
+  console.log('点击数据库用户名区域，节点:', node.name)
+  
+  const config = node.config || {}
+  const currentUsername = (config.username as string) || ''
+  
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 400px;
+    color: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '数据库用户名设置'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+  `
+  
+  const usernameInput = document.createElement('input')
+  usernameInput.type = 'text'
+  usernameInput.value = currentUsername
+  usernameInput.placeholder = '例如: root 或 admin'
+  usernameInput.style.cssText = `
+    width: 100%;
+    padding: 12px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    color: #f9fafb;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+  `
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  `
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+  `
+  
+  saveButton.onclick = () => {
+    const username = usernameInput.value.trim()
+    updateNode(node.id, {
+      config: {
+        ...node.config,
+        username: username
+      }
+    })
+    console.log('保存数据库用户名:', username)
+    document.body.removeChild(dialog)
+  }
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 12px 24px;
+    background: rgba(107, 114, 128, 0.8);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+  `
+  
+  cancelButton.onclick = () => {
+    document.body.removeChild(dialog)
+  }
+  
+  buttonContainer.appendChild(saveButton)
+  buttonContainer.appendChild(cancelButton)
+  
+  dialogContent.appendChild(title)
+  dialogContent.appendChild(usernameInput)
+  dialogContent.appendChild(buttonContainer)
+  dialog.appendChild(dialogContent)
+  document.body.appendChild(dialog)
+  
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  }
+  
+  setTimeout(() => {
+    usernameInput.focus()
+    usernameInput.select()
+  }, 100)
+}
+
+// 处理数据库密码点击
+const handleDbPasswordClick = (node: WorkflowNode) => {
+  console.log('点击数据库密码区域，节点:', node.name)
+  
+  const config = node.config || {}
+  const currentPassword = (config.password as string) || ''
+  
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 400px;
+    color: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '数据库密码设置'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+  `
+  
+  const passwordInput = document.createElement('input')
+  passwordInput.type = 'password'
+  passwordInput.value = currentPassword
+  passwordInput.placeholder = '请输入数据库密码'
+  passwordInput.style.cssText = `
+    width: 100%;
+    padding: 12px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    color: #f9fafb;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+  `
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  `
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+  `
+  
+  saveButton.onclick = () => {
+    const password = passwordInput.value
+    updateNode(node.id, {
+      config: {
+        ...node.config,
+        password: password
+      }
+    })
+    console.log('保存数据库密码')
+    document.body.removeChild(dialog)
+  }
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 12px 24px;
+    background: rgba(107, 114, 128, 0.8);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+  `
+  
+  cancelButton.onclick = () => {
+    document.body.removeChild(dialog)
+  }
+  
+  buttonContainer.appendChild(saveButton)
+  buttonContainer.appendChild(cancelButton)
+  
+  dialogContent.appendChild(title)
+  dialogContent.appendChild(passwordInput)
+  dialogContent.appendChild(buttonContainer)
+  dialog.appendChild(dialogContent)
+  document.body.appendChild(dialog)
+  
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  }
+  
+  setTimeout(() => {
+    passwordInput.focus()
+    passwordInput.select()
+  }, 100)
+}
+
+// 处理SQL查询点击
+const handleDbSqlClick = (node: WorkflowNode) => {
+  console.log('点击SQL查询区域，节点:', node.name)
+  
+  const config = node.config || {}
+  const currentSql = (config.sql as string) || ''
+  
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 700px;
+    width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    color: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = 'SQL查询设置'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    border-bottom: 1px solid #374151;
+    padding-bottom: 12px;
+  `
+  
+  const description = document.createElement('p')
+  description.textContent = '请输入要执行的SQL查询语句：'
+  description.style.cssText = `
+    margin: 0 0 16px 0;
+    color: #d1d5db;
+    font-size: 14px;
+    line-height: 1.5;
+  `
+  
+  const textarea = document.createElement('textarea')
+  textarea.value = currentSql
+  textarea.placeholder = 'SELECT * FROM users WHERE id = 1;\n\n-- 或者\n\nINSERT INTO users (name, email) VALUES ("张三", "zhangsan@example.com");'
+  textarea.style.cssText = `
+    width: 100%;
+    height: 200px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    padding: 12px;
+    color: #f9fafb;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+  `
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  `
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 8px 16px;
+    background: #374151;
+    color: #d1d5db;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  `
+  
+  cancelButton.onclick = () => {
+    document.body.removeChild(dialog)
+  }
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    padding: 8px 16px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  `
+  
+  saveButton.onclick = () => {
+    const sql = textarea.value.trim()
+    updateNode(node.id, {
+      config: {
+        ...config,
+        sql: sql
+      }
+    })
+    console.log('保存SQL查询:', sql)
+    document.body.removeChild(dialog)
+    
+    const toast = document.createElement('div')
+    toast.textContent = 'SQL查询已保存'
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10001;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 2000)
+  }
+  
+  buttonContainer.appendChild(cancelButton)
+  buttonContainer.appendChild(saveButton)
+  
+  dialogContent.appendChild(title)
+  dialogContent.appendChild(description)
+  dialogContent.appendChild(textarea)
+  dialogContent.appendChild(buttonContainer)
+  dialog.appendChild(dialogContent)
+  document.body.appendChild(dialog)
+  
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  }
+  
+  setTimeout(() => {
+    textarea.focus()
+  }, 100)
+}
+
+// 处理数据库类型选择器点击
+const handleDbTypeSelectorClick = (node: WorkflowNode) => {
+  console.log('点击数据库类型选择器，节点:', node.name)
+  
+  const config = node.config || {}
+  const currentDbType = (config.dbType as string) || 'mysql'
+  
+  // 切换数据库类型
+  const newDbType = currentDbType === 'mysql' ? 'postgresql' : 'mysql'
+  
+  // 更新节点配置
+  const newConfig = {
+    ...config,
+    dbType: newDbType
+  }
+  
+  // 如果端口是默认值，则更新为新数据库类型的默认端口
+  const currentPort = (config.port as string) || ''
+  if (currentPort === '3306' || currentPort === '5432' || currentPort === '') {
+    (newConfig as Record<string, unknown>).port = newDbType === 'mysql' ? '3306' : '5432'
+  }
+  
+  updateNode(node.id, { config: newConfig })
+  
+  // 显示切换提示
+  const toast = document.createElement('div')
+  toast.textContent = `已切换到 ${newDbType === 'mysql' ? 'MySQL' : 'PostgreSQL'}`
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #3b82f6;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    z-index: 10001;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  `
+  document.body.appendChild(toast)
+  setTimeout(() => {
+    document.body.removeChild(toast)
+  }, 2000)
+  
+  // 重新绘制画布
+  redraw()
+}
+
+// 处理数据库测试按钮点击
+const handleDbTestButtonClick = async (node: WorkflowNode) => {
+  console.log('点击数据库测试按钮，节点:', node.name)
+  
+  const config = node.config || {}
+  const host = (config.host as string) || ''
+  const port = (config.port as string) || ''
+  const database = (config.database as string) || ''
+  const username = (config.username as string) || ''
+  const password = (config.password as string) || ''
+  const sql = (config.sql as string) || ''
+  
+  // 调试：输出当前配置信息
+  console.log('数据库节点配置:', {
+    host: `'${host}'`,
+    port: `'${port}'`,
+    database: `'${database}'`,
+    username: `'${username}'`,
+    password: password ? '***' : `'${password}'`,
+    sql: `'${sql}'`,
+    fullConfig: config
+  })
+  
+  // 验证必填字段
+  if (!host.trim() || !port.trim() || !database.trim() || !username.trim()) {
+    const toast = document.createElement('div')
+    toast.textContent = '请先设置数据库连接信息（主机、端口、数据库名、用户名）'
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #ef4444;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10001;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 3000)
+    return
+  }
+  
+  // 更新节点状态为测试中
+  updateNode(node.id, {
+    config: {
+      ...config,
+      isTesting: true,
+      testResult: null
+    }
+  })
+  
+  try {
+    // 实际数据库连接测试
+    console.log('测试数据库连接:', {
+      type: node.type,
+      host,
+      port,
+      database,
+      username,
+      password: password ? '***' : '',
+      sql: sql || '无SQL查询'
+    })
+    
+    // 调用后端API进行真实的数据库连接和查询
+    const result = await window.api.testDatabaseConnection({
+      dbType: config.dbType || 'mysql',
+      host,
+      port: parseInt(port),
+      database,
+      username,
+      password,
+      sql: sql || null
+    })
+    
+    if (!result.success) {
+      throw new Error(result.error || '数据库连接失败')
+    }
+    
+    // 更新节点状态为测试成功
+    updateNode(node.id, {
+      config: {
+        ...config,
+        isTesting: false,
+        testResult: result
+      }
+    })
+    
+    // 获取输出连接
+    const outputConnections = connections.value.filter(conn => conn.from === node.id)
+    
+    // 如果测试成功且有SQL查询，将结果传递给连接的下游节点
+    if (result.success && sql && result.data) {
+      outputConnections.forEach(conn => {
+        const targetNode = workflowNodes.value.find(n => n.id === conn.to)
+        if (targetNode) {
+          if (targetNode.type === 'text-output') {
+            updateNode(targetNode.id, {
+              config: {
+                ...targetNode.config,
+                outputText: JSON.stringify(result.data, null, 2)
+              }
+            })
+          } else if (targetNode.type === 'text-input') {
+            updateNode(targetNode.id, {
+              config: {
+                ...targetNode.config,
+                textContent: JSON.stringify(result.data, null, 2)
+              }
+            })
+          }
+        }
+      })
+      
+      redraw()
+    }
+    
+    // 显示成功提示
+    const toast = document.createElement('div')
+    toast.textContent = `数据库连接测试成功${sql && outputConnections.length > 0 ? '，查询结果已传递到连接的节点' : ''}` 
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10001;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 3000)
+    
+  } catch (error) {
+    console.error('数据库测试失败:', error)
+    
+    const errorMessage = error instanceof Error ? error.message : '连接失败'
+    
+    // 更新节点状态为测试失败
+    updateNode(node.id, {
+      config: {
+        ...config,
+        isTesting: false,
+        testResult: {
+          success: false,
+          error: errorMessage
+        }
+      }
+    })
+    
+    // 显示错误提示
+    const toast = document.createElement('div')
+    toast.textContent = `数据库连接测试失败: ${errorMessage}`
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #ef4444;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10001;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 3000)
+  }
+}
+
 // 初始化MCP节点状态
 const initializeMcpNodeState = (nodeId: string, instanceId?: string): McpNodeState => {
   const state: McpNodeState = {
@@ -6739,6 +8437,14 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedApiUrlArea = getApiUrlAreaAtPosition(pos.x, pos.y)
   const clickedApiJsonArea = getApiJsonAreaAtPosition(pos.x, pos.y)
   const clickedApiTestButton = getApiTestButtonAtPosition(pos.x, pos.y)
+  const clickedDbHostArea = getDbHostAreaAtPosition(pos.x, pos.y)
+  const clickedDbPortArea = getDbPortAreaAtPosition(pos.x, pos.y)
+  const clickedDbNameArea = getDbNameAreaAtPosition(pos.x, pos.y)
+  const clickedDbUsernameArea = getDbUsernameAreaAtPosition(pos.x, pos.y)
+  const clickedDbPasswordArea = getDbPasswordAreaAtPosition(pos.x, pos.y)
+  const clickedDbSqlArea = getDbSqlAreaAtPosition(pos.x, pos.y)
+  const clickedDbTestButton = getDbTestButtonAtPosition(pos.x, pos.y)
+  const clickedDbTypeSelector = getDbTypeSelectorAtPosition(pos.x, pos.y)
   
   if (clickedUploadButton) {
     // 处理上传按钮点击
@@ -6773,6 +8479,30 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedApiTestButton) {
     // 处理API测试按钮点击
     handleApiTestButtonClick(clickedApiTestButton)
+  } else if (clickedDbHostArea) {
+    // 处理数据库主机区域点击
+    handleDbHostClick(clickedDbHostArea)
+  } else if (clickedDbPortArea) {
+    // 处理数据库端口区域点击
+    handleDbPortClick(clickedDbPortArea)
+  } else if (clickedDbNameArea) {
+    // 处理数据库名区域点击
+    handleDbNameClick(clickedDbNameArea)
+  } else if (clickedDbUsernameArea) {
+    // 处理数据库用户名区域点击
+    handleDbUsernameClick(clickedDbUsernameArea)
+  } else if (clickedDbPasswordArea) {
+    // 处理数据库密码区域点击
+    handleDbPasswordClick(clickedDbPasswordArea)
+  } else if (clickedDbSqlArea) {
+    // 处理数据库SQL查询区域点击
+    handleDbSqlClick(clickedDbSqlArea)
+  } else if (clickedDbTestButton) {
+    // 处理数据库测试按钮点击
+    handleDbTestButtonClick(clickedDbTestButton)
+  } else if (clickedDbTypeSelector) {
+    // 处理数据库类型选择器点击
+    handleDbTypeSelectorClick(clickedDbTypeSelector)
   } else if (clickedTextArea) {
     // 处理文本区域点击
     handleTextAreaClick(clickedTextArea)

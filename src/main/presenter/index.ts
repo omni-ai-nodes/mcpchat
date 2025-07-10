@@ -19,6 +19,7 @@ import { NotificationPresenter } from './notifactionPresenter'
 import { TabPresenter } from './tabPresenter'
 import { TrayPresenter } from './trayPresenter'
 import { OAuthPresenter } from './oauthPresenter'
+import { DatabasePresenter } from './databasePresenter'
 import {
   CONFIG_EVENTS,
   WINDOW_EVENTS
@@ -45,6 +46,7 @@ export class Presenter implements IPresenter {
   tabPresenter: TabPresenter
   trayPresenter: TrayPresenter
   oauthPresenter: OAuthPresenter
+  databasePresenter: DatabasePresenter
   // llamaCppPresenter: LlamaCppPresenter // 保留原始注释
 
   constructor() {
@@ -72,6 +74,7 @@ export class Presenter implements IPresenter {
     this.notificationPresenter = new NotificationPresenter()
     this.oauthPresenter = new OAuthPresenter()
     this.trayPresenter = new TrayPresenter()
+    this.databasePresenter = new DatabasePresenter()
 
     // this.llamaCppPresenter = new LlamaCppPresenter() // 保留原始注释
     this.setupEventBus() // 设置事件总线监听
@@ -144,6 +147,7 @@ export class Presenter implements IPresenter {
     this.shortcutPresenter.destroy() // 销毁快捷键监听
     this.syncPresenter.destroy() // 销毁同步相关资源
     this.notificationPresenter.clearAllNotifications() // 清除所有通知
+    this.databasePresenter.destroy() // 关闭数据库连接池
     // 注意: trayPresenter.destroy() 在 main/index.ts 的 will-quit 事件中处理
     // 此处不销毁 trayPresenter，其生命周期由 main/index.ts 管理
   }

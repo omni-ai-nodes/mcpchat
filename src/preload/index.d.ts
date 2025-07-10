@@ -46,6 +46,24 @@ interface WorkflowDeploymentResult {
   config: WorkflowData
 }
 
+// 数据库相关类型定义
+interface DatabaseConfig {
+  dbType: string
+  host: string
+  port: number
+  database: string
+  username: string
+  password: string
+  sql?: string | null
+}
+
+interface DatabaseResult {
+  success: boolean
+  message: string
+  data?: any
+  error?: string
+}
+
 declare global {
   interface Window {
     electron: ElectronAPI
@@ -65,6 +83,9 @@ declare global {
   loadWorkflow: (filePath: string) => Promise<{ success: boolean; workflow?: WorkflowData; error?: string }>
   runWorkflow: (workflowData: WorkflowData) => Promise<WorkflowExecutionResult>
   deployWorkflow: (workflowData: WorkflowData) => Promise<WorkflowDeploymentResult>
+  
+  // 数据库相关API
+  testDatabaseConnection: (config: DatabaseConfig) => Promise<DatabaseResult>
     }
   }
 }

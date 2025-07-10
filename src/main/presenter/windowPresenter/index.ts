@@ -7,6 +7,7 @@ import { presenter } from '@/presenter'
 import { eventBus } from '@/eventbus'
 import { WINDOW_EVENTS } from '@/events'
 import { IWindowPresenter, ChatMessage } from '@shared/presenter'
+import { DatabaseConfig } from '../databasePresenter'
 import { join } from 'path'
 import icon from '../../../../resources/icon.png?asset' // 应用图标 (macOS/Linux)
 import iconWin from '../../../../resources/icon.ico?asset' // 应用图标 (Windows)
@@ -1139,6 +1140,16 @@ export class WindowPresenter implements IWindowPresenter {
         return await presenter.llmproviderPresenter.getModelList(providerId)
       } catch (error) {
         console.error('获取提供者模型失败:', error)
+        throw error
+      }
+    })
+
+    // 测试数据库连接
+    ipcMain.handle('test-database-connection', async (_event, config: DatabaseConfig) => {
+      try {
+        return await presenter.databasePresenter.testConnection(config)
+      } catch (error) {
+        console.error('数据库连接测试失败:', error)
         throw error
       }
     })

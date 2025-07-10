@@ -29,6 +29,17 @@ interface WorkflowData {
   deploymentConfig?: Record<string, unknown>
 }
 
+// 数据库相关类型定义
+interface DatabaseConfig {
+  dbType: string
+  host: string
+  port: number
+  database: string
+  username: string
+  password: string
+  sql?: string | null
+}
+
 // 缓存变量
 let cachedWindowId: number | undefined = undefined
 let cachedWebContentsId: number | undefined = undefined
@@ -84,6 +95,10 @@ const api = {
   },
   deployWorkflow: (workflowData: WorkflowData) => {
     return ipcRenderer.invoke('deploy-workflow', workflowData)
+  },
+  // 数据库相关API
+  testDatabaseConnection: (config: DatabaseConfig) => {
+    return ipcRenderer.invoke('test-database-connection', config)
   }
 }
 exposeElectronAPI()
