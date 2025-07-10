@@ -1033,7 +1033,7 @@ const drawNode = (node: WorkflowNode) => {
   } else if (node.type === 'text-input') {
     height = (NODE_HEIGHT + 96) * scale.value  // 基础高度 + 文本输入区域高度 + 间距
   } else if (node.type === 'api-input') {
-    height = (NODE_HEIGHT + 216) * scale.value  // 基础高度 + API配置区域高度 + 间距
+    height = (NODE_HEIGHT + 256) * scale.value  // 基础高度 + API配置区域高度 + 间距
   } else if (node.type === 'text-output') {
     // 计算文本输出节点的自适应高度
     const outputText = (node.config?.outputText as string) || '暂无输出内容...'
@@ -1901,7 +1901,7 @@ const drawNode = (node: WorkflowNode) => {
   // 如果是API输入节点，绘制API配置区域
   if (node.type === 'api-input') {
     const apiAreaWidth = width - 16 * scale.value
-    const apiAreaHeight = 240 * scale.value  // API配置区域高度
+    const apiAreaHeight = 280 * scale.value  // API配置区域高度
     const apiAreaX = x + 8 * scale.value
     const apiAreaY = y + headerHeight + 8 * scale.value
     
@@ -1978,9 +1978,10 @@ const drawNode = (node: WorkflowNode) => {
     
     context.fillText(displayUrl, urlAreaX + 8 * scale.value, urlAreaY + urlAreaHeight / 2)
     
-    // 绘制JSON参数区域（仅在POST/PUT时显示）
-    if (method === 'POST' || method === 'PUT') {
-      const jsonAreaHeight = 60 * scale.value
+    // 绘制JSON参数区域（所有HTTP方法都显示）
+    // eslint-disable-next-line no-constant-condition
+    if (true) {
+      const jsonAreaHeight = 180 * scale.value
       const jsonAreaY = urlAreaY + urlAreaHeight + 8 * scale.value
       const jsonAreaX = apiAreaX + 8 * scale.value
       const jsonAreaWidth = apiAreaWidth - 16 * scale.value
@@ -2011,8 +2012,8 @@ const drawNode = (node: WorkflowNode) => {
       context.textAlign = 'left'
       context.textBaseline = 'top'
       
-      // 简单的JSON文本显示（最多3行）
-      const jsonLines = jsonDisplayText.split('\n').slice(0, 3)
+      // 简单的JSON文本显示（最多5行）
+      const jsonLines = jsonDisplayText.split('\n').slice(0, 5)
       jsonLines.forEach((line, index) => {
         const maxLineWidth = jsonAreaWidth - 16 * scale.value
         let displayLine = line
@@ -2110,9 +2111,10 @@ const drawNode = (node: WorkflowNode) => {
       node.apiUrlArea.height = urlAreaHeight / scale.value
     }
     
-    // JSON参数区域位置存储（仅在POST/PUT时显示）
-    if (method === 'POST' || method === 'PUT') {
-      const jsonAreaHeight = 60 * scale.value
+    // JSON参数区域位置存储（所有HTTP方法都显示）
+    // eslint-disable-next-line no-constant-condition
+    if (true) {
+      const jsonAreaHeight = 100 * scale.value
       const jsonAreaY = urlAreaY + urlAreaHeight + 8 * scale.value
       const jsonAreaX = apiAreaX + 8 * scale.value
       const jsonAreaWidth = apiAreaWidth - 16 * scale.value
@@ -2130,9 +2132,6 @@ const drawNode = (node: WorkflowNode) => {
         node.apiJsonArea.width = jsonAreaWidth / scale.value
         node.apiJsonArea.height = jsonAreaHeight / scale.value
       }
-    } else {
-      // 清除JSON参数区域（当方法不是POST/PUT时）
-      node.apiJsonArea = undefined
     }
     
     // 测试按钮区域
@@ -5624,7 +5623,7 @@ const handleApiTestButtonClick = async (node: WorkflowNode) => {
       method: method,
       headers: {
         'Content-Type': 'application/json'
-      }
+      } as HeadersInit
     }
     
     // 如果是POST或PUT请求且有JSON参数，添加到请求体
@@ -5656,7 +5655,7 @@ const handleApiTestButtonClick = async (node: WorkflowNode) => {
           success: response.ok,
           status: response.status,
           data: responseData
-        }
+        } as any
       }
     })
     
@@ -5693,7 +5692,7 @@ const handleApiTestButtonClick = async (node: WorkflowNode) => {
         testResult: {
           success: false,
           error: errorMessage
-        }
+        } as any
       }
     })
     
