@@ -5582,7 +5582,7 @@ const handleApiTestButtonClick = async (node: WorkflowNode) => {
   console.log('点击API测试按钮，节点:', node.name)
   
   const config = node.config || {}
-  const method = config.method || 'GET'
+  const method = (config.method as string) || 'GET'
   const url = (config.apiUrl as string) || ''
   const jsonParams = (config.jsonParams as string) || ''
   
@@ -5623,7 +5623,7 @@ const handleApiTestButtonClick = async (node: WorkflowNode) => {
       method: method,
       headers: {
         'Content-Type': 'application/json'
-      } as HeadersInit
+      }
     }
     
     // 如果是POST或PUT请求且有JSON参数，添加到请求体
@@ -5655,13 +5655,45 @@ const handleApiTestButtonClick = async (node: WorkflowNode) => {
           success: response.ok,
           status: response.status,
           data: responseData
-        } as any
+        }
       }
     })
     
+    // 获取输出连接
+    const outputConnections = connections.value.filter(conn => conn.from === node.id)
+    
+    // 如果测试成功，将API响应数据传递给连接的下游节点
+    if (response.ok) {
+      outputConnections.forEach(conn => {
+        const targetNode = workflowNodes.value.find(n => n.id === conn.to)
+        if (targetNode) {
+          // 根据目标节点类型更新其内容
+          if (targetNode.type === 'text-output') {
+            updateNode(targetNode.id, {
+              config: {
+                ...targetNode.config,
+                outputText: typeof responseData === 'string' ? responseData : JSON.stringify(responseData, null, 2)
+              }
+            })
+          } else if (targetNode.type === 'text-input') {
+            updateNode(targetNode.id, {
+              config: {
+                ...targetNode.config,
+                textContent: typeof responseData === 'string' ? responseData : JSON.stringify(responseData, null, 2)
+              }
+            })
+          }
+          // 可以根据需要添加更多节点类型的处理
+        }
+      })
+      
+      // 重新绘制画布以显示更新的内容
+      redraw()
+    }
+    
     // 显示成功提示
     const toast = document.createElement('div')
-    toast.textContent = `API测试${response.ok ? '成功' : '失败'} (${response.status})` 
+    toast.textContent = `API测试${response.ok ? '成功' : '失败'} (${response.status})${response.ok && outputConnections.length > 0 ? '，数据已传递到连接的节点' : ''}` 
     toast.style.cssText = `
       position: fixed;
       top: 20px;
@@ -5692,7 +5724,7 @@ const handleApiTestButtonClick = async (node: WorkflowNode) => {
         testResult: {
           success: false,
           error: errorMessage
-        } as any
+        }
       }
     })
     

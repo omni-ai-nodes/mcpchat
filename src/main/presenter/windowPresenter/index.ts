@@ -56,6 +56,9 @@ async function executeWorkflow(workflowData: WorkflowData) {
         case 'mcp-service':
           result = await executeMcpNode(node, inputData)
           break
+        case 'api-input':
+          result = await executeApiInputNode(node, inputData)
+          break
         case 'text-output':
           result = await executeTextOutputNode(node, inputData)
           break
@@ -695,6 +698,64 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
 }
 
 // 执行文本输出节点
+async function executeApiInputNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  const config = node.config || {}
+  const apiUrl = config.apiUrl as string
+  const method = (config.method as string) || 'GET'
+  const jsonParams = (config.jsonParams as string) || ''
+  
+  if (!apiUrl) {
+    throw new Error(`API输入节点 "${node.name}" 缺少API URL配置`)
+  }
+  
+  console.log(`执行API输入节点: ${node.name || node.id}, URL: ${apiUrl}, Method: ${method}`, inputData)
+  
+  try {
+    const requestOptions: RequestInit = {
+      method: method,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+    
+    // 如果是POST或PUT请求且有JSON参数，添加到请求体
+    if ((method === 'POST' || method === 'PUT') && jsonParams.trim()) {
+      try {
+        JSON.parse(jsonParams) // 验证JSON格式
+        requestOptions.body = jsonParams
+      } catch {
+        throw new Error('JSON参数格式错误')
+      }
+    }
+    
+    const response = await fetch(apiUrl, requestOptions)
+    const responseText = await response.text()
+    
+    let responseData
+    try {
+      responseData = JSON.parse(responseText)
+    } catch {
+      responseData = responseText
+    }
+    
+    if (!response.ok) {
+      throw new Error(`API请求失败 (${response.status}): ${responseText}`)
+    }
+    
+    console.log(`API输入节点 "${node.name}" 执行成功，状态码: ${response.status}`)
+    
+    // 返回API响应数据
+    return {
+      output: typeof responseData === 'string' ? responseData : JSON.stringify(responseData)
+    }
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '未知错误'
+    console.error(`API输入节点 "${node.name}" 执行失败:`, errorMessage)
+    throw new Error(`API输入节点 "${node.name}" 执行失败: ${errorMessage}`)
+  }
+}
+
 async function executeTextOutputNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
   console.log(`执行文本输出节点: ${node.name || node.id}`)
   return {
