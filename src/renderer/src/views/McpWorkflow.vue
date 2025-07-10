@@ -3651,15 +3651,26 @@ const getDbSqlAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
 
 // 获取数据库节点测试按钮点击位置
 const getDbTestButtonAtPosition = (x: number, y: number): WorkflowNode | null => {
+  console.log('检测数据库测试按钮点击位置:', x, y);
   for (const node of workflowNodes.value) {
     if ((node.type === 'mysql-input' || node.type === 'postgresql-input' || node.type === 'database-input') && node.dbTestButton) {
       const button = node.dbTestButton
+      console.log(`节点 ${node.name} (${node.type}) 按钮区域:`, {
+        x: button.x,
+        y: button.y,
+        width: button.width,
+        height: button.height,
+        right: button.x + button.width,
+        bottom: button.y + button.height
+      });
       if (x >= button.x && x <= button.x + button.width && 
           y >= button.y && y <= button.y + button.height) {
+        console.log('找到匹配的数据库测试按钮:', node.name);
         return node
       }
     }
   }
+  console.log('未找到匹配的数据库测试按钮');
   return null
 }
 
@@ -3700,6 +3711,24 @@ interface WorkflowData {
   deploymentConfig?: Record<string, unknown>
 }
 
+// 数据库相关类型定义
+interface DatabaseConfig {
+  dbType: string
+  host: string
+  port: number
+  database: string
+  username: string
+  password: string
+  sql?: string | null
+}
+
+interface DatabaseResult {
+  success: boolean
+  message: string
+  data?: unknown
+  error?: string
+}
+
 interface WindowAPI {
   getUploadedFiles: () => Promise<UploadedFile[]>
   readUploadedFile: (filePath: string) => Promise<string>
@@ -3710,6 +3739,7 @@ interface WindowAPI {
   loadWorkflow: (filePath: string) => Promise<{ success: boolean; workflowData: WorkflowData }>
   runWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; executionId: string; startTime: string; results: { processedNodes: number; processedConnections: number; nodeResults: Record<string, { output: string }> }; error?: string }>
   deployWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; deploymentId: string; timestamp: string }>
+  testDatabaseConnection: (config: DatabaseConfig) => Promise<DatabaseResult>
 }
 
 declare global {
@@ -7620,7 +7650,10 @@ const handleDbTypeSelectorClick = (node: WorkflowNode) => {
 
 // 处理数据库测试按钮点击
 const handleDbTestButtonClick = async (node: WorkflowNode) => {
-  console.log('点击数据库测试按钮，节点:', node.name)
+  console.log('=== 数据库测试按钮点击事件开始 ===');
+  console.log('点击数据库测试按钮，节点:', node.name, '节点ID:', node.id);
+  console.log('节点类型:', node.type);
+  console.log('按钮区域信息:', node.dbTestButton);
   
   const config = node.config || {}
   const host = (config.host as string) || ''
@@ -8420,6 +8453,10 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   event.stopPropagation()
   
   const pos = getCanvasPosition(event)
+  console.log('=== 鼠标点击事件 ===');
+  console.log('点击位置:', pos.x, pos.y);
+  console.log('原始事件位置:', event.clientX, event.clientY);
+  
   const clickedEditIcon = getEditIconAtPosition(pos.x, pos.y)
   const clickedTypeTag = getTypeTagAtPosition(pos.x, pos.y)
   const clickedNode = getNodeAtPosition(pos.x, pos.y)
@@ -8445,6 +8482,12 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedDbSqlArea = getDbSqlAreaAtPosition(pos.x, pos.y)
   const clickedDbTestButton = getDbTestButtonAtPosition(pos.x, pos.y)
   const clickedDbTypeSelector = getDbTypeSelectorAtPosition(pos.x, pos.y)
+  
+  console.log('点击检测结果:', {
+    clickedDbTestButton: clickedDbTestButton?.name || null,
+    clickedNode: clickedNode?.name || null,
+    clickedDbHostArea: clickedDbHostArea?.name || null
+  });
   
   if (clickedUploadButton) {
     // 处理上传按钮点击
@@ -8499,6 +8542,7 @@ const onCanvasMouseDown = (event: MouseEvent) => {
     handleDbSqlClick(clickedDbSqlArea)
   } else if (clickedDbTestButton) {
     // 处理数据库测试按钮点击
+    console.log('检测到数据库测试按钮点击，准备调用处理函数');
     handleDbTestButtonClick(clickedDbTestButton)
   } else if (clickedDbTypeSelector) {
     // 处理数据库类型选择器点击
