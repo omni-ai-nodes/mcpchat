@@ -60,6 +60,9 @@ async function executeWorkflow(workflowData: WorkflowData) {
         case 'api-input':
           result = await executeApiInputNode(node, inputData)
           break
+        case 'database-input':
+          result = await executeDatabaseInputNode(node, inputData)
+          break
         case 'text-output':
           result = await executeTextOutputNode(node, inputData)
           break
@@ -761,6 +764,65 @@ async function executeTextOutputNode(node: WorkflowNode, inputData: Record<strin
   console.log(`执行文本输出节点: ${node.name || node.id}`)
   return {
     output: (inputData.input as string) || ''
+  }
+}
+
+// 执行数据库输入节点
+async function executeDatabaseInputNode(node: WorkflowNode): Promise<NodeResult> {
+  const config = node.config || {}
+  
+  console.log(`执行数据库输入节点: ${node.name || node.id}`, config)
+  
+  // 构建数据库配置
+  const dbType = (config.dbType as string) || 'mysql'
+  const dbConfig = {
+    dbType: (dbType === 'mysql' || dbType === 'postgresql') ? dbType : 'mysql' as 'mysql' | 'postgresql',
+    host: config.host as string,
+    port: config.port as number,
+    database: config.database as string,
+    username: config.username as string,
+    password: config.password as string,
+    sql: config.sql as string
+  }
+  
+  // 验证必要参数
+  if (!dbConfig.host || !dbConfig.port || !dbConfig.database || !dbConfig.username) {
+    throw new Error(`数据库输入节点 "${node.name}" 缺少必要的数据库连接参数`)
+  }
+  
+  if (!dbConfig.sql || !dbConfig.sql.trim()) {
+    throw new Error(`数据库输入节点 "${node.name}" 缺少SQL查询语句`)
+  }
+  
+  try {
+    // 使用DatabasePresenter执行查询
+    const databaseResult = await presenter.databasePresenter.testConnection(dbConfig)
+    
+    if (!databaseResult.success) {
+      throw new Error(`数据库查询失败: ${databaseResult.message}`)
+    }
+    
+    // 将查询结果转换为字符串输出
+    let output = ''
+    if (databaseResult.data) {
+      if (Array.isArray(databaseResult.data)) {
+        // 如果是数组，转换为JSON字符串
+        output = JSON.stringify(databaseResult.data, null, 2)
+      } else {
+        // 如果是其他类型，也转换为JSON字符串
+        output = JSON.stringify(databaseResult.data, null, 2)
+      }
+    }
+    
+    console.log(`数据库输入节点 ${node.name} 执行成功，返回 ${Array.isArray(databaseResult.data) ? databaseResult.data.length : 1} 条记录`)
+    
+    return {
+      output,
+      data: databaseResult.data
+    }
+  } catch (error) {
+    console.error(`数据库输入节点 ${node.name} 执行失败:`, error)
+    throw error
   }
 }
 // TrayPresenter 在 main/index.ts 中全局管理，本 Presenter 不负责其生命周期

@@ -15,6 +15,8 @@ export interface DatabaseResult {
   message: string
   data?: unknown
   error?: string
+  connectionTime?: number
+  queryTime?: number
 }
 
 export class DatabasePresenter {
