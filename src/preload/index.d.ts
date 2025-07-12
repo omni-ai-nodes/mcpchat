@@ -40,6 +40,36 @@ interface WorkflowNode {
     width: number
     height: number
   }
+  fileOutputArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  fileFormatArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  emailRecipientArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  emailSubjectArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  emailSmtpArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 }
 
 interface WorkflowConnection {

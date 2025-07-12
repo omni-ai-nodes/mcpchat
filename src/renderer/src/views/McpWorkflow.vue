@@ -746,6 +746,66 @@ interface WorkflowNode {
     width: number
     height: number
   }
+  loopArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  loopTypeArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  loopParameterArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  loopParamArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  fileOutputArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  fileFormatArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  emailOutputArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  emailRecipientArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  emailSubjectArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  emailSmtpArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 }
 
 interface Connection {
@@ -1171,6 +1231,12 @@ const drawNode = (node: WorkflowNode) => {
   } else if (node.type === 'loop') {
     // 循环节点的高度
     height = (NODE_HEIGHT + 180) * scale.value  // 基础高度 + 循环配置区域高度 + 间距
+  } else if (node.type === 'file-output') {
+    // 文件输出节点的高度
+    height = (NODE_HEIGHT + 150) * scale.value  // 基础高度 + 文件输出配置区域高度 + 间距
+  } else if (node.type === 'email-output') {
+    // 邮件输出节点的高度
+    height = (NODE_HEIGHT + 200) * scale.value  // 基础高度 + 邮件配置区域高度 + 间距
   } else {
     height = NODE_HEIGHT * scale.value
   }
@@ -3898,6 +3964,392 @@ const drawNode = (node: WorkflowNode) => {
       node.textDisplayArea.height = displayAreaHeight / scale.value
     }
   }
+
+  // 如果是文件输出节点，绘制文件配置区域
+  if (node.type === 'file-output') {
+    const fileOutputAreaWidth = width - 16 * scale.value
+    const fileOutputAreaHeight = 160 * scale.value
+    const fileOutputAreaX = x + 8 * scale.value
+    const fileOutputAreaY = y + headerHeight + 8 * scale.value
+    
+    // 绘制整体背景
+    context.fillStyle = '#f0f9ff'  // 浅蓝色背景
+    context.beginPath()
+    context.roundRect(fileOutputAreaX, fileOutputAreaY, fileOutputAreaWidth, fileOutputAreaHeight, 8 * scale.value)
+    context.fill()
+    
+    // 绘制边框
+    context.strokeStyle = '#0ea5e9'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+    
+    // 绘制文件名配置区域
+    const fileNameAreaHeight = 30 * scale.value
+    const fileNameAreaY = fileOutputAreaY + 8 * scale.value
+    const fileNameAreaX = fileOutputAreaX + 8 * scale.value
+    const fileNameAreaWidth = fileOutputAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(fileNameAreaX, fileNameAreaY, fileNameAreaWidth, fileNameAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#0ea5e9'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制文件名标签和值
+    context.fillStyle = '#0369a1'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('文件名:', fileNameAreaX + 8 * scale.value, fileNameAreaY + 6 * scale.value)
+    
+    const fileName = (node.config?.fileName as string) || 'output.txt'
+    context.fillStyle = '#0c4a6e'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(fileName, fileNameAreaX + 60 * scale.value, fileNameAreaY + 6 * scale.value)
+    
+    // 绘制文件格式选择区域
+    const fileFormatAreaHeight = 30 * scale.value
+    const fileFormatAreaY = fileNameAreaY + fileNameAreaHeight + 8 * scale.value
+    const fileFormatAreaX = fileOutputAreaX + 8 * scale.value
+    const fileFormatAreaWidth = fileOutputAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(fileFormatAreaX, fileFormatAreaY, fileFormatAreaWidth, fileFormatAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#0ea5e9'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制文件格式标签和值
+    context.fillStyle = '#0369a1'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('格式:', fileFormatAreaX + 8 * scale.value, fileFormatAreaY + 6 * scale.value)
+    
+    const fileFormat = (node.config?.fileFormat as string) || 'txt'
+    const formatMap: Record<string, string> = {
+      'txt': '文本文件 (.txt)',
+      'json': 'JSON文件 (.json)',
+      'csv': 'CSV文件 (.csv)',
+      'html': 'HTML文件 (.html)',
+      'md': 'Markdown文件 (.md)',
+      'markdown': 'Markdown文件 (.md)'
+    }
+    const formatText = formatMap[fileFormat] || '文本文件 (.txt)'
+    
+    context.fillStyle = '#0c4a6e'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(formatText, fileFormatAreaX + 50 * scale.value, fileFormatAreaY + 6 * scale.value)
+    
+    // 绘制下拉箭头
+    context.fillStyle = '#0369a1'
+    context.beginPath()
+    const arrowX = fileFormatAreaX + fileFormatAreaWidth - 20 * scale.value
+    const arrowY = fileFormatAreaY + fileFormatAreaHeight / 2
+    context.moveTo(arrowX - 4 * scale.value, arrowY - 2 * scale.value)
+    context.lineTo(arrowX, arrowY + 2 * scale.value)
+    context.lineTo(arrowX + 4 * scale.value, arrowY - 2 * scale.value)
+    context.stroke()
+    
+    // 绘制状态显示区域
+    const statusAreaHeight = 60 * scale.value
+    const statusAreaY = fileFormatAreaY + fileFormatAreaHeight + 8 * scale.value
+    const statusAreaX = fileOutputAreaX + 8 * scale.value
+    const statusAreaWidth = fileOutputAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(statusAreaX, statusAreaY, statusAreaWidth, statusAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#0ea5e9'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制状态信息
+    context.fillStyle = '#0369a1'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('输出状态:', statusAreaX + 8 * scale.value, statusAreaY + 8 * scale.value)
+    
+    // 显示文件输出状态
+    const outputStatus = (node.config?.outputStatus as string) || '等待输入数据...'
+    const statusColor = outputStatus.includes('成功') ? '#059669' : outputStatus.includes('失败') ? '#dc2626' : '#64748b'
+    
+    context.fillStyle = statusColor
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(outputStatus, statusAreaX + 8 * scale.value, statusAreaY + 25 * scale.value)
+    
+    // 如果有文件路径，显示保存位置
+    const filePath = (node.config?.filePath as string) || ''
+    if (filePath) {
+      context.fillStyle = '#64748b'
+      context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      const shortPath = filePath.length > 40 ? '...' + filePath.slice(-37) : filePath
+      context.fillText(`保存位置: ${shortPath}`, statusAreaX + 8 * scale.value, statusAreaY + 42 * scale.value)
+    }
+    
+    // 存储文件输出区域位置信息，用于点击检测
+    if (!node.fileOutputArea) {
+      node.fileOutputArea = {
+        x: (fileOutputAreaX / scale.value) + offset.value.x,
+        y: (fileOutputAreaY / scale.value) + offset.value.y,
+        width: fileOutputAreaWidth / scale.value,
+        height: fileOutputAreaHeight / scale.value
+      }
+    } else {
+      node.fileOutputArea.x = (fileOutputAreaX / scale.value) + offset.value.x
+      node.fileOutputArea.y = (fileOutputAreaY / scale.value) + offset.value.y
+      node.fileOutputArea.width = fileOutputAreaWidth / scale.value
+      node.fileOutputArea.height = fileOutputAreaHeight / scale.value
+    }
+    
+    // 存储文件名区域位置信息
+    if (!node.fileNameArea) {
+      node.fileNameArea = {
+        x: (fileNameAreaX / scale.value) + offset.value.x,
+        y: (fileNameAreaY / scale.value) + offset.value.y,
+        width: fileNameAreaWidth / scale.value,
+        height: fileNameAreaHeight / scale.value
+      }
+    } else {
+      node.fileNameArea.x = (fileNameAreaX / scale.value) + offset.value.x
+      node.fileNameArea.y = (fileNameAreaY / scale.value) + offset.value.y
+      node.fileNameArea.width = fileNameAreaWidth / scale.value
+      node.fileNameArea.height = fileNameAreaHeight / scale.value
+    }
+    
+    // 存储文件格式区域位置信息
+    if (!node.fileFormatArea) {
+      node.fileFormatArea = {
+        x: (fileFormatAreaX / scale.value) + offset.value.x,
+        y: (fileFormatAreaY / scale.value) + offset.value.y,
+        width: fileFormatAreaWidth / scale.value,
+        height: fileFormatAreaHeight / scale.value
+      }
+    } else {
+      node.fileFormatArea.x = (fileFormatAreaX / scale.value) + offset.value.x
+      node.fileFormatArea.y = (fileFormatAreaY / scale.value) + offset.value.y
+      node.fileFormatArea.width = fileFormatAreaWidth / scale.value
+      node.fileFormatArea.height = fileFormatAreaHeight / scale.value
+    }
+  }
+
+  // 如果是邮件输出节点，绘制邮件配置区域
+  if (node.type === 'email-output') {
+    const emailOutputAreaWidth = width - 16 * scale.value
+    const emailOutputAreaHeight = 210 * scale.value
+    const emailOutputAreaX = x + 8 * scale.value
+    const emailOutputAreaY = y + headerHeight + 8 * scale.value
+    
+    // 绘制整体背景
+    context.fillStyle = '#fef3c7'  // 浅黄色背景
+    context.beginPath()
+    context.roundRect(emailOutputAreaX, emailOutputAreaY, emailOutputAreaWidth, emailOutputAreaHeight, 8 * scale.value)
+    context.fill()
+    
+    // 绘制边框
+    context.strokeStyle = '#f59e0b'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+    
+    // 绘制收件人配置区域
+    const recipientAreaHeight = 30 * scale.value
+    const recipientAreaY = emailOutputAreaY + 8 * scale.value
+    const recipientAreaX = emailOutputAreaX + 8 * scale.value
+    const recipientAreaWidth = emailOutputAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(recipientAreaX, recipientAreaY, recipientAreaWidth, recipientAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#f59e0b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制收件人标签和值
+    context.fillStyle = '#92400e'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('收件人:', recipientAreaX + 8 * scale.value, recipientAreaY + 6 * scale.value)
+    
+    const recipient = (node.config?.recipient as string) || 'example@email.com'
+    context.fillStyle = '#78350f'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(recipient, recipientAreaX + 60 * scale.value, recipientAreaY + 6 * scale.value)
+    
+    // 绘制主题配置区域
+    const subjectAreaHeight = 30 * scale.value
+    const subjectAreaY = recipientAreaY + recipientAreaHeight + 8 * scale.value
+    const subjectAreaX = emailOutputAreaX + 8 * scale.value
+    const subjectAreaWidth = emailOutputAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(subjectAreaX, subjectAreaY, subjectAreaWidth, subjectAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#f59e0b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制主题标签和值
+    context.fillStyle = '#92400e'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('主题:', subjectAreaX + 8 * scale.value, subjectAreaY + 6 * scale.value)
+    
+    const subject = (node.config?.subject as string) || '工作流输出结果'
+    context.fillStyle = '#78350f'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    const shortSubject = subject.length > 25 ? subject.substring(0, 22) + '...' : subject
+    context.fillText(shortSubject, subjectAreaX + 50 * scale.value, subjectAreaY + 6 * scale.value)
+    
+    // 绘制SMTP配置区域
+    const smtpAreaHeight = 30 * scale.value
+    const smtpAreaY = subjectAreaY + subjectAreaHeight + 8 * scale.value
+    const smtpAreaX = emailOutputAreaX + 8 * scale.value
+    const smtpAreaWidth = emailOutputAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(smtpAreaX, smtpAreaY, smtpAreaWidth, smtpAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#f59e0b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制SMTP标签和值
+    context.fillStyle = '#92400e'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('SMTP:', smtpAreaX + 8 * scale.value, smtpAreaY + 6 * scale.value)
+    
+    const smtpHost = (node.config?.smtpHost as string) || 'smtp.gmail.com'
+    const smtpPort = (node.config?.smtpPort as string) || '587'
+    const smtpInfo = `${smtpHost}:${smtpPort}`
+    context.fillStyle = '#78350f'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    const shortSmtp = smtpInfo.length > 25 ? smtpInfo.substring(0, 22) + '...' : smtpInfo
+    context.fillText(shortSmtp, smtpAreaX + 55 * scale.value, smtpAreaY + 6 * scale.value)
+    
+    // 绘制状态显示区域
+    const statusAreaHeight = 80 * scale.value
+    const statusAreaY = smtpAreaY + smtpAreaHeight + 8 * scale.value
+    const statusAreaX = emailOutputAreaX + 8 * scale.value
+    const statusAreaWidth = emailOutputAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(statusAreaX, statusAreaY, statusAreaWidth, statusAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#f59e0b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制状态信息
+    context.fillStyle = '#92400e'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('发送状态:', statusAreaX + 8 * scale.value, statusAreaY + 8 * scale.value)
+    
+    // 显示邮件发送状态
+    const emailStatus = (node.config?.emailStatus as string) || '等待输入数据...'
+    const statusColor = emailStatus.includes('成功') ? '#059669' : emailStatus.includes('失败') ? '#dc2626' : '#64748b'
+    
+    context.fillStyle = statusColor
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(emailStatus, statusAreaX + 8 * scale.value, statusAreaY + 25 * scale.value)
+    
+    // 如果有发送时间，显示发送时间
+    const sendTime = (node.config?.sendTime as string) || ''
+    if (sendTime) {
+      context.fillStyle = '#64748b'
+      context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.fillText(`发送时间: ${sendTime}`, statusAreaX + 8 * scale.value, statusAreaY + 42 * scale.value)
+    }
+    
+    // 显示配置提示
+    context.fillStyle = '#64748b'
+    context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText('点击配置区域设置邮件参数', statusAreaX + 8 * scale.value, statusAreaY + 60 * scale.value)
+    
+    // 存储邮件输出区域位置信息，用于点击检测
+    if (!node.emailOutputArea) {
+      node.emailOutputArea = {
+        x: (emailOutputAreaX / scale.value) + offset.value.x,
+        y: (emailOutputAreaY / scale.value) + offset.value.y,
+        width: emailOutputAreaWidth / scale.value,
+        height: emailOutputAreaHeight / scale.value
+      }
+    } else {
+      node.emailOutputArea.x = (emailOutputAreaX / scale.value) + offset.value.x
+      node.emailOutputArea.y = (emailOutputAreaY / scale.value) + offset.value.y
+      node.emailOutputArea.width = emailOutputAreaWidth / scale.value
+      node.emailOutputArea.height = emailOutputAreaHeight / scale.value
+    }
+    
+    // 存储收件人区域位置信息
+    if (!node.emailRecipientArea) {
+      node.emailRecipientArea = {
+        x: (recipientAreaX / scale.value) + offset.value.x,
+        y: (recipientAreaY / scale.value) + offset.value.y,
+        width: recipientAreaWidth / scale.value,
+        height: recipientAreaHeight / scale.value
+      }
+    } else {
+      node.emailRecipientArea.x = (recipientAreaX / scale.value) + offset.value.x
+      node.emailRecipientArea.y = (recipientAreaY / scale.value) + offset.value.y
+      node.emailRecipientArea.width = recipientAreaWidth / scale.value
+      node.emailRecipientArea.height = recipientAreaHeight / scale.value
+    }
+    
+    // 存储主题区域位置信息
+    if (!node.emailSubjectArea) {
+      node.emailSubjectArea = {
+        x: (subjectAreaX / scale.value) + offset.value.x,
+        y: (subjectAreaY / scale.value) + offset.value.y,
+        width: subjectAreaWidth / scale.value,
+        height: subjectAreaHeight / scale.value
+      }
+    } else {
+      node.emailSubjectArea.x = (subjectAreaX / scale.value) + offset.value.x
+      node.emailSubjectArea.y = (subjectAreaY / scale.value) + offset.value.y
+      node.emailSubjectArea.width = subjectAreaWidth / scale.value
+      node.emailSubjectArea.height = subjectAreaHeight / scale.value
+    }
+    
+    // 存储SMTP区域位置信息
+    if (!node.emailSmtpArea) {
+      node.emailSmtpArea = {
+        x: (smtpAreaX / scale.value) + offset.value.x,
+        y: (smtpAreaY / scale.value) + offset.value.y,
+        width: smtpAreaWidth / scale.value,
+        height: smtpAreaHeight / scale.value
+      }
+    } else {
+      node.emailSmtpArea.x = (smtpAreaX / scale.value) + offset.value.x
+      node.emailSmtpArea.y = (smtpAreaY / scale.value) + offset.value.y
+      node.emailSmtpArea.width = smtpAreaWidth / scale.value
+      node.emailSmtpArea.height = smtpAreaHeight / scale.value
+    }
+  }
 }
 
 const drawPort = (x: number, y: number, type: 'input' | 'output') => {
@@ -4541,8 +4993,64 @@ const getUploadButtonAtPosition = (x: number, y: number): WorkflowNode | null =>
 
 const getFileNameAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
   for (const node of workflowNodes.value) {
-    if (node.type === 'file-input' && node.fileNameArea) {
+    if ((node.type === 'file-input' || node.type === 'file-output') && node.fileNameArea) {
       const area = node.fileNameArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取文件格式区域点击位置
+const getFileFormatAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'file-output' && node.fileFormatArea) {
+      const area = node.fileFormatArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取邮件收件人区域点击位置
+const getEmailRecipientAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'email-output' && node.emailRecipientArea) {
+      const area = node.emailRecipientArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取邮件主题区域点击位置
+const getEmailSubjectAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'email-output' && node.emailSubjectArea) {
+      const area = node.emailSubjectArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取邮件SMTP配置区域点击位置
+const getEmailSmtpAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'email-output' && node.emailSmtpArea) {
+      const area = node.emailSmtpArea
       if (x >= area.x && x <= area.x + area.width && 
           y >= area.y && y <= area.y + area.height) {
         return node
@@ -4961,6 +5469,195 @@ declare global {
 const handleFileNameAreaClick = async (node: WorkflowNode) => {
   console.log('点击文件名区域，节点:', node.name)
   
+  // 如果是file-output节点，显示文件名编辑对话框
+  if (node.type === 'file-output') {
+    const dialog = document.createElement('div')
+    dialog.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      backdrop-filter: blur(4px);
+    `
+    
+    const content = document.createElement('div')
+    content.style.cssText = `
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 400px;
+      width: 90vw;
+      color: white;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      border: 1px solid #374151;
+    `
+    
+    const title = document.createElement('h3')
+    title.textContent = '编辑文件名'
+    title.style.cssText = `
+      margin: 0 0 20px 0;
+      color: #f9fafb;
+      font-size: 18px;
+      font-weight: 600;
+      text-align: center;
+      border-bottom: 1px solid #374151;
+      padding-bottom: 12px;
+    `
+    content.appendChild(title)
+    
+    const inputContainer = document.createElement('div')
+    inputContainer.style.cssText = 'margin-bottom: 20px;'
+    
+    const label = document.createElement('label')
+    label.textContent = '文件名（不含扩展名）：'
+    label.style.cssText = `
+      display: block;
+      margin-bottom: 8px;
+      color: #e5e7eb;
+      font-size: 14px;
+      font-weight: 500;
+    `
+    
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.value = (node.config?.fileName as string) || 'output'
+    input.style.cssText = `
+      width: 100%;
+      padding: 10px 12px;
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      color: #f9fafb;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s ease;
+    `
+    
+    input.addEventListener('focus', () => {
+      input.style.borderColor = '#60a5fa'
+    })
+    
+    input.addEventListener('blur', () => {
+      input.style.borderColor = '#374151'
+    })
+    
+    inputContainer.appendChild(label)
+    inputContainer.appendChild(input)
+    content.appendChild(inputContainer)
+    
+    const buttonContainer = document.createElement('div')
+    buttonContainer.style.cssText = `
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      padding-top: 16px;
+      border-top: 1px solid #374151;
+    `
+    
+    const saveButton = document.createElement('button')
+    saveButton.textContent = '保存'
+    saveButton.style.cssText = `
+      padding: 10px 24px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      min-width: 80px;
+    `
+    
+    saveButton.addEventListener('mouseenter', () => {
+      saveButton.style.background = '#2563eb'
+      saveButton.style.transform = 'translateY(-1px)'
+    })
+    
+    saveButton.addEventListener('mouseleave', () => {
+      saveButton.style.background = '#3b82f6'
+      saveButton.style.transform = 'translateY(0)'
+    })
+    
+    saveButton.addEventListener('click', () => {
+      const fileName = input.value.trim()
+      if (fileName) {
+        updateNode(node.id, {
+          config: {
+            ...node.config,
+            fileName: fileName
+          }
+        })
+        console.log('更新文件名:', fileName)
+      }
+      document.body.removeChild(dialog)
+    })
+    
+    const cancelButton = document.createElement('button')
+    cancelButton.textContent = '取消'
+    cancelButton.style.cssText = `
+      padding: 10px 24px;
+      background: #374151;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      min-width: 80px;
+    `
+    
+    cancelButton.addEventListener('mouseenter', () => {
+      cancelButton.style.background = '#4b5563'
+      cancelButton.style.transform = 'translateY(-1px)'
+    })
+    
+    cancelButton.addEventListener('mouseleave', () => {
+      cancelButton.style.background = '#374151'
+      cancelButton.style.transform = 'translateY(0)'
+    })
+    
+    cancelButton.addEventListener('click', () => {
+      document.body.removeChild(dialog)
+    })
+    
+    // 回车键保存
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        saveButton.click()
+      }
+    })
+    
+    buttonContainer.appendChild(saveButton)
+    buttonContainer.appendChild(cancelButton)
+    content.appendChild(buttonContainer)
+    dialog.appendChild(content)
+    
+    // 点击背景关闭对话框
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        document.body.removeChild(dialog)
+      }
+    })
+    
+    document.body.appendChild(dialog)
+    
+    // 自动聚焦并选中文本
+    setTimeout(() => {
+      input.focus()
+      input.select()
+    }, 100)
+    
+    return
+  }
+  
   try {
     // 获取已上传的文件列表
     const uploadedFiles: UploadedFile[] = await window.api.getUploadedFiles()
@@ -5285,6 +5982,768 @@ const handleFileNameAreaClick = async (node: WorkflowNode) => {
     console.error('获取已上传文件失败:', error)
     alert('获取已上传文件失败')
   }
+}
+
+const handleFileFormatAreaClick = (node: WorkflowNode) => {
+  console.log('点击文件格式区域，节点:', node.name)
+  
+  // 文件格式选项
+  const formatOptions = [
+    { value: 'txt', label: 'TXT 文本文件' },
+    { value: 'json', label: 'JSON 数据文件' },
+    { value: 'csv', label: 'CSV 表格文件' },
+    { value: 'html', label: 'HTML 网页文件' },
+    { value: 'md', label: 'Markdown 文档' }
+  ]
+  
+  // 创建格式选择对话框
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const content = document.createElement('div')
+  content.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 400px;
+    width: 90vw;
+    color: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '选择文件格式'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    border-bottom: 1px solid #374151;
+    padding-bottom: 12px;
+  `
+  content.appendChild(title)
+  
+  const formatList = document.createElement('div')
+  formatList.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+  `
+  
+  formatOptions.forEach((format) => {
+    const formatItem = document.createElement('div')
+    formatItem.style.cssText = `
+      border: 1px solid #374151;
+      border-radius: 8px;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: #111827;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    `
+    
+    const formatLabel = document.createElement('div')
+    formatLabel.textContent = format.label
+    formatLabel.style.cssText = 'font-size: 14px; color: #e5e7eb; font-weight: 500;'
+    
+    const formatValue = document.createElement('div')
+    formatValue.textContent = format.value.toUpperCase()
+    formatValue.style.cssText = 'font-size: 12px; color: #9ca3af; font-family: monospace;'
+    
+    formatItem.appendChild(formatLabel)
+    formatItem.appendChild(formatValue)
+    
+    // 高亮当前选中的格式
+    if (node.config?.fileFormat === format.value) {
+      formatItem.style.borderColor = '#60a5fa'
+      formatItem.style.background = '#1e3a8a'
+    }
+    
+    formatItem.addEventListener('mouseenter', () => {
+      if (node.config?.fileFormat !== format.value) {
+        formatItem.style.borderColor = '#60a5fa'
+        formatItem.style.background = '#0f172a'
+      }
+    })
+    
+    formatItem.addEventListener('mouseleave', () => {
+      if (node.config?.fileFormat !== format.value) {
+        formatItem.style.borderColor = '#374151'
+        formatItem.style.background = '#111827'
+      }
+    })
+    
+    formatItem.addEventListener('click', () => {
+      // 更新节点配置
+      updateNode(node.id, {
+        config: {
+          ...node.config,
+          fileFormat: format.value
+        }
+      })
+      
+      console.log('选择文件格式:', format.value)
+      document.body.removeChild(dialog)
+    })
+    
+    formatList.appendChild(formatItem)
+  })
+  
+  content.appendChild(formatList)
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    justify-content: center;
+    padding-top: 16px;
+    border-top: 1px solid #374151;
+  `
+  
+  const closeButton = document.createElement('button')
+  closeButton.textContent = '取消'
+  closeButton.style.cssText = `
+    padding: 10px 24px;
+    background: #374151;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
+  `
+  
+  closeButton.addEventListener('mouseenter', () => {
+    closeButton.style.background = '#4b5563'
+    closeButton.style.transform = 'translateY(-1px)'
+  })
+  
+  closeButton.addEventListener('mouseleave', () => {
+    closeButton.style.background = '#374151'
+    closeButton.style.transform = 'translateY(0)'
+  })
+  
+  closeButton.addEventListener('click', () => {
+    document.body.removeChild(dialog)
+  })
+  
+  buttonContainer.appendChild(closeButton)
+  content.appendChild(buttonContainer)
+  dialog.appendChild(content)
+  
+  // 点击背景关闭对话框
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  })
+  
+  document.body.appendChild(dialog)
+}
+
+// Email output 节点的点击处理函数
+const handleEmailRecipientAreaClick = async (node: WorkflowNode) => {
+  console.log('点击收件人区域，节点:', node.name)
+  
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const content = document.createElement('div')
+  content.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90vw;
+    color: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '配置收件人'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    border-bottom: 1px solid #374151;
+    padding-bottom: 12px;
+  `
+  content.appendChild(title)
+  
+  const inputContainer = document.createElement('div')
+  inputContainer.style.cssText = 'margin-bottom: 20px;'
+  
+  const label = document.createElement('label')
+  label.textContent = '收件人邮箱（多个邮箱用逗号分隔）：'
+  label.style.cssText = `
+    display: block;
+    margin-bottom: 8px;
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 500;
+  `
+  
+  const input = document.createElement('textarea')
+  input.value = (node.config?.emailRecipients as string) || ''
+  input.placeholder = '例如：user1@example.com, user2@example.com'
+  input.style.cssText = `
+    width: 100%;
+    height: 80px;
+    padding: 10px 12px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    color: #f9fafb;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s ease;
+    resize: vertical;
+    font-family: inherit;
+  `
+  
+  input.addEventListener('focus', () => {
+    input.style.borderColor = '#60a5fa'
+  })
+  
+  input.addEventListener('blur', () => {
+    input.style.borderColor = '#374151'
+  })
+  
+  inputContainer.appendChild(label)
+  inputContainer.appendChild(input)
+  content.appendChild(inputContainer)
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid #374151;
+  `
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    padding: 10px 24px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
+  `
+  
+  saveButton.addEventListener('click', () => {
+    const recipients = input.value.trim()
+    updateNode(node.id, {
+      config: {
+        ...node.config,
+        emailRecipients: recipients
+      }
+    })
+    console.log('更新收件人:', recipients)
+    document.body.removeChild(dialog)
+  })
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 10px 24px;
+    background: #374151;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
+  `
+  
+  cancelButton.addEventListener('click', () => {
+    document.body.removeChild(dialog)
+  })
+  
+  buttonContainer.appendChild(saveButton)
+  buttonContainer.appendChild(cancelButton)
+  content.appendChild(buttonContainer)
+  dialog.appendChild(content)
+  
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  })
+  
+  document.body.appendChild(dialog)
+  setTimeout(() => {
+    input.focus()
+  }, 100)
+}
+
+const handleEmailSubjectAreaClick = async (node: WorkflowNode) => {
+  console.log('点击主题区域，节点:', node.name)
+  
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const content = document.createElement('div')
+  content.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90vw;
+    color: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '配置邮件主题'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    border-bottom: 1px solid #374151;
+    padding-bottom: 12px;
+  `
+  content.appendChild(title)
+  
+  const inputContainer = document.createElement('div')
+  inputContainer.style.cssText = 'margin-bottom: 20px;'
+  
+  const label = document.createElement('label')
+  label.textContent = '邮件主题：'
+  label.style.cssText = `
+    display: block;
+    margin-bottom: 8px;
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 500;
+  `
+  
+  const input = document.createElement('input')
+  input.type = 'text'
+  input.value = (node.config?.emailSubject as string) || '工作流执行结果'
+  input.placeholder = '请输入邮件主题'
+  input.style.cssText = `
+    width: 100%;
+    padding: 10px 12px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    color: #f9fafb;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s ease;
+  `
+  
+  input.addEventListener('focus', () => {
+    input.style.borderColor = '#60a5fa'
+  })
+  
+  input.addEventListener('blur', () => {
+    input.style.borderColor = '#374151'
+  })
+  
+  inputContainer.appendChild(label)
+  inputContainer.appendChild(input)
+  content.appendChild(inputContainer)
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid #374151;
+  `
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    padding: 10px 24px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
+  `
+  
+  saveButton.addEventListener('click', () => {
+    const subject = input.value.trim()
+    updateNode(node.id, {
+      config: {
+        ...node.config,
+        emailSubject: subject
+      }
+    })
+    console.log('更新邮件主题:', subject)
+    document.body.removeChild(dialog)
+  })
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 10px 24px;
+    background: #374151;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
+  `
+  
+  cancelButton.addEventListener('click', () => {
+    document.body.removeChild(dialog)
+  })
+  
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      saveButton.click()
+    }
+  })
+  
+  buttonContainer.appendChild(saveButton)
+  buttonContainer.appendChild(cancelButton)
+  content.appendChild(buttonContainer)
+  dialog.appendChild(content)
+  
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  })
+  
+  document.body.appendChild(dialog)
+  setTimeout(() => {
+    input.focus()
+    input.select()
+  }, 100)
+}
+
+const handleEmailSmtpAreaClick = async (node: WorkflowNode) => {
+  console.log('点击SMTP配置区域，节点:', node.name)
+  
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  `
+  
+  const content = document.createElement('div')
+  content.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 600px;
+    width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    color: white;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '配置SMTP服务器'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    border-bottom: 1px solid #374151;
+    padding-bottom: 12px;
+  `
+  content.appendChild(title)
+  
+  // SMTP服务器地址
+  const hostContainer = document.createElement('div')
+  hostContainer.style.cssText = 'margin-bottom: 16px;'
+  
+  const hostLabel = document.createElement('label')
+  hostLabel.textContent = 'SMTP服务器地址：'
+  hostLabel.style.cssText = `
+    display: block;
+    margin-bottom: 6px;
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 500;
+  `
+  
+  const hostInput = document.createElement('input')
+  hostInput.type = 'text'
+  hostInput.value = (node.config?.smtpHost as string) || 'smtp.gmail.com'
+  hostInput.placeholder = '例如：smtp.gmail.com'
+  hostInput.style.cssText = `
+    width: 100%;
+    padding: 8px 12px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    color: #f9fafb;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s ease;
+  `
+  
+  hostContainer.appendChild(hostLabel)
+  hostContainer.appendChild(hostInput)
+  content.appendChild(hostContainer)
+  
+  // SMTP端口
+  const portContainer = document.createElement('div')
+  portContainer.style.cssText = 'margin-bottom: 16px;'
+  
+  const portLabel = document.createElement('label')
+  portLabel.textContent = 'SMTP端口：'
+  portLabel.style.cssText = `
+    display: block;
+    margin-bottom: 6px;
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 500;
+  `
+  
+  const portInput = document.createElement('input')
+  portInput.type = 'number'
+  portInput.value = (node.config?.smtpPort as string) || '587'
+  portInput.placeholder = '587'
+  portInput.style.cssText = `
+    width: 100%;
+    padding: 8px 12px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    color: #f9fafb;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s ease;
+  `
+  
+  portContainer.appendChild(portLabel)
+  portContainer.appendChild(portInput)
+  content.appendChild(portContainer)
+  
+  // 发件人邮箱
+  const userContainer = document.createElement('div')
+  userContainer.style.cssText = 'margin-bottom: 16px;'
+  
+  const userLabel = document.createElement('label')
+  userLabel.textContent = '发件人邮箱：'
+  userLabel.style.cssText = `
+    display: block;
+    margin-bottom: 6px;
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 500;
+  `
+  
+  const userInput = document.createElement('input')
+  userInput.type = 'email'
+  userInput.value = (node.config?.smtpUser as string) || ''
+  userInput.placeholder = 'your-email@gmail.com'
+  userInput.style.cssText = `
+    width: 100%;
+    padding: 8px 12px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    color: #f9fafb;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s ease;
+  `
+  
+  userContainer.appendChild(userLabel)
+  userContainer.appendChild(userInput)
+  content.appendChild(userContainer)
+  
+  // 邮箱密码/应用密码
+  const passContainer = document.createElement('div')
+  passContainer.style.cssText = 'margin-bottom: 20px;'
+  
+  const passLabel = document.createElement('label')
+  passLabel.textContent = '邮箱密码/应用密码：'
+  passLabel.style.cssText = `
+    display: block;
+    margin-bottom: 6px;
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 500;
+  `
+  
+  const passInput = document.createElement('input')
+  passInput.type = 'password'
+  passInput.value = (node.config?.smtpPass as string) || ''
+  passInput.placeholder = '请输入邮箱密码或应用密码'
+  passInput.style.cssText = `
+    width: 100%;
+    padding: 8px 12px;
+    background: #111827;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    color: #f9fafb;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s ease;
+  `
+  
+  passContainer.appendChild(passLabel)
+  passContainer.appendChild(passInput)
+  content.appendChild(passContainer)
+  
+  // 添加焦点样式
+  ;[hostInput, portInput, userInput, passInput].forEach(input => {
+    input.addEventListener('focus', () => {
+      input.style.borderColor = '#60a5fa'
+    })
+    input.addEventListener('blur', () => {
+      input.style.borderColor = '#374151'
+    })
+  })
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid #374151;
+  `
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    padding: 10px 24px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
+  `
+  
+  saveButton.addEventListener('click', () => {
+    updateNode(node.id, {
+      config: {
+        ...node.config,
+        smtpHost: hostInput.value.trim(),
+        smtpPort: parseInt(portInput.value) || 587,
+        smtpUser: userInput.value.trim(),
+        smtpPass: passInput.value.trim()
+      }
+    })
+    console.log('更新SMTP配置')
+    document.body.removeChild(dialog)
+  })
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 10px 24px;
+    background: #374151;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
+  `
+  
+  cancelButton.addEventListener('click', () => {
+    document.body.removeChild(dialog)
+  })
+  
+  buttonContainer.appendChild(saveButton)
+  buttonContainer.appendChild(cancelButton)
+  content.appendChild(buttonContainer)
+  dialog.appendChild(content)
+  
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  })
+  
+  document.body.appendChild(dialog)
+  setTimeout(() => {
+    hostInput.focus()
+  }, 100)
 }
 
 const handleUploadButtonClick = (node: WorkflowNode) => {
@@ -9383,7 +10842,7 @@ const handleLoopParameterAreaClick = (node: WorkflowNode) => {
     
     // 显示更新提示
     const toast = document.createElement('div')
-    toast.textContent = `${(title as string).replace('设置', '')}已更新`
+    toast.textContent = `${title.replace('设置', '')}已更新`
     toast.style.cssText = `
       position: fixed;
       top: 20px;
@@ -10666,6 +12125,10 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedPort = getPortAtCanvasPosition(pos.x, pos.y)
   const clickedUploadButton = getUploadButtonAtPosition(pos.x, pos.y)
   const clickedFileNameArea = getFileNameAreaAtPosition(pos.x, pos.y)
+  const clickedFileFormatArea = getFileFormatAreaAtPosition(pos.x, pos.y)
+  const clickedEmailRecipientArea = getEmailRecipientAreaAtPosition(pos.x, pos.y)
+  const clickedEmailSubjectArea = getEmailSubjectAreaAtPosition(pos.x, pos.y)
+  const clickedEmailSmtpArea = getEmailSmtpAreaAtPosition(pos.x, pos.y)
   const clickedTextArea = getTextAreaAtPosition(pos.x, pos.y)
   const clickedTextDisplayArea = getTextDisplayAreaAtPosition(pos.x, pos.y)
   const clickedEditButton = getEditButtonAtPosition(pos.x, pos.y)
@@ -10703,6 +12166,18 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedFileNameArea) {
     // 处理文件名区域点击
     handleFileNameAreaClick(clickedFileNameArea)
+  } else if (clickedFileFormatArea) {
+    // 处理文件格式区域点击
+    handleFileFormatAreaClick(clickedFileFormatArea)
+  } else if (clickedEmailRecipientArea) {
+    // 处理邮件收件人区域点击
+    handleEmailRecipientAreaClick(clickedEmailRecipientArea)
+  } else if (clickedEmailSubjectArea) {
+    // 处理邮件主题区域点击
+    handleEmailSubjectAreaClick(clickedEmailSubjectArea)
+  } else if (clickedEmailSmtpArea) {
+    // 处理邮件SMTP配置区域点击
+    handleEmailSmtpAreaClick(clickedEmailSmtpArea)
   } else if (clickedEditButton) {
     // 处理编辑按钮点击
     handleTextEditButtonClick(clickedEditButton)

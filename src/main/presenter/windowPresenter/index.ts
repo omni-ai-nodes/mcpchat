@@ -81,6 +81,12 @@ async function executeWorkflow(workflowData: WorkflowData) {
         case 'text-output':
           result = await executeTextOutputNode(node, inputData)
           break
+        case 'file-output':
+          result = await executeFileOutputNode(node, inputData)
+          break
+        case 'email-output':
+          result = await executeEmailOutputNode(node, inputData)
+          break
         default:
           result = { output: (inputData.input as string) || '' }
       }
@@ -1502,6 +1508,212 @@ async function executeTextOutputNode(node: WorkflowNode, inputData: Record<strin
   }
 }
 
+// 执行文件输出节点
+async function executeFileOutputNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  const config = node.config || {}
+  
+  // 获取输入数据
+  const inputText = (inputData.input as string) || (inputData.textInput as string) || ''
+  
+  if (!inputText.trim()) {
+    throw new Error(`文件输出节点 "${node.name}" 没有接收到文本输入`)
+  }
+  
+  console.log(`执行文件输出节点: ${node.name || node.id}`)
+  
+  try {
+    // 获取文件配置
+    const fileName = (config.fileName as string) || 'output.txt'
+    const fileFormat = (config.fileFormat as string) || 'txt'
+    const encoding = (config.encoding as string) || 'utf8'
+    
+    // 创建用户数据目录下的 APP/outputs 目录
+    const userDataPath = app.getPath('userData')
+    const outputsDir = path.join(userDataPath, 'APP', 'outputs')
+    
+    if (!fs.existsSync(outputsDir)) {
+      fs.mkdirSync(outputsDir, { recursive: true })
+    }
+    
+    // 生成唯一文件名（添加时间戳前缀）
+    const timestamp = Date.now()
+    const fileExtension = fileName.includes('.') ? '' : `.${fileFormat}`
+    const uniqueFileName = `${timestamp}_${fileName}${fileExtension}`
+    const filePath = path.join(outputsDir, uniqueFileName)
+    
+    // 根据文件格式处理输出内容
+    let outputContent = inputText
+    
+    switch (fileFormat.toLowerCase()) {
+      case 'json':
+        try {
+          // 尝试解析为JSON并格式化
+          const jsonData = JSON.parse(inputText)
+          outputContent = JSON.stringify(jsonData, null, 2)
+        } catch {
+          // 如果不是有效JSON，包装为JSON字符串
+          outputContent = JSON.stringify({ content: inputText }, null, 2)
+        }
+        break
+        
+      case 'csv':
+        // 如果输入是JSON数组，转换为CSV
+        try {
+          const data = JSON.parse(inputText)
+          if (Array.isArray(data) && data.length > 0) {
+            const headers = Object.keys(data[0])
+            const csvRows = [headers.join(',')]
+            data.forEach(row => {
+              const values = headers.map(header => {
+                const value = row[header] || ''
+                return typeof value === 'string' && value.includes(',') ? `"${value}"` : value
+              })
+              csvRows.push(values.join(','))
+            })
+            outputContent = csvRows.join('\n')
+          }
+        } catch {
+          // 如果不是有效JSON数组，保持原文本
+          outputContent = inputText
+        }
+        break
+        
+      case 'html':
+        // 如果输入不包含HTML标签，包装为基本HTML
+        if (!inputText.includes('<html>') && !inputText.includes('<!DOCTYPE')) {
+          outputContent = `<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="UTF-8">\n  <title>Output</title>\n</head>\n<body>\n  <pre>${inputText}</pre>\n</body>\n</html>`
+        }
+        break
+        
+      case 'md':
+      case 'markdown':
+        // 如果输入不包含Markdown语法，添加基本格式
+        if (!inputText.includes('#') && !inputText.includes('*') && !inputText.includes('`')) {
+          outputContent = `# Output\n\n${inputText}`
+        }
+        break
+        
+      default:
+        // 对于txt和其他格式，保持原文本
+        outputContent = inputText
+    }
+    
+    // 写入文件
+    fs.writeFileSync(filePath, outputContent, encoding as BufferEncoding)
+    
+    console.log(`文件输出节点 ${node.name} 执行成功，文件保存至: ${filePath}`)
+    
+    return {
+      output: `文件已保存: ${uniqueFileName}`,
+      filePath,
+      fileName: uniqueFileName,
+      fileSize: Buffer.byteLength(outputContent, encoding as BufferEncoding)
+    }
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '未知错误'
+    console.error(`文件输出节点 "${node.name}" 执行失败:`, errorMessage)
+    throw new Error(`文件输出节点 "${node.name}" 执行失败: ${errorMessage}`)
+  }
+}
+
+// 执行邮件输出节点
+async function executeEmailOutputNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  const config = node.config || {}
+  
+  // 获取输入数据
+  const inputText = (inputData.input as string) || (inputData.textInput as string) || ''
+  
+  if (!inputText.trim()) {
+    throw new Error(`邮件输出节点 "${node.name}" 没有接收到文本输入`)
+  }
+  
+  console.log(`执行邮件输出节点: ${node.name || node.id}`)
+  
+  try {
+    // 获取邮件配置
+    const recipient = (config.recipient as string) || ''
+    const subject = (config.subject as string) || '工作流输出结果'
+    const smtpHost = (config.smtpHost as string) || 'smtp.gmail.com'
+    const smtpPort = parseInt((config.smtpPort as string) || '587')
+    const smtpUser = (config.smtpUser as string) || ''
+    const smtpPassword = (config.smtpPassword as string) || ''
+    const smtpSecure = (config.smtpSecure as boolean) || false
+    
+    // 验证必要参数
+    if (!recipient || !recipient.includes('@')) {
+      throw new Error(`邮件输出节点 "${node.name}" 缺少有效的收件人邮箱地址`)
+    }
+    
+    if (!smtpUser || !smtpPassword) {
+      throw new Error(`邮件输出节点 "${node.name}" 缺少SMTP认证信息`)
+    }
+    
+    // 动态导入nodemailer
+    const nodemailer = await import('nodemailer')
+    
+    // 创建邮件传输器
+    const transporter = nodemailer.createTransporter({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure, // true for 465, false for other ports
+      auth: {
+        user: smtpUser,
+        pass: smtpPassword
+      },
+      // 添加超时设置
+      connectionTimeout: 60000, // 60秒
+      greetingTimeout: 30000, // 30秒
+      socketTimeout: 60000 // 60秒
+    })
+    
+    // 验证SMTP连接
+    await transporter.verify()
+    
+    // 准备邮件内容
+    const mailOptions = {
+      from: smtpUser,
+      to: recipient,
+      subject: subject,
+      text: inputText,
+      html: `<pre style="font-family: monospace; white-space: pre-wrap; word-wrap: break-word;">${inputText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`
+    }
+    
+    // 发送邮件
+    const info = await transporter.sendMail(mailOptions)
+    
+    const sendTime = new Date().toLocaleString('zh-CN')
+    const successMessage = `邮件发送成功！消息ID: ${info.messageId}`
+    
+    console.log(`邮件输出节点 ${node.name} 执行成功:`, successMessage)
+    
+    // 更新节点配置中的状态信息
+    if (typeof config === 'object' && config !== null) {
+      config.emailStatus = '发送成功'
+      config.sendTime = sendTime
+      config.messageId = info.messageId
+    }
+    
+    return {
+      output: successMessage,
+      emailStatus: '发送成功',
+      sendTime: sendTime,
+      messageId: info.messageId,
+      recipient: recipient
+    }
+  } catch (error) {
+    console.error(`邮件输出节点 ${node.name} 执行失败:`, error)
+    
+    // 更新节点配置中的错误状态
+    if (typeof config === 'object' && config !== null) {
+      config.emailStatus = `发送失败: ${error.message}`
+      config.sendTime = new Date().toLocaleString('zh-CN')
+    }
+    
+    throw new Error(`邮件发送失败: ${error.message}`)
+  }
+}
+
 // 执行数据库输入节点
 async function executeDatabaseInputNode(node: WorkflowNode): Promise<NodeResult> {
   const config = node.config || {}
@@ -1598,6 +1810,42 @@ interface WorkflowNode {
     height: number
   }
   loopParamArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  fileOutputArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  fileNameArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  fileFormatArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  emailRecipientArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  emailSubjectArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  emailSmtpArea?: {
     x: number
     y: number
     width: number
