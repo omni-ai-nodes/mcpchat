@@ -61,7 +61,22 @@ async function executeWorkflow(workflowData: WorkflowData) {
           result = await executeApiInputNode(node, inputData)
           break
         case 'database-input':
-          result = await executeDatabaseInputNode(node, inputData)
+          result = await executeDatabaseInputNode(node)
+          break
+        case 'text-transform':
+          result = await executeTextTransformNode(node, inputData)
+          break
+        case 'data-filter':
+          result = await executeDataFilterNode(node, inputData)
+          break
+        case 'ai-analysis':
+          result = await executeAiAnalysisNode(node, inputData)
+          break
+        case 'condition':
+          result = await executeConditionNode(node, inputData)
+          break
+        case 'loop':
+          result = await executeLoopNode(node, inputData, workflowData, nodeResults)
           break
         case 'text-output':
           result = await executeTextOutputNode(node, inputData)
@@ -96,6 +111,153 @@ async function executeWorkflow(workflowData: WorkflowData) {
       status: 'failed',
       error: error instanceof Error ? error.message : String(error)
     }
+  }
+}
+
+// 执行AI分析节点
+async function executeAiAnalysisNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  const config = node.config || {}
+  
+  // 获取输入文本
+  const inputText = (inputData.textInput as string) || (inputData.input as string) || ''
+  
+  if (!inputText.trim()) {
+    throw new Error(`AI分析节点 "${node.name}" 没有接收到文本输入`)
+  }
+  
+  console.log(`执行AI分析节点: ${node.name || node.id}, 分析类型: ${config.analysisType || 'sentiment'}`)
+  
+  try {
+    // 获取presenter实例
+    const { presenter } = await import('@/presenter')
+    const llmproviderPresenter = presenter.llmproviderPresenter
+    
+    if (!llmproviderPresenter) {
+      throw new Error('LLM提供者服务未初始化')
+    }
+    
+    // 获取节点配置的模型信息
+    const selectedProviderId = (config.provider as string) || (config.selectedProvider as string)
+    const selectedModelId = (config.model as string) || (config.selectedModel as string)
+    const analysisType = (config.analysisType as string) || 'sentiment'
+    const temperature = (config.temperature as number) || 0.7
+    const maxTokens = (config.maxTokens as number) || 1000
+    
+    // 获取当前LLM配置，优先使用节点配置的模型
+    let currentProvider = selectedProviderId ? 
+      llmproviderPresenter.getProviders().find(p => p.id === selectedProviderId) :
+      llmproviderPresenter.getCurrentProvider()
+      
+    if (!currentProvider) {
+      const availableProviders = llmproviderPresenter.getProviders().filter(p => p.enable)
+      if (availableProviders.length === 0) {
+        throw new Error('没有可用的LLM提供者，请先配置并启用至少一个LLM提供者')
+      }
+      currentProvider = availableProviders[0]
+      console.log(`自动选择LLM提供者: ${currentProvider.name}`)
+    }
+    
+    // 获取模型列表
+    const models = await llmproviderPresenter.getModelList(currentProvider.id)
+    if (!models || models.length === 0) {
+      throw new Error('未找到可用的模型')
+    }
+    
+    // 选择模型
+    let modelId = selectedModelId
+    if (!modelId || !models.find(m => m.id === modelId)) {
+      modelId = models[0].id // 使用第一个可用模型
+      console.log(`使用默认模型: ${modelId}`)
+    } else {
+      console.log(`使用配置的模型: ${modelId}`)
+    }
+    
+    // 构建分析提示词
+    let systemPrompt = ''
+    let userPrompt = ''
+    
+    switch (analysisType) {
+       case 'sentiment': {
+         systemPrompt = '你是一个专业的情感分析专家。请分析给定文本的情感倾向，并给出详细的分析结果。'
+         userPrompt = `请分析以下文本的情感倾向（积极、消极、中性），并说明理由：\n\n${inputText}`
+         break
+       }
+         
+       case 'summary': {
+         systemPrompt = '你是一个专业的文本摘要专家。请为给定文本生成简洁、准确的摘要。'
+         userPrompt = `请为以下文本生成摘要：\n\n${inputText}`
+         break
+       }
+         
+       case 'keywords': {
+         systemPrompt = '你是一个专业的关键词提取专家。请从给定文本中提取最重要的关键词。'
+         userPrompt = `请从以下文本中提取关键词：\n\n${inputText}`
+         break
+       }
+         
+       case 'classification': {
+         const classificationLabels = (config.classificationLabels as string) || ''
+         systemPrompt = '你是一个专业的文本分类专家。请根据给定的分类标签对文本进行分类。'
+         userPrompt = `请将以下文本分类到这些类别中：${classificationLabels}\n\n文本：${inputText}`
+         break
+       }
+         
+       case 'entities': {
+         systemPrompt = '你是一个专业的实体识别专家。请从给定文本中识别出人名、地名、组织名等实体。'
+         userPrompt = `请从以下文本中识别实体（人名、地名、组织名等）：\n\n${inputText}`
+         break
+       }
+         
+       case 'custom': {
+         const customPrompt = (config.customPrompt as string) || ''
+         if (!customPrompt.trim()) {
+           throw new Error('自定义分析类型需要提供自定义提示词')
+         }
+         systemPrompt = '你是一个专业的文本分析专家。请根据用户的要求分析给定的文本。'
+         userPrompt = `${customPrompt}\n\n文本：${inputText}`
+         break
+       }
+         
+       default: {
+         systemPrompt = '你是一个专业的文本分析专家。请分析给定的文本。'
+         userPrompt = `请分析以下文本：\n\n${inputText}`
+       }
+     }
+    
+    // 构建消息
+    const messages: Array<{ role: 'user' | 'system' | 'assistant'; content: string }> = [
+      {
+        role: 'system' as const,
+        content: systemPrompt
+      },
+      {
+        role: 'user' as const,
+        content: userPrompt
+      }
+    ]
+    
+    console.log(`调用模型 ${modelId} 进行AI分析，分析类型: ${analysisType}`)
+    
+    // 调用模型进行分析
+     const outputText = await llmproviderPresenter.generateCompletionStandalone(
+       currentProvider.id,
+       messages as ChatMessage[],
+       modelId
+     )
+    
+    if (!outputText || !outputText.trim()) {
+      throw new Error('模型返回了空响应')
+    }
+    
+    console.log(`AI分析完成: ${outputText.substring(0, 100)}${outputText.length > 100 ? '...' : ''}`)
+    
+    return {
+      output: outputText
+    }
+    
+  } catch (error) {
+    console.error(`AI分析节点执行失败:`, error)
+    throw new Error(`AI分析节点 "${node.name}" 执行失败: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -238,6 +400,293 @@ async function executeTextInputNode(node: WorkflowNode): Promise<NodeResult> {
   const config = node.config || {}
   return {
     output: (config.textContent as string) || (config.text as string) || (config.content as string) || ''
+  }
+}
+
+// 执行条件判断节点
+async function executeConditionNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  const config = node.config || {}
+  
+  // 获取输入数据
+  const inputValue = (inputData.input as string) || (inputData.textInput as string) || ''
+  
+  console.log(`执行条件判断节点: ${node.name || node.id}, 输入值: ${inputValue}`)
+  
+  // 获取配置参数
+  const conditionType = (config.conditionType as string) || 'equals'
+  const compareValue = (config.compareValue as string) || ''
+  const dataType = (config.dataType as string) || 'text'
+  const trueOutput = (config.trueOutput as string) || 'true'
+  const falseOutput = (config.falseOutput as string) || 'false'
+  
+  let result = false
+  
+  try {
+    // 根据数据类型转换输入值和比较值
+    let processedInputValue: string | number | boolean = inputValue
+    let processedCompareValue: string | number | boolean = compareValue
+    
+    if (dataType === 'number') {
+      processedInputValue = parseFloat(inputValue) || 0
+      processedCompareValue = parseFloat(compareValue) || 0
+    } else if (dataType === 'boolean') {
+      processedInputValue = inputValue.toLowerCase() === 'true' || inputValue === '1'
+      processedCompareValue = compareValue.toLowerCase() === 'true' || compareValue === '1'
+    }
+    
+    // 执行条件判断
+    switch (conditionType) {
+      case 'equals':
+        result = processedInputValue === processedCompareValue
+        break
+      case 'not-equals':
+        result = processedInputValue !== processedCompareValue
+        break
+      case 'contains':
+        result = String(processedInputValue).includes(String(processedCompareValue))
+        break
+      case 'not-contains':
+        result = !String(processedInputValue).includes(String(processedCompareValue))
+        break
+      case 'greater':
+        if (dataType === 'number') {
+          result = (processedInputValue as number) > (processedCompareValue as number)
+        } else {
+          result = String(processedInputValue).length > String(processedCompareValue).length
+        }
+        break
+      case 'less':
+        if (dataType === 'number') {
+          result = (processedInputValue as number) < (processedCompareValue as number)
+        } else {
+          result = String(processedInputValue).length < String(processedCompareValue).length
+        }
+        break
+      case 'greater-equal':
+        if (dataType === 'number') {
+          result = (processedInputValue as number) >= (processedCompareValue as number)
+        } else {
+          result = String(processedInputValue).length >= String(processedCompareValue).length
+        }
+        break
+      case 'less-equal':
+        if (dataType === 'number') {
+          result = (processedInputValue as number) <= (processedCompareValue as number)
+        } else {
+          result = String(processedInputValue).length <= String(processedCompareValue).length
+        }
+        break
+      case 'regex':
+        try {
+          const regex = new RegExp(compareValue)
+          result = regex.test(String(processedInputValue))
+        } catch (error) {
+          console.warn(`正则表达式无效: ${compareValue}`, error)
+          result = false
+        }
+        break
+      case 'empty':
+        result = !inputValue || inputValue.trim() === ''
+        break
+      case 'not-empty':
+        result = !!(inputValue && inputValue.trim() !== '')
+        break
+      default:
+        result = false
+    }
+    
+    const output = result ? trueOutput : falseOutput
+    
+    console.log(`条件判断结果: ${result}, 输出: ${output}`)
+    
+    return {
+      output: output
+    }
+  } catch (error) {
+    console.error(`条件判断节点执行失败:`, error)
+    throw new Error(`条件判断节点 "${node.name}" 执行失败: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+// 执行循环节点
+async function executeLoopNode(
+  node: WorkflowNode, 
+  inputData: Record<string, unknown>, 
+  workflowData: WorkflowData, 
+  nodeResults: Map<string, NodeResult>
+): Promise<NodeResult> {
+  const config = node.config || {}
+  
+  // 获取输入数据
+  const inputValue = (inputData.input as string) || (inputData.textInput as string) || ''
+  
+  console.log(`执行循环节点: ${node.name || node.id}, 输入值: ${inputValue}`)
+  
+  // 获取配置参数
+  const loopType = (config.loopType as string) || 'count'
+  const loopCount = parseInt((config.loopCount as string) || '1')
+  const loopCondition = (config.loopCondition as string) || ''
+  const loopData = (config.loopData as string) || ''
+  const maxIterations = (config.maxIterations as number) || 100 // 防止无限循环
+  
+  let iterations = 0
+  let currentValue = inputValue
+  const results: string[] = []
+  
+  try {
+    switch (loopType) {
+      case 'count': {
+        // 计数循环
+        const count = Math.min(loopCount, maxIterations)
+        console.log(`执行计数循环，次数: ${count}`)
+        
+        for (let i = 0; i < count; i++) {
+          iterations++
+          console.log(`循环迭代 ${iterations}/${count}`)
+          
+          // 执行循环体内的节点（这里简化处理，实际应该执行连接的子节点）
+          const iterationResult = {
+            iteration: iterations,
+            input: currentValue,
+            output: `循环第${iterations}次执行，输入: ${currentValue}`
+          }
+          
+          results.push(JSON.stringify(iterationResult))
+          currentValue = iterationResult.output
+        }
+        break
+      }
+      
+      case 'condition': {
+        // 条件循环
+        console.log(`执行条件循环，条件: ${loopCondition}`)
+        
+        while (iterations < maxIterations) {
+          iterations++
+          console.log(`循环迭代 ${iterations}，检查条件: ${loopCondition}`)
+          
+          // 简化的条件检查（实际应该支持更复杂的表达式）
+          let shouldContinue = false
+          try {
+            if (loopCondition.includes('length')) {
+              const targetLength = parseInt(loopCondition.match(/\d+/)?.[0] || '0')
+              shouldContinue = currentValue.length < targetLength
+            } else if (loopCondition.includes('contains')) {
+              const targetText = loopCondition.split('contains')[1]?.trim().replace(/["']/g, '') || ''
+              shouldContinue = !currentValue.includes(targetText)
+            } else {
+              // 默认条件：迭代次数小于10
+              shouldContinue = iterations < 10
+            }
+          } catch (error) {
+            console.warn(`条件解析失败: ${error}`)
+            shouldContinue = false
+          }
+          
+          if (!shouldContinue) {
+            console.log(`条件不满足，退出循环`)
+            break
+          }
+          
+          const iterationResult = {
+            iteration: iterations,
+            input: currentValue,
+            condition: loopCondition,
+            output: `条件循环第${iterations}次执行，输入: ${currentValue}`
+          }
+          
+          results.push(JSON.stringify(iterationResult))
+          currentValue = iterationResult.output
+        }
+        break
+      }
+      
+      case 'foreach': {
+        // 遍历循环
+        console.log(`执行遍历循环，数据源: ${loopData}`)
+        
+        let dataArray: string[] = []
+        try {
+          // 尝试解析为JSON数组
+          if (loopData.startsWith('[') && loopData.endsWith(']')) {
+            dataArray = JSON.parse(loopData)
+          } else {
+            // 按行分割
+            dataArray = loopData.split('\n').filter(line => line.trim())
+          }
+        } catch (error) {
+          // 如果解析失败，按逗号分割
+          dataArray = loopData.split(',').map(item => item.trim()).filter(item => item)
+        }
+        
+        const count = Math.min(dataArray.length, maxIterations)
+        console.log(`遍历数组，元素数量: ${count}`)
+        
+        for (let i = 0; i < count; i++) {
+          iterations++
+          const currentItem = dataArray[i]
+          console.log(`遍历迭代 ${iterations}/${count}，当前元素: ${currentItem}`)
+          
+          const iterationResult = {
+            iteration: iterations,
+            index: i,
+            item: currentItem,
+            input: currentValue,
+            output: `遍历第${iterations}次执行，元素: ${currentItem}，输入: ${currentValue}`
+          }
+          
+          results.push(JSON.stringify(iterationResult))
+          currentValue = iterationResult.output
+        }
+        break
+      }
+      
+      case 'infinite': {
+        // 无限循环（实际上有最大迭代限制）
+        console.log(`执行无限循环，最大迭代次数: ${maxIterations}`)
+        
+        while (iterations < maxIterations) {
+          iterations++
+          console.log(`无限循环迭代 ${iterations}/${maxIterations}`)
+          
+          const iterationResult = {
+            iteration: iterations,
+            input: currentValue,
+            output: `无限循环第${iterations}次执行，输入: ${currentValue}`
+          }
+          
+          results.push(JSON.stringify(iterationResult))
+          currentValue = iterationResult.output
+          
+          // 简单的退出条件：如果输出包含"stop"或"exit"
+          if (currentValue.toLowerCase().includes('stop') || currentValue.toLowerCase().includes('exit')) {
+            console.log(`检测到退出条件，停止无限循环`)
+            break
+          }
+        }
+        break
+      }
+      
+      default:
+        throw new Error(`不支持的循环类型: ${loopType}`)
+    }
+    
+    const finalOutput = {
+      loopType,
+      totalIterations: iterations,
+      results: results,
+      finalValue: currentValue,
+      summary: `${loopType}循环执行完成，共${iterations}次迭代`
+    }
+    
+    console.log(`循环节点执行完成: ${iterations}次迭代`)
+    
+    return {
+      output: JSON.stringify(finalOutput)
+    }
+  } catch (error) {
+    console.error(`循环节点执行失败:`, error)
+    throw new Error(`循环节点 "${node.name}" 执行失败: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -760,6 +1209,292 @@ async function executeApiInputNode(node: WorkflowNode, inputData: Record<string,
   }
 }
 
+// 执行文本转换节点
+async function executeTextTransformNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  const config = node.config || {}
+  const transformType = (config.transformType as string) || 'uppercase'
+  
+  // 获取输入文本
+  const inputText = (inputData.textInput as string) || (inputData.input as string) || ''
+  
+  if (!inputText.trim()) {
+    throw new Error(`文本转换节点 "${node.name}" 没有接收到文本输入`)
+  }
+  
+  console.log(`执行文本转换节点: ${node.name || node.id}, 转换类型: ${transformType}`)
+  
+  let output = inputText
+  
+  try {
+    switch (transformType) {
+      case 'uppercase':
+        output = inputText.toUpperCase()
+        break
+        
+      case 'lowercase':
+        output = inputText.toLowerCase()
+        break
+        
+      case 'trim':
+        output = inputText.trim()
+        break
+        
+      case 'replace':
+        const findText = (config.findText as string) || ''
+        const replaceText = (config.replaceText as string) || ''
+        
+        if (!findText) {
+          throw new Error(`文本转换节点 "${node.name}" 的替换操作缺少查找文本`)
+        }
+        
+        // 使用全局替换
+        const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')
+        output = inputText.replace(regex, replaceText)
+        break
+        
+      case 'extract':
+        const pattern = (config.pattern as string) || ''
+        
+        if (!pattern) {
+          throw new Error(`文本转换节点 "${node.name}" 的提取操作缺少正则表达式模式`)
+        }
+        
+        try {
+          const extractRegex = new RegExp(pattern, 'g')
+          const matches = inputText.match(extractRegex)
+          output = matches ? matches.join('\n') : ''
+        } catch (regexError) {
+          throw new Error(`文本转换节点 "${node.name}" 的正则表达式无效: ${pattern}`)
+        }
+        break
+        
+      default:
+        throw new Error(`文本转换节点 "${node.name}" 不支持的转换类型: ${transformType}`)
+    }
+    
+    console.log(`文本转换节点 ${node.name} 执行成功，输入长度: ${inputText.length}，输出长度: ${output.length}`)
+    
+    return {
+      output,
+      transformType,
+      inputLength: inputText.length,
+      outputLength: output.length
+    }
+  } catch (error) {
+    console.error(`文本转换节点 ${node.name} 执行失败:`, error)
+    throw error
+  }
+}
+
+async function executeDataFilterNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  const config = node.config || {}
+  const filterType = (config.filterType as string) || 'contains'
+  const outputMode = (config.outputMode as string) || 'matched'
+  
+  // 获取输入文本
+  const inputText = (inputData.textInput as string) || (inputData.input as string) || ''
+  
+  if (!inputText.trim()) {
+    throw new Error(`数据过滤节点 "${node.name}" 没有接收到文本输入`)
+  }
+  
+  console.log(`执行数据过滤节点: ${node.name || node.id}, 过滤类型: ${filterType}, 输出模式: ${outputMode}`)
+  
+  try {
+    // 将输入文本按行分割
+    const lines = inputText.split('\n').filter(line => line.trim() !== '')
+    let matchedLines: string[] = []
+    let filteredLines: string[] = []
+    
+    switch (filterType) {
+      case 'contains': {
+        const filterText = (config.filterText as string) || ''
+        if (!filterText) {
+          throw new Error(`数据过滤节点 "${node.name}" 的包含文本过滤缺少过滤文本`)
+        }
+        matchedLines = lines.filter(line => line.includes(filterText))
+        filteredLines = lines.filter(line => !line.includes(filterText))
+        break
+      }
+      
+      case 'not-contains': {
+        const filterText = (config.filterText as string) || ''
+        if (!filterText) {
+          throw new Error(`数据过滤节点 "${node.name}" 的不包含文本过滤缺少过滤文本`)
+        }
+        matchedLines = lines.filter(line => !line.includes(filterText))
+        filteredLines = lines.filter(line => line.includes(filterText))
+        break
+      }
+      
+      case 'starts-with': {
+        const filterText = (config.filterText as string) || ''
+        if (!filterText) {
+          throw new Error(`数据过滤节点 "${node.name}" 的开头过滤缺少过滤文本`)
+        }
+        matchedLines = lines.filter(line => line.startsWith(filterText))
+        filteredLines = lines.filter(line => !line.startsWith(filterText))
+        break
+      }
+      
+      case 'ends-with': {
+        const filterText = (config.filterText as string) || ''
+        if (!filterText) {
+          throw new Error(`数据过滤节点 "${node.name}" 的结尾过滤缺少过滤文本`)
+        }
+        matchedLines = lines.filter(line => line.endsWith(filterText))
+        filteredLines = lines.filter(line => !line.endsWith(filterText))
+        break
+      }
+      
+      case 'regex': {
+        const filterRegex = (config.filterRegex as string) || ''
+        if (!filterRegex) {
+          throw new Error(`数据过滤节点 "${node.name}" 的正则表达式过滤缺少正则表达式`)
+        }
+        
+        try {
+          const regex = new RegExp(filterRegex, 'i')
+          matchedLines = lines.filter(line => regex.test(line))
+          filteredLines = lines.filter(line => !regex.test(line))
+        } catch (regexError) {
+          throw new Error(`数据过滤节点 "${node.name}" 的正则表达式无效: ${filterRegex}`)
+        }
+        break
+      }
+      
+      case 'length': {
+        const lengthCondition = (config.lengthCondition as string) || 'greater'
+        const lengthValue = (config.lengthValue as number) || 0
+        const minLength = (config.minLength as number) || 0
+        const maxLength = (config.maxLength as number) || 0
+        
+        if (lengthCondition === 'between') {
+          if (minLength < 0 || maxLength < 0 || minLength > maxLength) {
+            throw new Error(`数据过滤节点 "${node.name}" 的长度范围无效`)
+          }
+          matchedLines = lines.filter(line => line.length >= minLength && line.length <= maxLength)
+          filteredLines = lines.filter(line => line.length < minLength || line.length > maxLength)
+        } else {
+          if (lengthValue < 0) {
+            throw new Error(`数据过滤节点 "${node.name}" 的长度值无效`)
+          }
+          
+          switch (lengthCondition) {
+            case 'greater':
+              matchedLines = lines.filter(line => line.length > lengthValue)
+              filteredLines = lines.filter(line => line.length <= lengthValue)
+              break
+            case 'less':
+              matchedLines = lines.filter(line => line.length < lengthValue)
+              filteredLines = lines.filter(line => line.length >= lengthValue)
+              break
+            case 'equal':
+              matchedLines = lines.filter(line => line.length === lengthValue)
+              filteredLines = lines.filter(line => line.length !== lengthValue)
+              break
+            default:
+              throw new Error(`数据过滤节点 "${node.name}" 不支持的长度条件: ${lengthCondition}`)
+          }
+        }
+        break
+      }
+      
+      case 'numeric': {
+        const numericCondition = (config.numericCondition as string) || 'greater'
+        const numericValue = (config.numericValue as number) || 0
+        const minValue = (config.minValue as number) || 0
+        const maxValue = (config.maxValue as number) || 0
+        
+        if (numericCondition === 'between') {
+          if (minValue > maxValue) {
+            throw new Error(`数据过滤节点 "${node.name}" 的数值范围无效`)
+          }
+          matchedLines = lines.filter(line => {
+            const num = parseFloat(line.trim())
+            return !isNaN(num) && num >= minValue && num <= maxValue
+          })
+          filteredLines = lines.filter(line => {
+            const num = parseFloat(line.trim())
+            return isNaN(num) || num < minValue || num > maxValue
+          })
+        } else {
+          switch (numericCondition) {
+            case 'greater':
+              matchedLines = lines.filter(line => {
+                const num = parseFloat(line.trim())
+                return !isNaN(num) && num > numericValue
+              })
+              filteredLines = lines.filter(line => {
+                const num = parseFloat(line.trim())
+                return isNaN(num) || num <= numericValue
+              })
+              break
+            case 'less':
+              matchedLines = lines.filter(line => {
+                const num = parseFloat(line.trim())
+                return !isNaN(num) && num < numericValue
+              })
+              filteredLines = lines.filter(line => {
+                const num = parseFloat(line.trim())
+                return isNaN(num) || num >= numericValue
+              })
+              break
+            case 'equal':
+              matchedLines = lines.filter(line => {
+                const num = parseFloat(line.trim())
+                return !isNaN(num) && num === numericValue
+              })
+              filteredLines = lines.filter(line => {
+                const num = parseFloat(line.trim())
+                return isNaN(num) || num !== numericValue
+              })
+              break
+            default:
+              throw new Error(`数据过滤节点 "${node.name}" 不支持的数值条件: ${numericCondition}`)
+          }
+        }
+        break
+      }
+      
+      default:
+        throw new Error(`数据过滤节点 "${node.name}" 不支持的过滤类型: ${filterType}`)
+    }
+    
+    // 根据输出模式返回结果
+    let output: string
+    switch (outputMode) {
+      case 'matched':
+        output = matchedLines.join('\n')
+        break
+      case 'filtered':
+        output = filteredLines.join('\n')
+        break
+      case 'count':
+        output = matchedLines.length.toString()
+        break
+      default:
+        output = matchedLines.join('\n')
+    }
+    
+    console.log(`数据过滤节点 ${node.name} 执行成功，输入行数: ${lines.length}，匹配行数: ${matchedLines.length}，过滤行数: ${filteredLines.length}`)
+    
+    return {
+      output,
+      filterType,
+      outputMode,
+      inputLines: lines.length,
+      matchedLines: matchedLines.length,
+      filteredLines: filteredLines.length,
+      matchedContent: matchedLines,
+      filteredContent: filteredLines
+    }
+  } catch (error) {
+    console.error(`数据过滤节点 ${node.name} 执行失败:`, error)
+    throw error
+  }
+}
+
 async function executeTextOutputNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
   console.log(`执行文本输出节点: ${node.name || node.id}`)
   return {
@@ -838,6 +1573,36 @@ interface WorkflowNode {
   config: Record<string, unknown>
   inputs?: string[]
   outputs?: string[]
+  conditionArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  loopArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  loopTypeArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  loopParameterArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  loopParamArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 }
 
 interface WorkflowConnection {

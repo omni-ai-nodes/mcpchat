@@ -11,6 +11,36 @@ interface WorkflowNode {
   config: Record<string, unknown>
   inputs?: string[]
   outputs?: string[]
+  conditionArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  loopArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  loopTypeArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  loopParameterArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  loopParamArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 }
 
 interface WorkflowConnection {

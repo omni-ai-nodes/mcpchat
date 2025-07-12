@@ -6,7 +6,7 @@
         v-model="localNode.name"
         class="property-input"
         type="text"
-        @input="updateProperty('name', $event.target.value)"
+        @input="updateProperty('name', ($event.target as HTMLInputElement)?.value)"
       />
     </div>
 
@@ -18,10 +18,10 @@
     <div class="property-group">
       <label class="property-label">描述</label>
       <textarea 
-        v-model="localNode.config.description"
+        :value="localNode.config.description || ''"
+        @input="updateConfig('description', ($event.target as HTMLTextAreaElement)?.value)"
         class="property-input property-textarea"
         placeholder="输入节点描述..."
-        @input="updateConfig('description', $event.target.value)"
       />
     </div>
 
@@ -30,19 +30,19 @@
       <div class="property-group">
         <label class="property-label">文件路径</label>
         <input 
-          v-model="localNode.config.filePath"
+          :value="localNode.config.filePath || ''"
+          @input="updateConfig('filePath', ($event.target as HTMLInputElement)?.value)"
           class="property-input"
           type="text"
           placeholder="选择文件路径..."
-          @input="updateConfig('filePath', $event.target.value)"
         />
       </div>
       <div class="property-group">
         <label class="property-label">文件类型</label>
         <select 
-          v-model="localNode.config.fileType"
+          :value="localNode.config.fileType || ''"
+          @change="updateConfig('fileType', ($event.target as HTMLSelectElement)?.value)"
           class="property-input"
-          @change="updateConfig('fileType', $event.target.value)"
         >
           <option value="text">文本文件</option>
           <option value="json">JSON文件</option>
@@ -56,10 +56,10 @@
       <div class="property-group">
         <label class="property-label">默认文本</label>
         <textarea 
-          v-model="localNode.config.defaultText"
+          :value="localNode.config.defaultText || ''"
+          @input="updateConfig('defaultText', ($event.target as HTMLTextAreaElement)?.value)"
           class="property-input property-textarea"
           placeholder="输入默认文本..."
-          @input="updateConfig('defaultText', $event.target.value)"
         />
       </div>
     </template>
@@ -68,19 +68,19 @@
       <div class="property-group">
         <label class="property-label">API URL</label>
         <input 
-          v-model="localNode.config.apiUrl"
+          :value="localNode.config.apiUrl || ''"
+          @input="updateConfig('apiUrl', ($event.target as HTMLInputElement)?.value)"
           class="property-input"
           type="url"
           placeholder="https://api.example.com/data"
-          @input="updateConfig('apiUrl', $event.target.value)"
         />
       </div>
       <div class="property-group">
         <label class="property-label">请求方法</label>
         <select 
-          v-model="localNode.config.method"
+          :value="localNode.config.method || ''"
+          @change="updateConfig('method', ($event.target as HTMLSelectElement)?.value)"
           class="property-input"
-          @change="updateConfig('method', $event.target.value)"
         >
           <option value="GET">GET</option>
           <option value="POST">POST</option>
@@ -91,20 +91,20 @@
       <div class="property-group">
         <label class="property-label">请求头</label>
         <textarea 
-          v-model="localNode.config.headers"
+          :value="localNode.config.headers || ''"
+          @input="updateConfig('headers', ($event.target as HTMLTextAreaElement)?.value)"
           class="property-input property-textarea"
           placeholder='{"Content-Type": "application/json"}'
-          @input="updateConfig('headers', $event.target.value)"
         />
       </div>
       <div v-if="localNode.config.method === 'POST' || localNode.config.method === 'PUT'" class="property-group">
         <label class="property-label">JSON参数</label>
         <textarea 
-          v-model="localNode.config.jsonParams"
+          :value="localNode.config.jsonParams || ''"
+          @input="updateConfig('jsonParams', ($event.target as HTMLTextAreaElement)?.value)"
           class="property-input property-textarea"
           placeholder='{"key": "value", "param": "data"}'
           rows="6"
-          @input="updateConfig('jsonParams', $event.target.value)"
         />
         <div class="property-hint">请输入有效的JSON格式参数</div>
       </div>
@@ -129,9 +129,9 @@
       <div class="property-group">
         <label class="property-label">转换类型</label>
         <select 
-          v-model="localNode.config.transformType"
+          :value="localNode.config.transformType || ''"
+          @change="updateConfig('transformType', ($event.target as HTMLSelectElement)?.value)"
           class="property-input"
-          @change="updateConfig('transformType', $event.target.value)"
         >
           <option value="uppercase">转大写</option>
           <option value="lowercase">转小写</option>
@@ -143,45 +143,361 @@
       <div v-if="localNode.config.transformType === 'replace'" class="property-group">
         <label class="property-label">查找文本</label>
         <input 
-          v-model="localNode.config.findText"
+          :value="localNode.config.findText || ''"
+          @input="updateConfig('findText', ($event.target as HTMLInputElement)?.value)"
           class="property-input"
           type="text"
-          @input="updateConfig('findText', $event.target.value)"
+          placeholder="要查找的文本"
         />
       </div>
       <div v-if="localNode.config.transformType === 'replace'" class="property-group">
         <label class="property-label">替换文本</label>
         <input 
-          v-model="localNode.config.replaceText"
+          :value="localNode.config.replaceText || ''"
+          @input="updateConfig('replaceText', ($event.target as HTMLInputElement)?.value)"
           class="property-input"
           type="text"
-          @input="updateConfig('replaceText', $event.target.value)"
+          placeholder="替换为的文本"
+        />
+      </div>
+      <div v-if="localNode.config.transformType === 'extract'" class="property-group">
+        <label class="property-label">正则表达式模式</label>
+        <input 
+          :value="localNode.config.pattern || ''"
+          @input="updateConfig('pattern', ($event.target as HTMLInputElement)?.value)"
+          class="property-input"
+          type="text"
+          placeholder="例如: \\d+|[a-zA-Z]+|\\w+@\\w+\\.\\w+"
+        />
+        <div class="property-hint">使用正则表达式提取匹配的文本，多个匹配结果将用换行符分隔</div>
+      </div>
+    </template>
+
+    <template v-else-if="node.type === 'data-filter'">
+      <div class="property-group">
+        <label class="property-label">过滤类型</label>
+        <select 
+          :value="localNode.config.filterType || ''"
+          @change="updateConfig('filterType', ($event.target as HTMLSelectElement)?.value)"
+          class="property-input"
+        >
+          <option value="contains">包含文本</option>
+          <option value="not-contains">不包含文本</option>
+          <option value="starts-with">以...开头</option>
+          <option value="ends-with">以...结尾</option>
+          <option value="regex">正则表达式</option>
+          <option value="length">长度过滤</option>
+          <option value="numeric">数值过滤</option>
+        </select>
+      </div>
+      <div v-if="localNode.config.filterType === 'contains' || localNode.config.filterType === 'not-contains' || localNode.config.filterType === 'starts-with' || localNode.config.filterType === 'ends-with'" class="property-group">
+        <label class="property-label">过滤文本</label>
+        <input 
+          :value="localNode.config.filterText || ''"
+          @input="updateConfig('filterText', ($event.target as HTMLInputElement)?.value)"
+          class="property-input"
+          type="text"
+          placeholder="要过滤的文本内容"
+        />
+      </div>
+      <div v-if="localNode.config.filterType === 'regex'" class="property-group">
+        <label class="property-label">正则表达式</label>
+        <input 
+          :value="localNode.config.filterRegex || ''"
+          @input="updateConfig('filterRegex', ($event.target as HTMLInputElement)?.value)"
+          class="property-input"
+          type="text"
+          placeholder="例如: ^\\d+$|[a-zA-Z]+|\\w+@\\w+\\.\\w+"
+        />
+        <div class="property-hint">使用正则表达式匹配文本，匹配的内容将被保留</div>
+      </div>
+      <div v-if="localNode.config.filterType === 'length'" class="property-group">
+        <label class="property-label">长度条件</label>
+        <select 
+          :value="localNode.config.lengthCondition || ''"
+          @change="updateConfig('lengthCondition', ($event.target as HTMLSelectElement)?.value)"
+          class="property-input"
+        >
+          <option value="greater">大于</option>
+          <option value="less">小于</option>
+          <option value="equal">等于</option>
+          <option value="between">介于</option>
+        </select>
+      </div>
+      <div v-if="localNode.config.filterType === 'length' && localNode.config.lengthCondition !== 'between'" class="property-group">
+        <label class="property-label">长度值</label>
+        <input 
+          v-model.number="localNode.config.lengthValue"
+          class="property-input"
+          type="number"
+          min="0"
+          placeholder="字符长度"
+          @input="updateConfig('lengthValue', Number(($event.target as HTMLInputElement)?.value))"
+        />
+      </div>
+      <div v-if="localNode.config.filterType === 'length' && localNode.config.lengthCondition === 'between'" class="property-group">
+        <label class="property-label">最小长度</label>
+        <input 
+          :value="localNode.config.minLength || ''"
+          class="property-input"
+          type="number"
+          min="0"
+          placeholder="最小字符长度"
+          @input="updateConfig('minLength', Number(($event.target as HTMLInputElement)?.value))"
+        />
+      </div>
+      <div v-if="localNode.config.filterType === 'length' && localNode.config.lengthCondition === 'between'" class="property-group">
+        <label class="property-label">最大长度</label>
+        <input 
+          :value="localNode.config.maxLength || ''"
+          class="property-input"
+          type="number"
+          min="0"
+          placeholder="最大字符长度"
+          @input="updateConfig('maxLength', Number(($event.target as HTMLInputElement)?.value))"
+        />
+      </div>
+      <div v-if="localNode.config.filterType === 'numeric'" class="property-group">
+        <label class="property-label">数值条件</label>
+        <select 
+          :value="localNode.config.numericCondition || ''"
+          @change="updateConfig('numericCondition', ($event.target as HTMLSelectElement)?.value)"
+          class="property-input"
+        >
+          <option value="greater">大于</option>
+          <option value="less">小于</option>
+          <option value="equal">等于</option>
+          <option value="between">介于</option>
+        </select>
+      </div>
+      <div v-if="localNode.config.filterType === 'numeric' && localNode.config.numericCondition !== 'between'" class="property-group">
+        <label class="property-label">数值</label>
+        <input 
+          :value="localNode.config.numericValue || ''"
+          class="property-input"
+          type="number"
+          step="any"
+          placeholder="比较的数值"
+          @input="updateConfig('numericValue', Number(($event.target as HTMLInputElement)?.value))"
+        />
+      </div>
+      <div v-if="localNode.config.filterType === 'numeric' && localNode.config.numericCondition === 'between'" class="property-group">
+        <label class="property-label">最小值</label>
+        <input 
+          :value="localNode.config.minValue || ''"
+          class="property-input"
+          type="number"
+          step="any"
+          placeholder="最小数值"
+          @input="updateConfig('minValue', Number(($event.target as HTMLInputElement)?.value))"
+        />
+      </div>
+      <div v-if="localNode.config.filterType === 'numeric' && localNode.config.numericCondition === 'between'" class="property-group">
+        <label class="property-label">最大值</label>
+        <input 
+          :value="localNode.config.maxValue || ''"
+          class="property-input"
+          type="number"
+          step="any"
+          placeholder="最大数值"
+          @input="updateConfig('maxValue', Number(($event.target as HTMLInputElement)?.value))"
+        />
+      </div>
+      <div class="property-group">
+        <label class="property-label">输出模式</label>
+        <select 
+          :value="localNode.config.outputMode || ''"
+          @change="updateConfig('outputMode', ($event.target as HTMLSelectElement)?.value)"
+          class="property-input"
+        >
+          <option value="matched">匹配的内容</option>
+          <option value="filtered">过滤后的内容</option>
+          <option value="count">匹配数量</option>
+        </select>
+        <div class="property-hint">选择输出匹配的内容、过滤后的内容或匹配数量</div>
+      </div>
+    </template>
+
+    <template v-else-if="node.type === 'ai-analysis'">
+      <div class="property-group">
+        <label class="property-label">选择提供商</label>
+        <select 
+          :value="localNode.config.selectedProvider || ''"
+          @change="updateConfig('selectedProvider', ($event.target as HTMLSelectElement).value)"
+          class="property-input"
+        >
+          <option value="">请选择提供商...</option>
+          <option 
+            v-for="provider in availableProviders.filter(p => p.enable)"
+            :key="provider.id"
+            :value="provider.id"
+          >
+            {{ provider.name }}
+          </option>
+        </select>
+      </div>
+      <div class="property-group">
+        <label class="property-label">选择模型</label>
+        <select 
+          :value="localNode.config.selectedModel || ''"
+          @change="updateConfig('selectedModel', ($event.target as HTMLSelectElement).value)"
+          class="property-input"
+          :disabled="!localNode.config.selectedProvider"
+        >
+          <option value="">请选择模型...</option>
+          <option 
+            v-for="model in availableModels"
+            :key="model.id"
+            :value="model.id"
+          >
+            {{ model.name || model.id }}
+          </option>
+        </select>
+      </div>
+      <div class="property-group">
+        <label class="property-label">分析类型</label>
+        <select 
+          :value="localNode.config.analysisType || ''"
+          @change="updateConfig('analysisType', ($event.target as HTMLSelectElement)?.value)"
+          class="property-input"
+        >
+          <option value="sentiment">情感分析</option>
+          <option value="summary">内容摘要</option>
+          <option value="keywords">关键词提取</option>
+          <option value="classification">文本分类</option>
+          <option value="entity">实体识别</option>
+          <option value="custom">自定义分析</option>
+        </select>
+      </div>
+      <div v-if="localNode.config.analysisType === 'custom'" class="property-group">
+        <label class="property-label">自定义提示词</label>
+        <textarea 
+          :value="localNode.config.customPrompt || ''"
+          @input="updateConfig('customPrompt', ($event.target as HTMLTextAreaElement)?.value)"
+          class="property-input property-textarea"
+          placeholder="请输入自定义的分析提示词，例如：请分析以下文本的主要观点和论据..."
+          rows="4"
+        />
+        <div class="property-hint">自定义提示词将用于指导AI进行特定的文本分析</div>
+      </div>
+      <div v-if="localNode.config.analysisType === 'classification'" class="property-group">
+        <label class="property-label">分类标签</label>
+        <textarea 
+          :value="localNode.config.classificationLabels || ''"
+          @input="updateConfig('classificationLabels', ($event.target as HTMLTextAreaElement)?.value)"
+          class="property-input property-textarea"
+          placeholder="请输入分类标签，每行一个，例如：\n正面\n负面\n中性"
+          rows="3"
+        />
+        <div class="property-hint">每行输入一个分类标签，AI将从这些标签中选择最合适的</div>
+      </div>
+      <div class="property-group">
+        <label class="property-label">输出格式</label>
+        <select 
+          :value="localNode.config.outputFormat || ''"
+          @change="updateConfig('outputFormat', ($event.target as HTMLSelectElement)?.value)"
+          class="property-input"
+        >
+          <option value="text">纯文本</option>
+          <option value="json">JSON格式</option>
+          <option value="structured">结构化文本</option>
+        </select>
+      </div>
+      <div class="property-group">
+        <label class="property-label">温度参数</label>
+        <input 
+          :value="localNode.config.temperature || ''"
+          class="property-input"
+          type="number"
+          min="0"
+          max="2"
+          step="0.1"
+          placeholder="0.3"
+          @input="updateConfig('temperature', Number(($event.target as HTMLInputElement)?.value))"
+        />
+        <div class="property-hint">较低的温度值(0.1-0.3)适合分析任务，确保结果更稳定</div>
+      </div>
+      <div class="property-group">
+        <label class="property-label">最大令牌数</label>
+        <input 
+          :value="localNode.config.maxTokens || ''"
+          class="property-input"
+          type="number"
+          min="1"
+          max="4096"
+          placeholder="1024"
+          @input="updateConfig('maxTokens', Number(($event.target as HTMLInputElement)?.value))"
         />
       </div>
     </template>
+
+
 
     <template v-else-if="node.type === 'condition'">
       <div class="property-group">
         <label class="property-label">条件类型</label>
         <select 
-          v-model="localNode.config.conditionType"
+          :value="localNode.config.conditionType || ''"
+          @change="updateConfig('conditionType', ($event.target as HTMLSelectElement)?.value)"
           class="property-input"
-          @change="updateConfig('conditionType', $event.target.value)"
         >
-          <option value="equals">等于</option>
+          <option value="equal">等于</option>
+          <option value="not-equal">不等于</option>
           <option value="contains">包含</option>
+          <option value="not-contains">不包含</option>
           <option value="greater">大于</option>
           <option value="less">小于</option>
+          <option value="greater-equal">大于等于</option>
+          <option value="less-equal">小于等于</option>
           <option value="regex">正则匹配</option>
+          <option value="empty">为空</option>
+          <option value="not-empty">不为空</option>
         </select>
       </div>
-      <div class="property-group">
+      <div v-if="localNode.config.conditionType !== 'empty' && localNode.config.conditionType !== 'not-empty'" class="property-group">
         <label class="property-label">比较值</label>
         <input 
-          v-model="localNode.config.compareValue"
+          :value="localNode.config.compareValue || ''"
+          @input="updateConfig('compareValue', ($event.target as HTMLInputElement)?.value)"
           class="property-input"
           type="text"
-          @input="updateConfig('compareValue', $event.target.value)"
+          placeholder="输入比较的值"
+        />
+        <div v-if="localNode.config.conditionType === 'regex'" class="property-hint">
+          使用正则表达式进行匹配，例如：^\\d+$ 匹配纯数字
+        </div>
+      </div>
+      <div class="property-group">
+        <label class="property-label">数据类型</label>
+        <select 
+          :value="localNode.config.dataType || ''"
+          @change="updateConfig('dataType', ($event.target as HTMLSelectElement)?.value)"
+          class="property-input"
+        >
+          <option value="string">文本</option>
+          <option value="number">数字</option>
+          <option value="boolean">布尔值</option>
+        </select>
+        <div class="property-hint">选择输入数据的类型以进行正确的比较</div>
+      </div>
+      <div class="property-group">
+        <label class="property-label">真值输出</label>
+        <input 
+          :value="localNode.config.trueOutput || ''"
+          @input="updateConfig('trueOutput', ($event.target as HTMLInputElement)?.value)"
+          class="property-input"
+          type="text"
+          placeholder="条件为真时的输出值"
+        />
+      </div>
+      <div class="property-group">
+        <label class="property-label">假值输出</label>
+        <input 
+          :value="localNode.config.falseOutput || ''"
+          @input="updateConfig('falseOutput', ($event.target as HTMLInputElement)?.value)"
+          class="property-input"
+          type="text"
+          placeholder="条件为假时的输出值"
         />
       </div>
     </template>
@@ -190,7 +506,7 @@
       <div class="property-group">
         <label class="property-label">选择提供商</label>
         <select 
-          v-model="localNode.config.selectedProvider"
+          :value="localNode.config.selectedProvider || ''"
           class="property-input"
           @change="updateConfig('selectedProvider', ($event.target as HTMLSelectElement).value)"
         >
@@ -207,7 +523,7 @@
       <div class="property-group">
         <label class="property-label">选择模型</label>
         <select 
-          v-model="localNode.config.selectedModel"
+          :value="localNode.config.selectedModel || ''"
           class="property-input"
           @change="updateConfig('selectedModel', ($event.target as HTMLSelectElement).value)"
           :disabled="!localNode.config.selectedProvider"
@@ -225,26 +541,26 @@
       <div class="property-group">
         <label class="property-label">温度参数</label>
         <input 
-          v-model.number="localNode.config.temperature"
+          :value="localNode.config.temperature || ''"
           class="property-input"
           type="number"
           min="0"
           max="2"
           step="0.1"
           placeholder="0.7"
-          @input="updateConfig('temperature', Number($event.target.value))"
+          @input="updateConfig('temperature', Number(($event.target as HTMLInputElement)?.value))"
         />
       </div>
       <div class="property-group">
         <label class="property-label">最大令牌数</label>
         <input 
-          v-model.number="localNode.config.maxTokens"
+          :value="localNode.config.maxTokens || ''"
           class="property-input"
           type="number"
           min="1"
           max="4096"
           placeholder="2048"
-          @input="updateConfig('maxTokens', Number($event.target.value))"
+          @input="updateConfig('maxTokens', Number(($event.target as HTMLInputElement)?.value))"
         />
       </div>
     </template>
@@ -255,19 +571,19 @@
         <div class="position-input-group">
           <label class="position-label">X:</label>
           <input 
-            v-model.number="localNode.x"
+            :value="localNode.x || ''"
             class="position-input"
             type="number"
-            @input="updateProperty('x', Number($event.target.value))"
+            @input="updateProperty('x', Number(($event.target as HTMLInputElement)?.value))"
           />
         </div>
         <div class="position-input-group">
           <label class="position-label">Y:</label>
           <input 
-            v-model.number="localNode.y"
+            :value="localNode.y || ''"
             class="position-input"
             type="number"
-            @input="updateProperty('y', Number($event.target.value))"
+            @input="updateProperty('y', Number(($event.target as HTMLInputElement)?.value))"
           />
         </div>
       </div>
@@ -663,5 +979,12 @@ select.property-input option {
   background: rgba(220, 38, 38, 0.1);
   border: 1px solid #dc2626;
   color: #ef4444;
+}
+
+.property-hint {
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style>

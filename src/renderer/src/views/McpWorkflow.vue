@@ -704,6 +704,48 @@ interface WorkflowNode {
     width: number
     height: number
   }
+  transformArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  filterArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  analysisArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  conditionArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  conditionTypeArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  conditionValueArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  conditionOutputArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 }
 
 interface Connection {
@@ -1074,7 +1116,7 @@ const drawNode = (node: WorkflowNode) => {
   const x = (node.x + offset.value.x) * scale.value
   const y = (node.y + offset.value.y) * scale.value
   const width = NODE_WIDTH * scale.value
-  // 为file-input、text-input、api-input、text-output、mcp-service和model-service节点动态计算高度
+  // 为file-input、text-input、api-input、text-output、text-transform、mcp-service和model-service节点动态计算高度
   let height: number
   if (node.type === 'file-input') {
     height = (NODE_HEIGHT + 226) * scale.value  // 基础高度 + 上传区域高度 + 间距
@@ -1089,10 +1131,46 @@ const drawNode = (node: WorkflowNode) => {
     const outputText = (node.config?.outputText as string) || '暂无输出内容...'
     const adaptiveHeight = calculateTextOutputHeight(outputText, width - 16 * scale.value, context)
     height = (NODE_HEIGHT + adaptiveHeight - 22) * scale.value  // 基础高度 + 自适应文本区域高度 + 间距
+  } else if (node.type === 'text-transform') {
+    // 根据转换类型计算高度
+    const transformType = (node.config?.transformType as string) || 'uppercase'
+    if (transformType === 'replace') {
+      height = (NODE_HEIGHT + 136) * scale.value  // 基础高度 + 转换配置区域高度（包含查找和替换输入框）+ 间距
+    } else if (transformType === 'extract') {
+      height = (NODE_HEIGHT + 150) * scale.value  // 基础高度 + 转换配置区域高度（包含正则表达式模式和说明）+ 间距
+    } else {
+      height = (NODE_HEIGHT + 120) * scale.value  // 基础高度 + 转换配置区域高度 + 间距
+    }
   } else if (node.type === 'mcp-service') {
     height = (NODE_HEIGHT + 116) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
   } else if (node.type === 'model-service') {
     height = (NODE_HEIGHT + 106) * scale.value  // 基础高度 + 模型选择区域高度 + 间距
+  } else if (node.type === 'data-filter') {
+    // 根据过滤类型计算高度
+    const filterType = (node.config?.filterType as string) || 'contains'
+    if (filterType === 'length' || filterType === 'numeric') {
+      height = (NODE_HEIGHT + 160) * scale.value  // 基础高度 + 过滤配置区域高度（包含条件选择和数值输入）+ 间距
+    } else if (filterType === 'regex') {
+      height = (NODE_HEIGHT + 140) * scale.value  // 基础高度 + 过滤配置区域高度（包含正则表达式输入）+ 间距
+    } else {
+      height = (NODE_HEIGHT + 130) * scale.value  // 基础高度 + 过滤配置区域高度 + 间距
+    }
+  } else if (node.type === 'ai-analysis') {
+    // 根据分析类型计算高度
+    const analysisType = (node.config?.analysisType as string) || 'sentiment'
+    if (analysisType === 'custom') {
+      height = (NODE_HEIGHT + 180) * scale.value  // 基础高度 + AI分析配置区域高度（包含自定义提示词）+ 间距
+    } else if (analysisType === 'classification') {
+      height = (NODE_HEIGHT + 160) * scale.value  // 基础高度 + AI分析配置区域高度（包含分类标签）+ 间距
+    } else {
+      height = (NODE_HEIGHT + 140) * scale.value  // 基础高度 + AI分析配置区域高度 + 间距
+    }
+  } else if (node.type === 'condition') {
+    // 条件判断节点的高度
+    height = (NODE_HEIGHT + 150) * scale.value  // 基础高度 + 条件配置区域高度 + 间距
+  } else if (node.type === 'loop') {
+    // 循环节点的高度
+    height = (NODE_HEIGHT + 180) * scale.value  // 基础高度 + 循环配置区域高度 + 间距
   } else {
     height = NODE_HEIGHT * scale.value
   }
@@ -1945,6 +2023,1068 @@ const drawNode = (node: WorkflowNode) => {
       node.modelServiceArea.y = serviceAreaY
       node.modelServiceArea.width = serviceAreaWidth
       node.modelServiceArea.height = serviceAreaHeight
+    }
+  }
+
+  // 如果是text-transform节点，绘制转换配置区域
+  if (node.type === 'text-transform') {
+    const transformAreaWidth = width - 16 * scale.value
+    const transformAreaHeight = 120 * scale.value  // 转换配置区域高度
+    const transformAreaX = x + 8 * scale.value
+    const transformAreaY = y + headerHeight + 8 * scale.value
+    
+    // 绘制整体背景
+    context.fillStyle = '#1e293b'  // 深蓝灰色背景
+    context.beginPath()
+    context.roundRect(transformAreaX, transformAreaY, transformAreaWidth, transformAreaHeight, 8 * scale.value)
+    context.fill()
+    
+    // 绘制边框
+    context.strokeStyle = '#334155'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+    
+    // 绘制转换类型选择区域
+    const typeAreaHeight = 30 * scale.value
+    const typeAreaY = transformAreaY + 8 * scale.value
+    const typeAreaX = transformAreaX + 8 * scale.value
+    const typeAreaWidth = transformAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#0f172a'
+    context.beginPath()
+    context.roundRect(typeAreaX, typeAreaY, typeAreaWidth, typeAreaHeight, 4 * scale.value)
+    context.fill()
+    
+    context.strokeStyle = '#1e293b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制转换类型标签
+    context.fillStyle = '#e2e8f0'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('转换类型:', typeAreaX + 8 * scale.value, typeAreaY + 6 * scale.value)
+    
+    // 绘制当前选择的转换类型
+    const transformType = (node.config?.transformType as string) || 'uppercase'
+    const transformTypeLabels: Record<string, string> = {
+      'uppercase': '转大写',
+      'lowercase': '转小写', 
+      'trim': '去除空格',
+      'replace': '替换文本',
+      'extract': '提取文本'
+    }
+    const transformTypeLabel = transformTypeLabels[transformType] || '转大写'
+    
+    context.fillStyle = '#cbd5e1'
+    context.font = `bold ${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(transformTypeLabel, typeAreaX + 80 * scale.value, typeAreaY + 6 * scale.value)
+    
+    // 如果是替换文本类型，显示查找和替换文本
+    if (transformType === 'replace') {
+      const findText = (node.config?.findText as string) || ''
+      const replaceText = (node.config?.replaceText as string) || ''
+      
+      // 绘制查找文本区域
+      const findAreaY = typeAreaY + typeAreaHeight + 8 * scale.value
+      const findAreaHeight = 25 * scale.value
+      
+      context.fillStyle = '#0f172a'
+      context.beginPath()
+      context.roundRect(typeAreaX, findAreaY, typeAreaWidth, findAreaHeight, 4 * scale.value)
+      context.fill()
+      
+      context.strokeStyle = '#1e293b'
+      context.lineWidth = 1 * scale.value
+      context.stroke()
+      
+      context.fillStyle = '#9ca3af'
+      context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'left'
+      context.textBaseline = 'middle'
+      context.fillText(`查找: ${findText || '(未设置)'}`, typeAreaX + 8 * scale.value, findAreaY + findAreaHeight / 2)
+      
+      // 绘制替换文本区域
+      const replaceAreaY = findAreaY + findAreaHeight + 4 * scale.value
+      const replaceAreaHeight = 25 * scale.value
+      
+      context.fillStyle = '#0f172a'
+      context.beginPath()
+      context.roundRect(typeAreaX, replaceAreaY, typeAreaWidth, replaceAreaHeight, 4 * scale.value)
+      context.fill()
+      
+      context.strokeStyle = '#1e293b'
+      context.lineWidth = 1 * scale.value
+      context.stroke()
+      
+      context.fillStyle = '#9ca3af'
+      context.fillText(`替换: ${replaceText || '(未设置)'}`, typeAreaX + 8 * scale.value, replaceAreaY + replaceAreaHeight / 2)
+    } else if (transformType === 'extract') {
+      // 如果是提取文本类型，显示正则表达式模式
+      const pattern = (node.config?.pattern as string) || ''
+      
+      // 绘制正则表达式模式区域
+      const patternAreaY = typeAreaY + typeAreaHeight + 8 * scale.value
+      const patternAreaHeight = 25 * scale.value
+      
+      context.fillStyle = '#0f172a'
+      context.beginPath()
+      context.roundRect(typeAreaX, patternAreaY, typeAreaWidth, patternAreaHeight, 4 * scale.value)
+      context.fill()
+      
+      context.strokeStyle = '#1e293b'
+      context.lineWidth = 1 * scale.value
+      context.stroke()
+      
+      context.fillStyle = '#9ca3af'
+      context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'left'
+      context.textBaseline = 'middle'
+      context.fillText(`正则模式: ${pattern || '(未设置)'}`, typeAreaX + 8 * scale.value, patternAreaY + patternAreaHeight / 2)
+      
+      // 绘制说明区域
+      const descAreaY = patternAreaY + patternAreaHeight + 4 * scale.value
+      const descAreaHeight = 25 * scale.value
+      
+      context.fillStyle = '#374151'
+      context.beginPath()
+      context.roundRect(typeAreaX, descAreaY, typeAreaWidth, descAreaHeight, 4 * scale.value)
+      context.fill()
+      
+      context.fillStyle = '#9ca3af'
+      context.font = `${8 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText('使用正则表达式提取匹配的文本', typeAreaX + typeAreaWidth / 2, descAreaY + descAreaHeight / 2)
+    } else {
+      // 对于其他转换类型，显示简单的说明
+      const descriptions: Record<string, string> = {
+        'uppercase': '将输入文本转换为大写字母',
+        'lowercase': '将输入文本转换为小写字母',
+        'trim': '去除文本首尾的空白字符'
+      }
+      
+      const description = descriptions[transformType] || '文本转换处理'
+      
+      const descAreaY = typeAreaY + typeAreaHeight + 8 * scale.value
+      const descAreaHeight = 30 * scale.value
+      
+      context.fillStyle = '#374151'
+      context.beginPath()
+      context.roundRect(typeAreaX, descAreaY, typeAreaWidth, descAreaHeight, 4 * scale.value)
+      context.fill()
+      
+      context.fillStyle = '#9ca3af'
+      context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText(description, typeAreaX + typeAreaWidth / 2, descAreaY + descAreaHeight / 2)
+    }
+    
+    // 存储转换区域位置信息，用于点击检测
+    if (!node.transformArea) {
+      node.transformArea = {
+        x: (transformAreaX / scale.value) + offset.value.x,
+        y: (transformAreaY / scale.value) + offset.value.y,
+        width: transformAreaWidth / scale.value,
+        height: transformAreaHeight / scale.value
+      }
+    } else {
+      node.transformArea.x = (transformAreaX / scale.value) + offset.value.x
+      node.transformArea.y = (transformAreaY / scale.value) + offset.value.y
+      node.transformArea.width = transformAreaWidth / scale.value
+      node.transformArea.height = transformAreaHeight / scale.value
+    }
+  }
+
+  // 如果是数据过滤节点，绘制过滤配置区域
+  if (node.type === 'data-filter') {
+    const filterAreaWidth = width - 16 * scale.value
+    const filterAreaHeight = 120 * scale.value
+    const filterAreaX = x + 8 * scale.value
+    const filterAreaY = y + headerHeight + 8 * scale.value
+
+    // 绘制整体背景
+    context.fillStyle = '#f8fafc'
+    context.beginPath()
+    context.roundRect(filterAreaX, filterAreaY, filterAreaWidth, filterAreaHeight, 8 * scale.value)
+    context.fill()
+
+    // 绘制边框
+    context.strokeStyle = '#e2e8f0'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+
+    // 绘制过滤类型选择区域
+    const typeAreaHeight = 30 * scale.value
+    const typeAreaY = filterAreaY + 8 * scale.value
+    const typeAreaX = filterAreaX + 8 * scale.value
+    const typeAreaWidth = filterAreaWidth - 16 * scale.value
+
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(typeAreaX, typeAreaY, typeAreaWidth, typeAreaHeight, 4 * scale.value)
+    context.fill()
+
+    context.strokeStyle = '#cbd5e1'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+
+    // 绘制过滤类型标签
+    context.fillStyle = '#64748b'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('过滤类型:', typeAreaX + 8 * scale.value, typeAreaY - 16 * scale.value)
+
+    // 显示当前选择的过滤类型
+    const filterTypeMap: Record<string, string> = {
+      'contains': '包含文本',
+      'not-contains': '不包含文本',
+      'starts-with': '以...开头',
+      'ends-with': '以...结尾',
+      'regex': '正则表达式',
+      'length': '长度过滤',
+      'numeric': '数值过滤'
+    }
+    const currentFilterType = (node.config?.filterType as string) || 'contains'
+    const filterTypeText = filterTypeMap[currentFilterType] || '包含文本'
+    context.fillStyle = '#1e293b'
+    context.font = `${12 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'middle'
+    context.fillText(filterTypeText, typeAreaX + 8 * scale.value, typeAreaY + typeAreaHeight / 2)
+
+    // 绘制下拉箭头
+    context.fillStyle = '#64748b'
+    context.beginPath()
+    const arrowX = typeAreaX + typeAreaWidth - 20 * scale.value
+    const arrowY = typeAreaY + typeAreaHeight / 2
+    context.moveTo(arrowX - 4 * scale.value, arrowY - 2 * scale.value)
+    context.lineTo(arrowX, arrowY + 2 * scale.value)
+    context.lineTo(arrowX + 4 * scale.value, arrowY - 2 * scale.value)
+    context.stroke()
+
+    // 绘制配置区域
+    const configAreaHeight = 70 * scale.value
+    const configAreaY = typeAreaY + typeAreaHeight + 8 * scale.value
+    const configAreaX = filterAreaX + 8 * scale.value
+    const configAreaWidth = filterAreaWidth - 16 * scale.value
+
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(configAreaX, configAreaY, configAreaWidth, configAreaHeight, 4 * scale.value)
+    context.fill()
+
+    context.strokeStyle = '#cbd5e1'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+
+    // 根据过滤类型显示不同的配置信息
+    context.fillStyle = '#475569'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    
+    let configText = ''
+    let configValue = ''
+    
+    if (currentFilterType === 'contains' || currentFilterType === 'not-contains' || 
+        currentFilterType === 'starts-with' || currentFilterType === 'ends-with') {
+      const filterText = (node.config?.filterText as string) || ''
+      configText = '过滤文本:'
+      configValue = filterText || '未设置'
+    } else if (currentFilterType === 'regex') {
+      const filterRegex = (node.config?.filterRegex as string) || ''
+      configText = '正则表达式:'
+      configValue = filterRegex || '未设置'
+    } else if (currentFilterType === 'length') {
+      const lengthCondition = (node.config?.lengthCondition as string) || 'greater'
+      const lengthValue = (node.config?.lengthValue as number) || 0
+      const minLength = (node.config?.minLength as number) || 0
+      const maxLength = (node.config?.maxLength as number) || 0
+      configText = '长度条件:'
+      if (lengthCondition === 'between') {
+        configValue = `介于 ${minLength} - ${maxLength}`
+      } else {
+        const conditionMap: Record<string, string> = { 'greater': '大于', 'less': '小于', 'equal': '等于' }
+        configValue = `${conditionMap[lengthCondition] || '大于'} ${lengthValue}`
+      }
+    } else if (currentFilterType === 'numeric') {
+      const numericCondition = (node.config?.numericCondition as string) || 'greater'
+      const numericValue = (node.config?.numericValue as number) || 0
+      const minValue = (node.config?.minValue as number) || 0
+      const maxValue = (node.config?.maxValue as number) || 0
+      configText = '数值条件:'
+      if (numericCondition === 'between') {
+        configValue = `介于 ${minValue} - ${maxValue}`
+      } else {
+        const conditionMap: Record<string, string> = { 'greater': '大于', 'less': '小于', 'equal': '等于' }
+        configValue = `${conditionMap[numericCondition] || '大于'} ${numericValue}`
+      }
+    }
+    
+    context.fillText(configText, configAreaX + 8 * scale.value, configAreaY + 8 * scale.value)
+    context.fillStyle = '#1e293b'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(configValue, configAreaX + 8 * scale.value, configAreaY + 25 * scale.value)
+    
+    // 显示输出模式
+    const outputMode = (node.config?.outputMode as string) || 'matched'
+    const outputModeMap: Record<string, string> = {
+      'matched': '匹配的内容',
+      'filtered': '过滤后的内容',
+      'count': '匹配数量'
+    }
+    const outputModeText = `输出: ${outputModeMap[outputMode] || '匹配的内容'}`
+    context.fillStyle = '#64748b'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(outputModeText, configAreaX + 8 * scale.value, configAreaY + 45 * scale.value)
+
+    // 存储过滤区域位置信息，用于点击检测
+    if (!node.filterArea) {
+      node.filterArea = {
+        x: (filterAreaX / scale.value) + offset.value.x,
+        y: (filterAreaY / scale.value) + offset.value.y,
+        width: filterAreaWidth / scale.value,
+        height: filterAreaHeight / scale.value
+      }
+    } else {
+      node.filterArea.x = (filterAreaX / scale.value) + offset.value.x
+      node.filterArea.y = (filterAreaY / scale.value) + offset.value.y
+      node.filterArea.width = filterAreaWidth / scale.value
+      node.filterArea.height = filterAreaHeight / scale.value
+    }
+  }
+
+  // 如果是循环节点，绘制循环配置区域
+  if (node.type === 'loop') {
+    const loopAreaWidth = width - 16 * scale.value
+    const loopAreaHeight = 160 * scale.value
+    const loopAreaX = x + 8 * scale.value
+    const loopAreaY = y + headerHeight + 8 * scale.value
+
+    // 绘制整体背景
+    context.fillStyle = '#e0f2fe'
+    context.beginPath()
+    context.roundRect(loopAreaX, loopAreaY, loopAreaWidth, loopAreaHeight, 8 * scale.value)
+    context.fill()
+
+    // 绘制边框
+    context.strokeStyle = '#0284c7'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+
+    // 绘制循环类型选择区域
+    const typeAreaHeight = 30 * scale.value
+    const typeAreaY = loopAreaY + 8 * scale.value
+    const typeAreaX = loopAreaX + 8 * scale.value
+    const typeAreaWidth = loopAreaWidth - 16 * scale.value
+
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(typeAreaX, typeAreaY, typeAreaWidth, typeAreaHeight, 4 * scale.value)
+    context.fill()
+
+    context.strokeStyle = '#0284c7'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+
+    // 绘制循环类型标签
+    context.fillStyle = '#0c4a6e'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('循环类型:', typeAreaX + 8 * scale.value, typeAreaY - 16 * scale.value)
+
+    // 显示当前选择的循环类型
+    const loopTypeMap: Record<string, string> = {
+      'count': '计数循环',
+      'condition': '条件循环',
+      'foreach': '遍历循环',
+      'infinite': '无限循环'
+    }
+    const currentLoopType = (node.config?.loopType as string) || 'count'
+    const loopTypeText = loopTypeMap[currentLoopType] || '计数循环'
+    context.fillStyle = '#164e63'
+    context.font = `${12 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'middle'
+    context.fillText(loopTypeText, typeAreaX + 8 * scale.value, typeAreaY + typeAreaHeight / 2)
+
+    // 绘制下拉箭头
+    context.fillStyle = '#0c4a6e'
+    context.beginPath()
+    const arrowX = typeAreaX + typeAreaWidth - 20 * scale.value
+    const arrowY = typeAreaY + typeAreaHeight / 2
+    context.moveTo(arrowX - 4 * scale.value, arrowY - 2 * scale.value)
+    context.lineTo(arrowX, arrowY + 2 * scale.value)
+    context.lineTo(arrowX + 4 * scale.value, arrowY - 2 * scale.value)
+    context.stroke()
+
+    // 绘制循环参数区域
+    const paramAreaHeight = 30 * scale.value
+    const paramAreaY = typeAreaY + typeAreaHeight + 8 * scale.value
+    const paramAreaX = loopAreaX + 8 * scale.value
+    const paramAreaWidth = loopAreaWidth - 16 * scale.value
+
+    // 只有在需要参数的循环类型下才显示参数区域
+    const needsParameter = currentLoopType !== 'infinite'
+    if (needsParameter) {
+      context.fillStyle = '#ffffff'
+      context.beginPath()
+      context.roundRect(paramAreaX, paramAreaY, paramAreaWidth, paramAreaHeight, 4 * scale.value)
+      context.fill()
+
+      context.strokeStyle = '#0369a1'
+      context.lineWidth = 1 * scale.value
+      context.stroke()
+
+      // 绘制参数标签和内容
+      let paramLabel = ''
+      let paramValue = ''
+      
+      switch (currentLoopType) {
+        case 'count':
+          paramLabel = '循环次数:'
+          paramValue = (node.config?.loopCount as string) || '1'
+          break
+        case 'condition':
+          paramLabel = '循环条件:'
+          paramValue = (node.config?.loopCondition as string) || '未设置'
+          break
+        case 'foreach':
+          paramLabel = '遍历数据:'
+          paramValue = (node.config?.loopData as string) || '未设置'
+          break
+      }
+      
+      context.fillStyle = '#0c4a6e'
+      context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'left'
+      context.textBaseline = 'top'
+      context.fillText(paramLabel, paramAreaX + 8 * scale.value, paramAreaY - 16 * scale.value)
+
+      context.fillStyle = '#164e63'
+      context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'left'
+      context.textBaseline = 'middle'
+      const displayValue = paramValue || '未设置'
+      context.fillText(displayValue, paramAreaX + 8 * scale.value, paramAreaY + paramAreaHeight / 2)
+    }
+
+    // 绘制状态显示区域
+    const statusAreaHeight = 30 * scale.value
+    const statusAreaY = needsParameter ? paramAreaY + paramAreaHeight + 8 * scale.value : paramAreaY
+    const statusAreaX = loopAreaX + 8 * scale.value
+    const statusAreaWidth = loopAreaWidth - 16 * scale.value
+
+    context.fillStyle = '#f0f9ff'
+    context.beginPath()
+    context.roundRect(statusAreaX, statusAreaY, statusAreaWidth, statusAreaHeight, 4 * scale.value)
+    context.fill()
+
+    context.strokeStyle = '#0369a1'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+
+    // 显示循环状态信息
+    const currentIteration = (node.config?.currentIteration as number) || 0
+    const maxIterations = currentLoopType === 'count' ? (parseInt((node.config?.loopCount as string) || '1')) : '∞'
+    
+    context.fillStyle = '#0c4a6e'
+    context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'middle'
+    context.fillText(`当前迭代: ${currentIteration}`, statusAreaX + 8 * scale.value, statusAreaY + statusAreaHeight / 2)
+    
+    context.textAlign = 'right'
+    context.fillText(`最大迭代: ${maxIterations}`, statusAreaX + statusAreaWidth - 8 * scale.value, statusAreaY + statusAreaHeight / 2)
+
+    // 存储循环区域位置信息，用于点击检测
+    if (!node.loopArea) {
+      node.loopArea = {
+        x: (loopAreaX / scale.value) + offset.value.x,
+        y: (loopAreaY / scale.value) + offset.value.y,
+        width: loopAreaWidth / scale.value,
+        height: loopAreaHeight / scale.value
+      }
+    } else {
+      node.loopArea.x = (loopAreaX / scale.value) + offset.value.x
+      node.loopArea.y = (loopAreaY / scale.value) + offset.value.y
+      node.loopArea.width = loopAreaWidth / scale.value
+      node.loopArea.height = loopAreaHeight / scale.value
+    }
+
+    // 存储循环类型选择区域位置信息
+    if (!node.loopTypeArea) {
+      node.loopTypeArea = {
+        x: (typeAreaX / scale.value) + offset.value.x,
+        y: (typeAreaY / scale.value) + offset.value.y,
+        width: typeAreaWidth / scale.value,
+        height: typeAreaHeight / scale.value
+      }
+    } else {
+      node.loopTypeArea.x = (typeAreaX / scale.value) + offset.value.x
+      node.loopTypeArea.y = (typeAreaY / scale.value) + offset.value.y
+      node.loopTypeArea.width = typeAreaWidth / scale.value
+      node.loopTypeArea.height = typeAreaHeight / scale.value
+    }
+
+    // 存储循环参数区域位置信息（仅在需要时）
+    if (needsParameter) {
+      if (!node.loopParameterArea) {
+        node.loopParameterArea = {
+          x: (paramAreaX / scale.value) + offset.value.x,
+          y: (paramAreaY / scale.value) + offset.value.y,
+          width: paramAreaWidth / scale.value,
+          height: paramAreaHeight / scale.value
+        }
+      } else {
+        node.loopParameterArea.x = (paramAreaX / scale.value) + offset.value.x
+        node.loopParameterArea.y = (paramAreaY / scale.value) + offset.value.y
+        node.loopParameterArea.width = paramAreaWidth / scale.value
+        node.loopParameterArea.height = paramAreaHeight / scale.value
+      }
+    } else {
+      // 如果不需要参数，清除该区域
+      node.loopParameterArea = undefined
+    }
+  }
+
+  // 如果是条件判断节点，绘制条件配置区域
+  if (node.type === 'condition') {
+    const conditionAreaWidth = width - 16 * scale.value
+    const conditionAreaHeight = 130 * scale.value
+    const conditionAreaX = x + 8 * scale.value
+    const conditionAreaY = y + headerHeight + 8 * scale.value
+
+    // 绘制整体背景
+    context.fillStyle = '#fef3c7'
+    context.beginPath()
+    context.roundRect(conditionAreaX, conditionAreaY, conditionAreaWidth, conditionAreaHeight, 8 * scale.value)
+    context.fill()
+
+    // 绘制边框
+    context.strokeStyle = '#f59e0b'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+
+    // 绘制条件类型选择区域
+    const typeAreaHeight = 30 * scale.value
+    const typeAreaY = conditionAreaY + 8 * scale.value
+    const typeAreaX = conditionAreaX + 8 * scale.value
+    const typeAreaWidth = conditionAreaWidth - 16 * scale.value
+
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(typeAreaX, typeAreaY, typeAreaWidth, typeAreaHeight, 4 * scale.value)
+    context.fill()
+
+    context.strokeStyle = '#f59e0b'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+
+    // 绘制条件类型标签
+    context.fillStyle = '#92400e'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('条件类型:', typeAreaX + 8 * scale.value, typeAreaY - 16 * scale.value)
+
+    // 显示当前选择的条件类型
+    const conditionTypeMap: Record<string, string> = {
+      'equals': '等于',
+      'not-equals': '不等于',
+      'contains': '包含',
+      'not-contains': '不包含',
+      'greater': '大于',
+      'less': '小于',
+      'greater-equal': '大于等于',
+      'less-equal': '小于等于',
+      'regex': '正则匹配',
+      'empty': '为空',
+      'not-empty': '不为空'
+    }
+    const currentConditionType = (node.config?.conditionType as string) || 'equals'
+    const conditionTypeText = conditionTypeMap[currentConditionType] || '等于'
+    context.fillStyle = '#78350f'
+    context.font = `${12 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'middle'
+    context.fillText(conditionTypeText, typeAreaX + 8 * scale.value, typeAreaY + typeAreaHeight / 2)
+
+    // 绘制下拉箭头
+    context.fillStyle = '#92400e'
+    context.beginPath()
+    const arrowX = typeAreaX + typeAreaWidth - 20 * scale.value
+    const arrowY = typeAreaY + typeAreaHeight / 2
+    context.moveTo(arrowX - 4 * scale.value, arrowY - 2 * scale.value)
+    context.lineTo(arrowX, arrowY + 2 * scale.value)
+    context.lineTo(arrowX + 4 * scale.value, arrowY - 2 * scale.value)
+    context.stroke()
+
+    // 绘制比较值区域
+    const valueAreaHeight = 30 * scale.value
+    const valueAreaY = typeAreaY + typeAreaHeight + 8 * scale.value
+    const valueAreaX = conditionAreaX + 8 * scale.value
+    const valueAreaWidth = conditionAreaWidth - 16 * scale.value
+
+    // 只有在需要比较值的条件类型下才显示比较值区域
+    const needsCompareValue = !['empty', 'not-empty'].includes(currentConditionType)
+    if (needsCompareValue) {
+      context.fillStyle = '#ffffff'
+      context.beginPath()
+      context.roundRect(valueAreaX, valueAreaY, valueAreaWidth, valueAreaHeight, 4 * scale.value)
+      context.fill()
+
+      context.strokeStyle = '#d97706'
+      context.lineWidth = 1 * scale.value
+      context.stroke()
+
+      // 绘制比较值标签和内容
+      const compareValue = (node.config?.compareValue as string) || ''
+      const dataType = (node.config?.dataType as string) || 'text'
+      const dataTypeMap: Record<string, string> = {
+        'text': '文本',
+        'number': '数字',
+        'boolean': '布尔值'
+      }
+      
+      context.fillStyle = '#92400e'
+      context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'left'
+      context.textBaseline = 'top'
+      context.fillText(`比较值 (${dataTypeMap[dataType]}):`, valueAreaX + 8 * scale.value, valueAreaY - 16 * scale.value)
+
+      context.fillStyle = '#78350f'
+      context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+      context.textAlign = 'left'
+      context.textBaseline = 'middle'
+      const displayValue = compareValue || '未设置'
+      context.fillText(displayValue, valueAreaX + 8 * scale.value, valueAreaY + valueAreaHeight / 2)
+    }
+
+    // 绘制输出配置区域
+    const outputAreaHeight = 30 * scale.value
+    const outputAreaY = needsCompareValue ? valueAreaY + valueAreaHeight + 8 * scale.value : valueAreaY
+    const outputAreaX = conditionAreaX + 8 * scale.value
+    const outputAreaWidth = conditionAreaWidth - 16 * scale.value
+
+    context.fillStyle = '#fef9c3'
+    context.beginPath()
+    context.roundRect(outputAreaX, outputAreaY, outputAreaWidth, outputAreaHeight, 4 * scale.value)
+    context.fill()
+
+    context.strokeStyle = '#d97706'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+
+    // 显示真值和假值输出
+    const trueOutput = (node.config?.trueOutput as string) || 'true'
+    const falseOutput = (node.config?.falseOutput as string) || 'false'
+    
+    context.fillStyle = '#92400e'
+    context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'middle'
+    context.fillText(`真值: ${trueOutput}`, outputAreaX + 8 * scale.value, outputAreaY + outputAreaHeight / 2)
+    
+    context.textAlign = 'right'
+    context.fillText(`假值: ${falseOutput}`, outputAreaX + outputAreaWidth - 8 * scale.value, outputAreaY + outputAreaHeight / 2)
+
+    // 存储条件区域位置信息，用于点击检测
+    if (!node.conditionArea) {
+      node.conditionArea = {
+        x: (conditionAreaX / scale.value) + offset.value.x,
+        y: (conditionAreaY / scale.value) + offset.value.y,
+        width: conditionAreaWidth / scale.value,
+        height: conditionAreaHeight / scale.value
+      }
+    } else {
+      node.conditionArea.x = (conditionAreaX / scale.value) + offset.value.x
+      node.conditionArea.y = (conditionAreaY / scale.value) + offset.value.y
+      node.conditionArea.width = conditionAreaWidth / scale.value
+      node.conditionArea.height = conditionAreaHeight / scale.value
+    }
+
+    // 存储条件类型选择区域位置信息
+    if (!node.conditionTypeArea) {
+      node.conditionTypeArea = {
+        x: (typeAreaX / scale.value) + offset.value.x,
+        y: (typeAreaY / scale.value) + offset.value.y,
+        width: typeAreaWidth / scale.value,
+        height: typeAreaHeight / scale.value
+      }
+    } else {
+      node.conditionTypeArea.x = (typeAreaX / scale.value) + offset.value.x
+      node.conditionTypeArea.y = (typeAreaY / scale.value) + offset.value.y
+      node.conditionTypeArea.width = typeAreaWidth / scale.value
+      node.conditionTypeArea.height = typeAreaHeight / scale.value
+    }
+
+    // 存储比较值区域位置信息（仅在需要时）
+    if (needsCompareValue) {
+      if (!node.conditionValueArea) {
+        node.conditionValueArea = {
+          x: (valueAreaX / scale.value) + offset.value.x,
+          y: (valueAreaY / scale.value) + offset.value.y,
+          width: valueAreaWidth / scale.value,
+          height: valueAreaHeight / scale.value
+        }
+      } else {
+        node.conditionValueArea.x = (valueAreaX / scale.value) + offset.value.x
+        node.conditionValueArea.y = (valueAreaY / scale.value) + offset.value.y
+        node.conditionValueArea.width = valueAreaWidth / scale.value
+        node.conditionValueArea.height = valueAreaHeight / scale.value
+      }
+    } else {
+      // 如果不需要比较值，清除该区域
+      node.conditionValueArea = undefined
+    }
+
+    // 存储输出配置区域位置信息
+    if (!node.conditionOutputArea) {
+      node.conditionOutputArea = {
+        x: (outputAreaX / scale.value) + offset.value.x,
+        y: (outputAreaY / scale.value) + offset.value.y,
+        width: outputAreaWidth / scale.value,
+        height: outputAreaHeight / scale.value
+      }
+    } else {
+      node.conditionOutputArea.x = (outputAreaX / scale.value) + offset.value.x
+      node.conditionOutputArea.y = (outputAreaY / scale.value) + offset.value.y
+      node.conditionOutputArea.width = outputAreaWidth / scale.value
+      node.conditionOutputArea.height = outputAreaHeight / scale.value
+    }
+  }
+
+  // 如果是循环节点，绘制循环配置区域
+  if (node.type === 'loop') {
+    const loopAreaWidth = width - 16 * scale.value
+    const loopAreaHeight = 160 * scale.value
+    const loopAreaX = x + 8 * scale.value
+    const loopAreaY = y + headerHeight + 8 * scale.value
+
+    // 绘制整体背景
+    context.fillStyle = '#f3e8ff'
+    context.beginPath()
+    context.roundRect(loopAreaX, loopAreaY, loopAreaWidth, loopAreaHeight, 8 * scale.value)
+    context.fill()
+
+    // 绘制边框
+    context.strokeStyle = '#8b5cf6'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+
+    // 绘制循环类型选择区域
+    const typeAreaHeight = 30 * scale.value
+    const typeAreaY = loopAreaY + 8 * scale.value
+    const typeAreaX = loopAreaX + 8 * scale.value
+    const typeAreaWidth = loopAreaWidth - 16 * scale.value
+
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(typeAreaX, typeAreaY, typeAreaWidth, typeAreaHeight, 4 * scale.value)
+    context.fill()
+
+    context.strokeStyle = '#8b5cf6'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+
+    // 绘制循环类型标签
+    context.fillStyle = '#6b21a8'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('循环类型:', typeAreaX + 8 * scale.value, typeAreaY - 16 * scale.value)
+
+    // 显示当前选择的循环类型
+    const loopTypeMap: Record<string, string> = {
+      'for': '计数循环',
+      'while': '条件循环',
+      'foreach': '遍历循环'
+    }
+    const currentLoopType = (node.config?.loopType as string) || 'for'
+    const loopTypeText = loopTypeMap[currentLoopType] || '计数循环'
+    context.fillStyle = '#581c87'
+    context.font = `${12 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'middle'
+    context.fillText(loopTypeText, typeAreaX + 8 * scale.value, typeAreaY + typeAreaHeight / 2)
+
+    // 绘制下拉箭头
+    context.fillStyle = '#6b21a8'
+    context.beginPath()
+    const arrowX = typeAreaX + typeAreaWidth - 20 * scale.value
+    const arrowY = typeAreaY + typeAreaHeight / 2
+    context.moveTo(arrowX - 4 * scale.value, arrowY - 2 * scale.value)
+    context.lineTo(arrowX, arrowY + 2 * scale.value)
+    context.lineTo(arrowX + 4 * scale.value, arrowY - 2 * scale.value)
+    context.stroke()
+
+    // 绘制循环参数区域
+    const paramAreaHeight = 30 * scale.value
+    const paramAreaY = typeAreaY + typeAreaHeight + 8 * scale.value
+    const paramAreaX = loopAreaX + 8 * scale.value
+    const paramAreaWidth = loopAreaWidth - 16 * scale.value
+
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(paramAreaX, paramAreaY, paramAreaWidth, paramAreaHeight, 4 * scale.value)
+    context.fill()
+
+    context.strokeStyle = '#a855f7'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+
+    // 根据循环类型显示不同的参数
+    let paramLabel = ''
+    let paramValue = ''
+    
+    if (currentLoopType === 'for') {
+      paramLabel = '循环次数:'
+      paramValue = (node.config?.loopCount as string) || '1'
+    } else if (currentLoopType === 'while') {
+      paramLabel = '循环条件:'
+      paramValue = (node.config?.loopCondition as string) || '未设置'
+    } else if (currentLoopType === 'foreach') {
+      paramLabel = '遍历数据:'
+      paramValue = (node.config?.loopData as string) || '未设置'
+    }
+    
+    context.fillStyle = '#6b21a8'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText(paramLabel, paramAreaX + 8 * scale.value, paramAreaY - 16 * scale.value)
+
+    context.fillStyle = '#581c87'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'middle'
+    const displayValue = paramValue || '未设置'
+    context.fillText(displayValue, paramAreaX + 8 * scale.value, paramAreaY + paramAreaHeight / 2)
+
+    // 绘制循环状态区域
+    const statusAreaHeight = 30 * scale.value
+    const statusAreaY = paramAreaY + paramAreaHeight + 8 * scale.value
+    const statusAreaX = loopAreaX + 8 * scale.value
+    const statusAreaWidth = loopAreaWidth - 16 * scale.value
+
+    context.fillStyle = '#faf5ff'
+    context.beginPath()
+    context.roundRect(statusAreaX, statusAreaY, statusAreaWidth, statusAreaHeight, 4 * scale.value)
+    context.fill()
+
+    context.strokeStyle = '#a855f7'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+
+    // 显示循环状态信息
+    const currentIteration = (node.config?.currentIteration as number) || 0
+    const maxIterations = (node.config?.maxIterations as number) || 100
+    const statusText = `当前迭代: ${currentIteration} / 最大: ${maxIterations}`
+    
+    context.fillStyle = '#6b21a8'
+    context.font = `${9 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'middle'
+    context.fillText(statusText, statusAreaX + 8 * scale.value, statusAreaY + statusAreaHeight / 2)
+    
+    // 显示循环控制按钮状态
+    const isBreakEnabled = (node.config?.breakEnabled as boolean) || false
+    const breakText = isBreakEnabled ? '可中断' : '不可中断'
+    context.textAlign = 'right'
+    context.fillText(breakText, statusAreaX + statusAreaWidth - 8 * scale.value, statusAreaY + statusAreaHeight / 2)
+
+    // 存储循环区域位置信息，用于点击检测
+    if (!node.loopArea) {
+      node.loopArea = {
+        x: (loopAreaX / scale.value) + offset.value.x,
+        y: (loopAreaY / scale.value) + offset.value.y,
+        width: loopAreaWidth / scale.value,
+        height: loopAreaHeight / scale.value
+      }
+    } else {
+      node.loopArea.x = (loopAreaX / scale.value) + offset.value.x
+      node.loopArea.y = (loopAreaY / scale.value) + offset.value.y
+      node.loopArea.width = loopAreaWidth / scale.value
+      node.loopArea.height = loopAreaHeight / scale.value
+    }
+
+    // 存储循环类型选择区域位置信息
+    if (!node.loopTypeArea) {
+      node.loopTypeArea = {
+        x: (typeAreaX / scale.value) + offset.value.x,
+        y: (typeAreaY / scale.value) + offset.value.y,
+        width: typeAreaWidth / scale.value,
+        height: typeAreaHeight / scale.value
+      }
+    } else {
+      node.loopTypeArea.x = (typeAreaX / scale.value) + offset.value.x
+      node.loopTypeArea.y = (typeAreaY / scale.value) + offset.value.y
+      node.loopTypeArea.width = typeAreaWidth / scale.value
+      node.loopTypeArea.height = typeAreaHeight / scale.value
+    }
+
+    // 存储循环参数区域位置信息
+    if (!node.loopParamArea) {
+      node.loopParamArea = {
+        x: (paramAreaX / scale.value) + offset.value.x,
+        y: (paramAreaY / scale.value) + offset.value.y,
+        width: paramAreaWidth / scale.value,
+        height: paramAreaHeight / scale.value
+      }
+    } else {
+      node.loopParamArea.x = (paramAreaX / scale.value) + offset.value.x
+      node.loopParamArea.y = (paramAreaY / scale.value) + offset.value.y
+      node.loopParamArea.width = paramAreaWidth / scale.value
+      node.loopParamArea.height = paramAreaHeight / scale.value
+    }
+  }
+
+  // 如果是AI分析节点，绘制分析配置区域
+  if (node.type === 'ai-analysis') {
+    const analysisAreaWidth = width - 16 * scale.value
+    const analysisAreaHeight = 120 * scale.value
+    const analysisAreaX = x + 8 * scale.value
+    const analysisAreaY = y + headerHeight + 8 * scale.value
+
+    // 绘制整体背景
+    context.fillStyle = '#f0f9ff'
+    context.beginPath()
+    context.roundRect(analysisAreaX, analysisAreaY, analysisAreaWidth, analysisAreaHeight, 8 * scale.value)
+    context.fill()
+
+    // 绘制边框
+    context.strokeStyle = '#0ea5e9'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+
+    // 绘制分析类型选择区域
+    const typeAreaHeight = 30 * scale.value
+    const typeAreaY = analysisAreaY + 8 * scale.value
+    const typeAreaX = analysisAreaX + 8 * scale.value
+    const typeAreaWidth = analysisAreaWidth - 16 * scale.value
+
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(typeAreaX, typeAreaY, typeAreaWidth, typeAreaHeight, 4 * scale.value)
+    context.fill()
+
+    context.strokeStyle = '#0ea5e9'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+
+    // 绘制分析类型标签
+    context.fillStyle = '#0369a1'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    context.fillText('分析类型:', typeAreaX + 8 * scale.value, typeAreaY - 16 * scale.value)
+
+    // 显示当前选择的分析类型
+    const analysisTypeMap: Record<string, string> = {
+      'sentiment': '情感分析',
+      'summary': '内容摘要',
+      'keywords': '关键词提取',
+      'classification': '文本分类',
+      'entities': '实体识别',
+      'custom': '自定义分析'
+    }
+    const currentAnalysisType = (node.config?.analysisType as string) || 'sentiment'
+    const analysisTypeText = analysisTypeMap[currentAnalysisType] || '情感分析'
+    context.fillStyle = '#0c4a6e'
+    context.font = `${12 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'middle'
+    context.fillText(analysisTypeText, typeAreaX + 8 * scale.value, typeAreaY + typeAreaHeight / 2)
+
+    // 绘制下拉箭头
+    context.fillStyle = '#0369a1'
+    context.beginPath()
+    const arrowX = typeAreaX + typeAreaWidth - 20 * scale.value
+    const arrowY = typeAreaY + typeAreaHeight / 2
+    context.moveTo(arrowX - 4 * scale.value, arrowY - 2 * scale.value)
+    context.lineTo(arrowX, arrowY + 2 * scale.value)
+    context.lineTo(arrowX + 4 * scale.value, arrowY - 2 * scale.value)
+    context.stroke()
+
+    // 绘制配置区域
+    const configAreaHeight = 70 * scale.value
+    const configAreaY = typeAreaY + typeAreaHeight + 8 * scale.value
+    const configAreaX = analysisAreaX + 8 * scale.value
+    const configAreaWidth = analysisAreaWidth - 16 * scale.value
+
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.roundRect(configAreaX, configAreaY, configAreaWidth, configAreaHeight, 4 * scale.value)
+    context.fill()
+
+    context.strokeStyle = '#0ea5e9'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+
+    // 根据分析类型显示不同的配置信息
+    context.fillStyle = '#0369a1'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    
+    let configText = ''
+    let configValue = ''
+    
+    if (currentAnalysisType === 'custom') {
+      const customPrompt = (node.config?.customPrompt as string) || ''
+      configText = '自定义提示词:'
+      configValue = customPrompt || '未设置'
+    } else if (currentAnalysisType === 'classification') {
+      const classificationLabels = (node.config?.classificationLabels as string) || ''
+      configText = '分类标签:'
+      configValue = classificationLabels || '未设置'
+    } else {
+      configText = '分析配置:'
+      configValue = '使用默认设置'
+    }
+    
+    context.fillText(configText, configAreaX + 8 * scale.value, configAreaY + 8 * scale.value)
+    context.fillStyle = '#0c4a6e'
+    context.font = `${11 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    
+    // 限制显示文本长度
+    const maxLength = 30
+    const displayValue = configValue.length > maxLength ? configValue.substring(0, maxLength) + '...' : configValue
+    context.fillText(displayValue, configAreaX + 8 * scale.value, configAreaY + 25 * scale.value)
+    
+    // 显示模型信息
+    const provider = (node.config?.provider as string) || ''
+    const model = (node.config?.model as string) || ''
+    const modelText = provider && model ? `模型: ${provider}/${model}` : '模型: 未设置'
+    context.fillStyle = '#0369a1'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.fillText(modelText, configAreaX + 8 * scale.value, configAreaY + 45 * scale.value)
+
+    // 存储分析区域位置信息，用于点击检测
+    if (!node.analysisArea) {
+      node.analysisArea = {
+        x: (analysisAreaX / scale.value) + offset.value.x,
+        y: (analysisAreaY / scale.value) + offset.value.y,
+        width: analysisAreaWidth / scale.value,
+        height: analysisAreaHeight / scale.value
+      }
+    } else {
+      node.analysisArea.x = (analysisAreaX / scale.value) + offset.value.x
+      node.analysisArea.y = (analysisAreaY / scale.value) + offset.value.y
+      node.analysisArea.width = analysisAreaWidth / scale.value
+      node.analysisArea.height = analysisAreaHeight / scale.value
     }
   }
 
@@ -3681,6 +4821,76 @@ const getDbTypeSelectorAtPosition = (x: number, y: number): WorkflowNode | null 
       const selector = node.dbTypeSelector
       if (x >= selector.x && x <= selector.x + selector.width && 
           y >= selector.y && y <= selector.y + selector.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取条件节点条件类型选择区域点击位置
+const getConditionTypeAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'condition' && node.conditionTypeArea) {
+      const area = node.conditionTypeArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取条件节点比较值区域点击位置
+const getConditionValueAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'condition' && node.conditionValueArea) {
+      const area = node.conditionValueArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取条件节点输出配置区域点击位置
+const getConditionOutputAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'condition' && node.conditionOutputArea) {
+      const area = node.conditionOutputArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取循环节点循环类型选择区域点击位置
+const getLoopTypeAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'loop' && node.loopTypeArea) {
+      const area = node.loopTypeArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 获取循环节点参数区域点击位置
+const getLoopParameterAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'loop' && node.loopParameterArea) {
+      const area = node.loopParameterArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
         return node
       }
     }
@@ -7648,6 +8858,999 @@ const handleDbTypeSelectorClick = (node: WorkflowNode) => {
   redraw()
 }
 
+// 处理循环类型选择区域点击
+const handleLoopTypeAreaClick = (node: WorkflowNode) => {
+  console.log('点击循环类型选择区域，节点:', node.name)
+  
+  const config = node.config || {}
+  const currentType = (config.loopType as string) || 'count'
+  
+  // 循环类型选项
+  const loopTypes = [
+    { value: 'count', label: '计数循环' },
+    { value: 'condition', label: '条件循环' },
+    { value: 'foreach', label: '遍历循环' },
+    { value: 'infinite', label: '无限循环' }
+  ]
+  
+  // 创建下拉选择对话框
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+  `
+  
+  const content = document.createElement('div')
+  content.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 300px;
+    max-width: 400px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '选择循环类型'
+  title.style.cssText = `
+    margin: 0 0 16px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+  `
+  
+  content.appendChild(title)
+  
+  // 创建选项列表
+  loopTypes.forEach(type => {
+    const option = document.createElement('div')
+    option.textContent = type.label
+    option.style.cssText = `
+      padding: 12px 16px;
+      margin: 4px 0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: #e5e7eb;
+      background: ${type.value === currentType ? '#3b82f6' : '#374151'};
+      border: 1px solid ${type.value === currentType ? '#3b82f6' : '#4b5563'};
+    `
+    
+    option.addEventListener('mouseenter', () => {
+      if (type.value !== currentType) {
+        option.style.background = '#4b5563'
+        option.style.borderColor = '#6b7280'
+      }
+    })
+    
+    option.addEventListener('mouseleave', () => {
+      if (type.value !== currentType) {
+        option.style.background = '#374151'
+        option.style.borderColor = '#4b5563'
+      }
+    })
+    
+    option.addEventListener('click', () => {
+      updateNode(node.id, {
+        config: {
+          ...config,
+          loopType: type.value
+        }
+      })
+      
+      // 显示更新提示
+      const toast = document.createElement('div')
+      toast.textContent = `循环类型已更新为: ${type.label}`
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 10001;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      `
+      document.body.appendChild(toast)
+      setTimeout(() => {
+        document.body.removeChild(toast)
+      }, 2000)
+      
+      document.body.removeChild(dialog)
+      redraw()
+    })
+    
+    content.appendChild(option)
+  })
+  
+  // 添加取消按钮
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    width: 100%;
+    padding: 12px;
+    margin-top: 16px;
+    background: #374151;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  cancelButton.addEventListener('mouseenter', () => {
+    cancelButton.style.background = '#4b5563'
+  })
+  
+  cancelButton.addEventListener('mouseleave', () => {
+    cancelButton.style.background = '#374151'
+  })
+  
+  cancelButton.addEventListener('click', () => {
+    document.body.removeChild(dialog)
+  })
+  
+  content.appendChild(cancelButton)
+  dialog.appendChild(content)
+  
+  // 点击背景关闭对话框
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  })
+  
+  document.body.appendChild(dialog)
+}
+
+// 处理条件类型选择区域点击
+const handleConditionTypeAreaClick = (node: WorkflowNode) => {
+  console.log('点击条件类型选择区域，节点:', node.name)
+  
+  const config = node.config || {}
+  const currentType = (config.conditionType as string) || 'equals'
+  
+  // 条件类型选项
+  const conditionTypes = [
+    { value: 'equals', label: '等于 (=)' },
+    { value: 'not_equals', label: '不等于 (≠)' },
+    { value: 'greater_than', label: '大于 (>)' },
+    { value: 'less_than', label: '小于 (<)' },
+    { value: 'greater_equal', label: '大于等于 (≥)' },
+    { value: 'less_equal', label: '小于等于 (≤)' },
+    { value: 'contains', label: '包含' },
+    { value: 'not_contains', label: '不包含' },
+    { value: 'starts_with', label: '开头是' },
+    { value: 'ends_with', label: '结尾是' },
+    { value: 'is_empty', label: '为空' },
+    { value: 'is_not_empty', label: '不为空' }
+  ]
+  
+  // 创建下拉选择对话框
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+  `
+  
+  const content = document.createElement('div')
+  content.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 300px;
+    max-width: 400px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '选择条件类型'
+  title.style.cssText = `
+    margin: 0 0 16px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+  `
+  
+  content.appendChild(title)
+  
+  // 创建选项列表
+  conditionTypes.forEach(type => {
+    const option = document.createElement('div')
+    option.textContent = type.label
+    option.style.cssText = `
+      padding: 12px 16px;
+      margin: 4px 0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: #e5e7eb;
+      background: ${type.value === currentType ? '#3b82f6' : '#374151'};
+      border: 1px solid ${type.value === currentType ? '#3b82f6' : '#4b5563'};
+    `
+    
+    option.addEventListener('mouseenter', () => {
+      if (type.value !== currentType) {
+        option.style.background = '#4b5563'
+        option.style.borderColor = '#6b7280'
+      }
+    })
+    
+    option.addEventListener('mouseleave', () => {
+      if (type.value !== currentType) {
+        option.style.background = '#374151'
+        option.style.borderColor = '#4b5563'
+      }
+    })
+    
+    option.addEventListener('click', () => {
+      updateNode(node.id, {
+        config: {
+          ...config,
+          conditionType: type.value
+        }
+      })
+      
+      // 显示更新提示
+      const toast = document.createElement('div')
+      toast.textContent = `条件类型已更新为: ${type.label}`
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 10001;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      `
+      document.body.appendChild(toast)
+      setTimeout(() => {
+        document.body.removeChild(toast)
+      }, 2000)
+      
+      document.body.removeChild(dialog)
+      redraw()
+    })
+    
+    content.appendChild(option)
+  })
+  
+  // 添加取消按钮
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    width: 100%;
+    padding: 12px;
+    margin-top: 16px;
+    background: #374151;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  cancelButton.addEventListener('mouseenter', () => {
+    cancelButton.style.background = '#4b5563'
+  })
+  
+  cancelButton.addEventListener('mouseleave', () => {
+    cancelButton.style.background = '#374151'
+  })
+  
+  cancelButton.addEventListener('click', () => {
+    document.body.removeChild(dialog)
+  })
+  
+  content.appendChild(cancelButton)
+  dialog.appendChild(content)
+  
+  // 点击背景关闭对话框
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  })
+  
+  document.body.appendChild(dialog)
+}
+
+// 处理循环参数区域点击
+const handleLoopParameterAreaClick = (node: WorkflowNode) => {
+  console.log('点击循环参数区域，节点:', node.name)
+  
+  const config = node.config || {}
+  const loopType = (config.loopType as string) || 'count'
+  
+  let title = ''
+  let placeholder = ''
+  let currentValue = ''
+  let configKey = ''
+  
+  switch (loopType) {
+    case 'count':
+      title = '设置循环次数'
+      placeholder = '请输入循环次数（正整数）...'
+      currentValue = (config.loopCount as string) || '1'
+      configKey = 'loopCount'
+      break
+    case 'condition':
+      title = '设置循环条件'
+      placeholder = '请输入循环条件表达式...'
+      currentValue = (config.loopCondition as string) || ''
+      configKey = 'loopCondition'
+      break
+    case 'foreach':
+      title = '设置遍历数据'
+      placeholder = '请输入要遍历的数据源...'
+      currentValue = (config.loopData as string) || ''
+      configKey = 'loopData'
+      break
+    case 'infinite': {
+      // 无限循环不需要参数设置
+      const toast = document.createElement('div')
+      toast.textContent = '无限循环不需要设置参数'
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #f59e0b;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 10001;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      `
+      document.body.appendChild(toast)
+      setTimeout(() => {
+        document.body.removeChild(toast)
+      }, 2000)
+      return
+    }
+  }
+  
+  // 创建输入对话框
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+  `
+  
+  const content = document.createElement('div')
+  content.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 400px;
+    max-width: 500px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid #374151;
+  `
+  
+  const titleElement = document.createElement('h3')
+  titleElement.textContent = title
+  titleElement.style.cssText = `
+    margin: 0 0 16px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+  `
+  
+  const input = document.createElement(loopType === 'count' ? 'input' : 'textarea')
+  input.value = currentValue
+  input.placeholder = placeholder
+  
+  if (loopType === 'count') {
+    (input as HTMLInputElement).type = 'number'
+    (input as HTMLInputElement).min = '1'
+    input.style.cssText = `
+      width: 100%;
+      padding: 12px;
+      background: #374151;
+      border: 1px solid #4b5563;
+      border-radius: 8px;
+      color: #f9fafb;
+      font-size: 14px;
+      outline: none;
+      font-family: inherit;
+    `
+  } else {
+    input.style.cssText = `
+      width: 100%;
+      min-height: 100px;
+      padding: 12px;
+      background: #374151;
+      border: 1px solid #4b5563;
+      border-radius: 8px;
+      color: #f9fafb;
+      font-size: 14px;
+      resize: vertical;
+      outline: none;
+      font-family: inherit;
+    `
+  }
+  
+  input.addEventListener('focus', () => {
+    input.style.borderColor = '#3b82f6'
+  })
+  
+  input.addEventListener('blur', () => {
+    input.style.borderColor = '#4b5563'
+  })
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+  `
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    flex: 1;
+    padding: 12px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  saveButton.addEventListener('mouseenter', () => {
+    saveButton.style.background = '#2563eb'
+  })
+  
+  saveButton.addEventListener('mouseleave', () => {
+    saveButton.style.background = '#3b82f6'
+  })
+  
+  saveButton.addEventListener('click', () => {
+    let value = input.value
+    
+    // 验证输入
+    if (loopType === 'count') {
+      const num = parseInt(value)
+      if (isNaN(num) || num < 1) {
+        const errorToast = document.createElement('div')
+        errorToast.textContent = '请输入有效的正整数'
+        errorToast.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #ef4444;
+          color: white;
+          padding: 12px 20px;
+          border-radius: 8px;
+          z-index: 10001;
+          font-weight: 500;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        `
+        document.body.appendChild(errorToast)
+        setTimeout(() => {
+          document.body.removeChild(errorToast)
+        }, 2000)
+        return
+      }
+      value = num.toString()
+    }
+    
+    updateNode(node.id, {
+      config: {
+        ...config,
+        [configKey]: value
+      }
+    })
+    
+    // 显示更新提示
+    const toast = document.createElement('div')
+    toast.textContent = `${(title as string).replace('设置', '')}已更新`
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10001;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 2000)
+    
+    document.body.removeChild(dialog)
+    redraw()
+  })
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    flex: 1;
+    padding: 12px;
+    background: #374151;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  cancelButton.addEventListener('mouseenter', () => {
+    cancelButton.style.background = '#4b5563'
+  })
+  
+  cancelButton.addEventListener('mouseleave', () => {
+    cancelButton.style.background = '#374151'
+  })
+  
+  cancelButton.addEventListener('click', () => {
+    document.body.removeChild(dialog)
+  })
+  
+  buttonContainer.appendChild(saveButton)
+  buttonContainer.appendChild(cancelButton)
+  
+  content.appendChild(titleElement)
+  content.appendChild(input)
+  content.appendChild(buttonContainer)
+  dialog.appendChild(content)
+  
+  // 点击背景关闭对话框
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  })
+  
+  document.body.appendChild(dialog)
+  
+  // 自动聚焦输入框
+  setTimeout(() => {
+    input.focus()
+  }, 100)
+}
+
+// 处理条件比较值区域点击
+const handleConditionValueAreaClick = (node: WorkflowNode) => {
+  console.log('点击条件比较值区域，节点:', node.name)
+  
+  const config = node.config || {}
+  const currentValue = (config.compareValue as string) || ''
+  
+  // 创建输入对话框
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+  `
+  
+  const content = document.createElement('div')
+  content.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 400px;
+    max-width: 500px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '设置比较值'
+  title.style.cssText = `
+    margin: 0 0 16px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+  `
+  
+  const input = document.createElement('textarea')
+  input.value = currentValue
+  input.placeholder = '请输入比较值...'
+  input.style.cssText = `
+    width: 100%;
+    min-height: 100px;
+    padding: 12px;
+    background: #374151;
+    border: 1px solid #4b5563;
+    border-radius: 8px;
+    color: #f9fafb;
+    font-size: 14px;
+    resize: vertical;
+    outline: none;
+    font-family: inherit;
+  `
+  
+  input.addEventListener('focus', () => {
+    input.style.borderColor = '#3b82f6'
+  })
+  
+  input.addEventListener('blur', () => {
+    input.style.borderColor = '#4b5563'
+  })
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+  `
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    flex: 1;
+    padding: 12px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  saveButton.addEventListener('mouseenter', () => {
+    saveButton.style.background = '#2563eb'
+  })
+  
+  saveButton.addEventListener('mouseleave', () => {
+    saveButton.style.background = '#3b82f6'
+  })
+  
+  saveButton.addEventListener('click', () => {
+    updateNode(node.id, {
+      config: {
+        ...config,
+        compareValue: input.value
+      }
+    })
+    
+    // 显示更新提示
+    const toast = document.createElement('div')
+    toast.textContent = '比较值已更新'
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10001;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 2000)
+    
+    document.body.removeChild(dialog)
+    redraw()
+  })
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    flex: 1;
+    padding: 12px;
+    background: #374151;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  cancelButton.addEventListener('mouseenter', () => {
+    cancelButton.style.background = '#4b5563'
+  })
+  
+  cancelButton.addEventListener('mouseleave', () => {
+    cancelButton.style.background = '#374151'
+  })
+  
+  cancelButton.addEventListener('click', () => {
+    document.body.removeChild(dialog)
+  })
+  
+  buttonContainer.appendChild(saveButton)
+  buttonContainer.appendChild(cancelButton)
+  
+  content.appendChild(title)
+  content.appendChild(input)
+  content.appendChild(buttonContainer)
+  dialog.appendChild(content)
+  
+  // 点击背景关闭对话框
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  })
+  
+  document.body.appendChild(dialog)
+  
+  // 自动聚焦到输入框
+  setTimeout(() => {
+    input.focus()
+    input.setSelectionRange(input.value.length, input.value.length)
+  }, 100)
+}
+
+// 处理条件输出配置区域点击
+const handleConditionOutputAreaClick = (node: WorkflowNode) => {
+  console.log('点击条件输出配置区域，节点:', node.name)
+  
+  const config = node.config || {}
+  const currentTrueOutput = (config.trueOutput as string) || ''
+  const currentFalseOutput = (config.falseOutput as string) || ''
+  
+  // 创建输入对话框
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+  `
+  
+  const content = document.createElement('div')
+  content.style.cssText = `
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 500px;
+    max-width: 600px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '配置条件输出'
+  title.style.cssText = `
+    margin: 0 0 20px 0;
+    color: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+  `
+  
+  // 真值输出配置
+  const trueLabel = document.createElement('label')
+  trueLabel.textContent = '条件为真时的输出:'
+  trueLabel.style.cssText = `
+    display: block;
+    color: #10b981;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  `
+  
+  const trueInput = document.createElement('textarea')
+  trueInput.value = currentTrueOutput
+  trueInput.placeholder = '请输入条件为真时的输出值...'
+  trueInput.style.cssText = `
+    width: 100%;
+    min-height: 80px;
+    padding: 12px;
+    background: #374151;
+    border: 1px solid #10b981;
+    border-radius: 8px;
+    color: #f9fafb;
+    font-size: 14px;
+    resize: vertical;
+    outline: none;
+    font-family: inherit;
+    margin-bottom: 16px;
+  `
+  
+  // 假值输出配置
+  const falseLabel = document.createElement('label')
+  falseLabel.textContent = '条件为假时的输出:'
+  falseLabel.style.cssText = `
+    display: block;
+    color: #ef4444;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  `
+  
+  const falseInput = document.createElement('textarea')
+  falseInput.value = currentFalseOutput
+  falseInput.placeholder = '请输入条件为假时的输出值...'
+  falseInput.style.cssText = `
+    width: 100%;
+    min-height: 80px;
+    padding: 12px;
+    background: #374151;
+    border: 1px solid #ef4444;
+    border-radius: 8px;
+    color: #f9fafb;
+    font-size: 14px;
+    resize: vertical;
+    outline: none;
+    font-family: inherit;
+    margin-bottom: 20px;
+  `
+  
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 12px;
+  `
+  
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存配置'
+  saveButton.style.cssText = `
+    flex: 1;
+    padding: 12px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  saveButton.addEventListener('mouseenter', () => {
+    saveButton.style.background = '#2563eb'
+  })
+  
+  saveButton.addEventListener('mouseleave', () => {
+    saveButton.style.background = '#3b82f6'
+  })
+  
+  saveButton.addEventListener('click', () => {
+    updateNode(node.id, {
+      config: {
+        ...config,
+        trueOutput: trueInput.value,
+        falseOutput: falseInput.value
+      }
+    })
+    
+    // 显示更新提示
+    const toast = document.createElement('div')
+    toast.textContent = '条件输出配置已更新'
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10001;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 2000)
+    
+    document.body.removeChild(dialog)
+    redraw()
+  })
+  
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    flex: 1;
+    padding: 12px;
+    background: #374151;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `
+  
+  cancelButton.addEventListener('mouseenter', () => {
+    cancelButton.style.background = '#4b5563'
+  })
+  
+  cancelButton.addEventListener('mouseleave', () => {
+    cancelButton.style.background = '#374151'
+  })
+  
+  cancelButton.addEventListener('click', () => {
+    document.body.removeChild(dialog)
+  })
+  
+  buttonContainer.appendChild(saveButton)
+  buttonContainer.appendChild(cancelButton)
+  
+  content.appendChild(title)
+  content.appendChild(trueLabel)
+  content.appendChild(trueInput)
+  content.appendChild(falseLabel)
+  content.appendChild(falseInput)
+  content.appendChild(buttonContainer)
+  dialog.appendChild(content)
+  
+  // 点击背景关闭对话框
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) {
+      document.body.removeChild(dialog)
+    }
+  })
+  
+  document.body.appendChild(dialog)
+  
+  // 自动聚焦到第一个输入框
+  setTimeout(() => {
+    trueInput.focus()
+  }, 100)
+}
+
 // 处理数据库测试按钮点击
 const handleDbTestButtonClick = async (node: WorkflowNode) => {
   console.log('=== 数据库测试按钮点击事件开始 ===');
@@ -7720,7 +9923,7 @@ const handleDbTestButtonClick = async (node: WorkflowNode) => {
     
     // 调用后端API进行真实的数据库连接和查询
     const result = await window.api.testDatabaseConnection({
-      dbType: config.dbType || 'mysql',
+      dbType: (config.dbType as string) || 'mysql',
       host,
       port: parseInt(port),
       database,
@@ -8482,6 +10685,11 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedDbSqlArea = getDbSqlAreaAtPosition(pos.x, pos.y)
   const clickedDbTestButton = getDbTestButtonAtPosition(pos.x, pos.y)
   const clickedDbTypeSelector = getDbTypeSelectorAtPosition(pos.x, pos.y)
+  const clickedConditionTypeArea = getConditionTypeAreaAtPosition(pos.x, pos.y)
+  const clickedConditionValueArea = getConditionValueAreaAtPosition(pos.x, pos.y)
+  const clickedConditionOutputArea = getConditionOutputAreaAtPosition(pos.x, pos.y)
+  const clickedLoopTypeArea = getLoopTypeAreaAtPosition(pos.x, pos.y)
+  const clickedLoopParameterArea = getLoopParameterAreaAtPosition(pos.x, pos.y)
   
   console.log('点击检测结果:', {
     clickedDbTestButton: clickedDbTestButton?.name || null,
@@ -8547,6 +10755,21 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedDbTypeSelector) {
     // 处理数据库类型选择器点击
     handleDbTypeSelectorClick(clickedDbTypeSelector)
+  } else if (clickedConditionTypeArea) {
+    // 处理条件类型选择区域点击
+    handleConditionTypeAreaClick(clickedConditionTypeArea)
+  } else if (clickedConditionValueArea) {
+    // 处理条件比较值区域点击
+    handleConditionValueAreaClick(clickedConditionValueArea)
+  } else if (clickedConditionOutputArea) {
+    // 处理条件输出配置区域点击
+    handleConditionOutputAreaClick(clickedConditionOutputArea)
+  } else if (clickedLoopTypeArea) {
+    // 处理循环类型选择区域点击
+    handleLoopTypeAreaClick(clickedLoopTypeArea)
+  } else if (clickedLoopParameterArea) {
+    // 处理循环参数区域点击
+    handleLoopParameterAreaClick(clickedLoopParameterArea)
   } else if (clickedTextArea) {
     // 处理文本区域点击
     handleTextAreaClick(clickedTextArea)
