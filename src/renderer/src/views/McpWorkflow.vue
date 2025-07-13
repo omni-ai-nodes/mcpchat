@@ -1113,7 +1113,7 @@ const drawNode = (node: WorkflowNode) => {
   } else if (node.type === 'model-service') {
     height = (NODE_HEIGHT + 106) * scale.value  // 基础高度 + 模型选择区域高度 + 间距
   } else if (node.type === 'nodejs-code') {
-    height = (NODE_HEIGHT + 216) * scale.value  // 基础高度 + 代码编辑区域高度 + 间距
+    height = (NODE_HEIGHT + 288) * scale.value  // 基础高度 + 代码编辑区域高度 + 间距
   } else {
     height = NODE_HEIGHT * scale.value
   }
@@ -1630,7 +1630,7 @@ const drawNode = (node: WorkflowNode) => {
   // 如果是Node.js代码节点，绘制代码编辑区域
   if (node.type === 'nodejs-code') {
     const codeAreaWidth = width - 16 * scale.value
-    const codeAreaHeight = 240 * scale.value
+    const codeAreaHeight = 310 * scale.value
     const codeAreaX = x + 8 * scale.value
     const codeAreaY = y + headerHeight + 8 * scale.value
     
@@ -1647,7 +1647,7 @@ const drawNode = (node: WorkflowNode) => {
     context.stroke()
     
     // 绘制代码编辑区域
-    const editorHeight = 200 * scale.value
+    const editorHeight = 270 * scale.value
     const editorY = codeAreaY + 8 * scale.value
     const editorX = codeAreaX + 8 * scale.value
     const editorWidth = codeAreaWidth - 16 * scale.value
@@ -1696,7 +1696,10 @@ return {
     const lineHeight = 12 * scale.value
     const lines = displayCode.split('\n')
     
-    lines.slice(0, 8).forEach((line, index) => {
+    // 根据编辑器高度动态计算可显示的行数
+    const maxVisibleLines = Math.floor((editorHeight - 16 * scale.value) / lineHeight)
+    
+    lines.slice(0, maxVisibleLines).forEach((line, index) => {
       // 简单的语法高亮
       if (line.trim().startsWith('//')) {
         context.fillStyle = '#7c3aed'  // 注释颜色
