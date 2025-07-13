@@ -36,7 +36,7 @@ const DEFAULT_INMEMORY_SERVERS: Record<string, MCPServerConfig> = {
     type: 'inmemory' as MCPServerType,
     command: 'artifacts',
     env: {},
-    disable: false
+    disable: true
   },
   bochaSearch: {
     args: [],
@@ -228,17 +228,48 @@ export class McpConfHelper {
 
     // 检查并补充缺少的inmemory服务
     const updatedServers = { ...storedServers }
+    let hasChanges = false
 
-    // 遍历所有默认的inmemory服务，确保它们都存在
+    // 遍历所有默认的inmemory服务，确保它们都存在并更新默认配置
     for (const [serverName, serverConfig] of Object.entries(DEFAULT_INMEMORY_SERVERS)) {
       if (!updatedServers[serverName]) {
         console.log(`添加缺少的inmemory服务: ${serverName}`)
         updatedServers[serverName] = serverConfig
+        hasChanges = true
+      } else {
+        // 更新已存在服务的默认配置（如disable状态）
+        if (updatedServers[serverName].disable !== serverConfig.disable) {
+          console.log(`更新inmemory服务 ${serverName} 的disable状态: ${updatedServers[serverName].disable} -> ${serverConfig.disable}`)
+          updatedServers[serverName] = {
+            ...updatedServers[serverName],
+            disable: serverConfig.disable
+          }
+          hasChanges = true
+        }
       }
     }
 
-    // 如果有新增的服务，更新存储
-    if (Object.keys(updatedServers).length > Object.keys(storedServers).length) {
+    // 遍历所有系统内存服务，确保它们都存在并更新默认配置
+    for (const [serverName, serverConfig] of Object.entries(SYSTEM_INMEM_MCP_SERVERS)) {
+      if (!updatedServers[serverName]) {
+        console.log(`添加缺少的系统内存服务: ${serverName}`)
+        updatedServers[serverName] = serverConfig
+        hasChanges = true
+      } else {
+        // 更新已存在服务的默认配置（如disable状态）
+        if (updatedServers[serverName].disable !== serverConfig.disable) {
+          console.log(`更新系统内存服务 ${serverName} 的disable状态: ${updatedServers[serverName].disable} -> ${serverConfig.disable}`)
+          updatedServers[serverName] = {
+            ...updatedServers[serverName],
+            disable: serverConfig.disable
+          }
+          hasChanges = true
+        }
+      }
+    }
+
+    // 如果有变化，更新存储
+    if (hasChanges) {
       this.mcpStore.set('mcpServers', updatedServers)
     }
 

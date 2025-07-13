@@ -256,8 +256,18 @@ export const useMcpStore = defineStore('mcp', () => {
       const serverConfig = config.value.mcpServers[serverName]
 
       if (isRunning) {
+        // 停止服务器
         await mcpPresenter.stopServer(serverName)
+        // 更新配置中的disable状态为true，确保重启应用后不会自动启动
+        if (serverConfig) {
+          await mcpPresenter.updateMcpServer(serverName, { disable: true })
+        }
       } else {
+        // 启动服务器前，先更新配置中的disable状态为false
+        if (serverConfig) {
+          await mcpPresenter.updateMcpServer(serverName, { disable: false })
+        }
+        
         // 检查是否为 gallery 类型的服务器
         if (serverConfig?.type === 'gallery') {
           // 对于 gallery 类型，直接通过 SDK 启动
@@ -268,6 +278,8 @@ export const useMcpStore = defineStore('mcp', () => {
         }
       }
 
+      // 重新加载配置以反映disable状态的变化
+      await loadConfig()
       await updateServerStatus(serverName)
       return true
     } catch (error) {

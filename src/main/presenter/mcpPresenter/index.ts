@@ -195,27 +195,34 @@ export class McpPresenter implements IMCPPresenter {
       const customPrompts = await this.configPresenter.getCustomPrompts()
       const hasCustomPrompts = customPrompts && customPrompts.length > 0
 
+      // 获取服务器配置
+      const servers = await this.configPresenter.getMcpServers()
+      const serverConfig = servers[customPromptsServerName]
+      
+      // 检查服务器是否被禁用
+      const isServerDisabled = serverConfig?.disable === true
+      
       // 检查服务器是否正在运行
       const isServerRunning = this.serverManager.isServerRunning(customPromptsServerName)
 
-      if (hasCustomPrompts && !isServerRunning) {
-        // 有自定义提示词但服务器未运行，启动服务器
+      if (hasCustomPrompts && !isServerRunning && !isServerDisabled) {
+        // 有自定义提示词但服务器未运行且未被禁用，启动服务器
         try {
           await this.serverManager.startServer(customPromptsServerName)
           eventBus.send(MCP_EVENTS.SERVER_STARTED, SendTarget.ALL_WINDOWS, customPromptsServerName)
         } catch (error) {
           console.error(`Failed to start custom prompts server ${customPromptsServerName}:`, error)
         }
-      } else if (!hasCustomPrompts && isServerRunning) {
-        // 没有自定义提示词但服务器正在运行，停止服务器
+      } else if ((!hasCustomPrompts || isServerDisabled) && isServerRunning) {
+        // 没有自定义提示词或服务器被禁用但正在运行，停止服务器
         try {
           await this.serverManager.stopServer(customPromptsServerName)
           eventBus.send(MCP_EVENTS.SERVER_STOPPED, SendTarget.ALL_WINDOWS, customPromptsServerName)
         } catch (error) {
           console.error(`Failed to stop custom prompts server ${customPromptsServerName}:`, error)
         }
-      } else if (hasCustomPrompts && isServerRunning) {
-        // 有自定义提示词且服务器正在运行，重启服务器以刷新缓存
+      } else if (hasCustomPrompts && isServerRunning && !isServerDisabled) {
+        // 有自定义提示词且服务器正在运行且未被禁用，重启服务器以刷新缓存
         try {
           await this.serverManager.stopServer(customPromptsServerName)
           await this.serverManager.startServer(customPromptsServerName)
