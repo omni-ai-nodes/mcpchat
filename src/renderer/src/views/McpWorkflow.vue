@@ -16,7 +16,7 @@
             <h3 class="text-sm font-medium mb-3 text-muted-foreground uppercase tracking-wide">{{ t('common.mcp.workflow.inputNodes') }}</h3>
             <div class="space-y-2">
               <div 
-                v-for="node in inputNodes" 
+                v-for="node in activeInputNodes" 
                 :key="node.type"
                 class="p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
                 draggable="true"
@@ -54,7 +54,7 @@
             <h3 class="text-sm font-medium mb-3 text-muted-foreground uppercase tracking-wide">{{ t('common.mcp.workflow.processNodes') }}</h3>
             <div class="space-y-2">
               <div 
-                v-for="node in processNodes" 
+                v-for="node in activeProcessNodes" 
                 :key="node.type"
                 class="p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
                 draggable="true"
@@ -79,7 +79,7 @@
             <h3 class="text-sm font-medium mb-3 text-muted-foreground uppercase tracking-wide">{{ t('common.mcp.workflow.outputNodes') }}</h3>
             <div class="space-y-2">
               <div 
-                v-for="node in outputNodes" 
+                v-for="node in activeOutputNodes" 
                 :key="node.type"
                 class="p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors"
                 draggable="true"
@@ -505,7 +505,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -547,6 +547,7 @@ interface NodeTemplate {
   description: string
   icon: string
   category: 'input' | 'process' | 'output'
+  activate: boolean
 }
 
 interface WorkflowNode {
@@ -813,28 +814,32 @@ const inputNodes: NodeTemplate[] = [
     name: '文本输入',
     description: '手动输入文本',
     icon: 'lucide:type',
-    category: 'input'
+    category: 'input',
+    activate: true
   },
   {
     type: 'file-input',
     name: '文件输入',
     description: '读取本地文件',
     icon: 'lucide:file-input',
-    category: 'input'
+    category: 'input',
+    activate: true
   },
   {
     type: 'api-input',
     name: 'API输入',
     description: '从API获取数据',
     icon: 'lucide:globe',
-    category: 'input'
+    category: 'input',
+    activate: true
   },
   {
     type: 'database-input',
     name: '数据库输入',
     description: '从数据库读取',
     icon: 'lucide:database',
-    category: 'input'
+    category: 'input',
+    activate: true
   }
 ]
 
@@ -844,56 +849,64 @@ const processNodes: NodeTemplate[] = [
     name: 'MCP服务',
     description: '连接MCP服务提供商',
     icon: 'lucide:server',
-    category: 'process'
+    category: 'process',
+    activate: true
   },
   {
     type: 'model-service',
     name: '模型服务',
     description: '选择和配置AI模型',
     icon: 'lucide:cpu',
-    category: 'process'
+    category: 'process',
+    activate: true
   },
   {
     type: 'nodejs-code',
     name: 'Node.js代码',
     description: '执行自定义Node.js代码',
     icon: 'lucide:code',
-    category: 'process'
+    category: 'process',
+    activate: true
   },
   {
     type: 'text-transform',
     name: '文本处理',
     description: '文本转换和处理',
     icon: 'lucide:text-cursor',
-    category: 'process'
+    category: 'process',
+    activate: false
   },
   {
     type: 'data-filter',
     name: '数据过滤',
     description: '过滤和筛选数据',
     icon: 'lucide:filter',
-    category: 'process'
+    category: 'process',
+    activate: false
   },
   {
     type: 'ai-analysis',
     name: 'AI分析',
     description: '使用AI进行分析',
     icon: 'lucide:brain',
-    category: 'process'
+    category: 'process',
+    activate: false
   },
   {
     type: 'condition',
     name: '条件判断',
     description: '根据条件分支',
     icon: 'lucide:git-branch',
-    category: 'process'
+    category: 'process',
+    activate: false
   },
   {
     type: 'loop',
     name: '循环处理',
     description: '重复执行操作',
     icon: 'lucide:repeat',
-    category: 'process'
+    category: 'process',
+    activate: false
   }
 ]
 
@@ -903,37 +916,47 @@ const outputNodes: NodeTemplate[] = [
     name: '文本输出',
     description: '输出文本内容',
     icon: 'lucide:type',
-    category: 'output'
+    category: 'output',
+    activate: true
   },
   {
     type: 'file-output',
     name: '文件输出',
     description: '保存到文件',
     icon: 'lucide:file-output',
-    category: 'output'
+    category: 'output',
+    activate: false
   },
   {
     type: 'email-output',
     name: '邮件发送',
     description: '发送邮件通知',
     icon: 'lucide:mail',
-    category: 'output'
+    category: 'output',
+    activate: false
   },
   {
     type: 'api-output',
     name: 'API输出',
     description: '发送到API',
     icon: 'lucide:send',
-    category: 'output'
+    category: 'output',
+    activate: false
   },
   {
     type: 'notification',
     name: '通知',
     description: '系统通知',
     icon: 'lucide:bell',
-    category: 'output'
+    category: 'output',
+    activate: false
   }
 ]
+
+// 计算属性：过滤激活的节点
+const activeInputNodes = computed(() => inputNodes.filter(node => node.activate))
+const activeProcessNodes = computed(() => processNodes.filter(node => node.activate))
+const activeOutputNodes = computed(() => outputNodes.filter(node => node.activate))
 
 // Canvas 初始化和渲染
 const initCanvas = () => {
