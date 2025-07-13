@@ -164,11 +164,17 @@ export class McpClient {
         const HOME_DIR = app.getPath('home')
 
         // 检查是否为npx命令，如果是则尝试本地化
+        let args = this.serverConfig.args as string[]
         if (command.startsWith('npx ')) {
           const packageName = command.split(' ')[1]
           const localCommand = await this.localPackageManager.getLocalCommand(packageName)
           if (localCommand) {
-            command = localCommand
+            // 解析本地化命令，分离command和args
+            const commandParts = localCommand.split(' ')
+            command = commandParts[0]
+            const localArgs = commandParts.slice(1)
+            // 合并本地args和原始args
+            args = [...localArgs, ...(args || [])]
             console.info(`Using local package for ${packageName}: ${localCommand}`)
           }
         }
@@ -288,7 +294,7 @@ export class McpClient {
         console.log('gallery mcp env', env)
         this.transport = new StdioClientTransport({
           command,
-          args: this.serverConfig.args as string[],
+          args,
           env,
           stderr: 'pipe'
         })
@@ -298,11 +304,17 @@ export class McpClient {
         const HOME_DIR = app.getPath('home')
 
         // 检查是否为npx命令，如果是则尝试本地化
+        let args = this.serverConfig.args as string[]
         if (command.startsWith('npx ')) {
           const packageName = command.split(' ')[1]
           const localCommand = await this.localPackageManager.getLocalCommand(packageName)
           if (localCommand) {
-            command = localCommand
+            // 解析本地化命令，分离command和args
+            const commandParts = localCommand.split(' ')
+            command = commandParts[0]
+            const localArgs = commandParts.slice(1)
+            // 合并本地args和原始args
+            args = [...localArgs, ...(args || [])]
             console.info(`Using local package for ${packageName}: ${localCommand}`)
           }
         }
@@ -424,7 +436,7 @@ export class McpClient {
         console.log('mcp env', env)
         this.transport = new StdioClientTransport({
           command,
-          args: this.serverConfig.args as string[],
+          args,
           env,
           stderr: 'pipe'
         })

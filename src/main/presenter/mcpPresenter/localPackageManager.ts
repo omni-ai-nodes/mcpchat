@@ -3,8 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { spawn } from 'child_process'
 import { eventBus, SendTarget } from '@/eventbus'
-import { NOTIFICATION_EVENTS, MCP_EVENTS } from '@/events'
-import { getErrorMessageLabels } from '@shared/i18n'
+import { MCP_EVENTS } from '@/events'
 
 /**
  * 本地包管理器 - 用于处理MCP服务的本地化部署
@@ -109,12 +108,7 @@ export class LocalPackageManager {
           stdio: ['pipe', 'pipe', 'pipe']
         })
 
-        let stdout = ''
         let stderr = ''
-
-        child.stdout?.on('data', (data) => {
-          stdout += data.toString()
-        })
 
         child.stderr?.on('data', (data) => {
           stderr += data.toString()
@@ -183,8 +177,8 @@ export class LocalPackageManager {
                 args: [binPath, ...packageArgs]
               }
             }
-          } catch (error) {
-            console.error(`解析包 ${packageName} 的package.json失败:`, error)
+          } catch {
+            console.error(`解析包 ${packageName} 的package.json失败`)
           }
         }
       }
@@ -200,7 +194,7 @@ export class LocalPackageManager {
   /**
    * 获取包的可执行文件路径
    */
-  private getPackageBinPath(packagePath: string, packageJson: any, packageName: string): string | null {
+  private getPackageBinPath(packagePath: string, packageJson: { bin?: string | Record<string, string>; main?: string }, packageName: string): string | null {
     if (packageJson.bin) {
       if (typeof packageJson.bin === 'string') {
         return path.join(packagePath, packageJson.bin)
@@ -318,18 +312,28 @@ export class LocalPackageManager {
    * 否则尝试智能安装
    */
   async getLocalCommand(packageName: string, npmRegistry?: string): Promise<string | null> {
+    console.log(`[LocalPackageManager] getLocalCommand called for package: ${packageName}`);
+    
     // 首先尝试智能安装包
     const installed = await this.smartInstallPackage(packageName, npmRegistry)
+    console.log(`[LocalPackageManager] smartInstallPackage result for ${packageName}: ${installed}`);
+    
     if (!installed) {
+      console.log(`[LocalPackageManager] Package ${packageName} installation failed`);
       return null
     }
 
     // 生成本地化命令
     const localCommand = this.generateLocalCommand(`npx ${packageName}`)
+    console.log(`[LocalPackageManager] generateLocalCommand result for ${packageName}:`, localCommand);
+    
     if (localCommand) {
-      return `${localCommand.command} ${localCommand.args.join(' ')}`
+      const result = `${localCommand.command} ${localCommand.args.join(' ')}`;
+      console.log(`[LocalPackageManager] Final local command for ${packageName}: ${result}`);
+      return result;
     }
 
+    console.log(`[LocalPackageManager] No local command generated for ${packageName}`);
     return null
   }
 
@@ -337,14 +341,22 @@ export class LocalPackageManager {
    * 智能安装包 - 优先使用本地缓存，网络可用时自动缓存
    */
   async smartInstallPackage(packageName: string, npmRegistry?: string): Promise<boolean> {
+    console.log(`[LocalPackageManager] smartInstallPackage called for: ${packageName}`);
+    console.log(`[LocalPackageManager] Cache path: ${this.localNodeModulesPath}`);
+    
     // 首先检查本地缓存
-    if (this.isPackageCached(packageName)) {
+    const isCached = this.isPackageCached(packageName);
+    console.log(`[LocalPackageManager] isPackageCached(${packageName}): ${isCached}`);
+    
+    if (isCached) {
       console.log(`包 ${packageName} 已在本地缓存中`)
       return true
     }
 
     // 检查网络连接
     const hasNetwork = await this.checkNetworkConnection()
+    console.log(`[LocalPackageManager] Network connection available: ${hasNetwork}`);
+    
     if (!hasNetwork) {
       console.warn(`包 ${packageName} 不在本地缓存中，且无网络连接`)
       return false
@@ -352,7 +364,10 @@ export class LocalPackageManager {
 
     // 尝试在线安装到缓存
     try {
-      return await this.installPackageToCache(packageName, npmRegistry)
+      console.log(`[LocalPackageManager] Attempting to install ${packageName} to cache`);
+      const result = await this.installPackageToCache(packageName, npmRegistry);
+      console.log(`[LocalPackageManager] installPackageToCache result for ${packageName}: ${result}`);
+      return result;
     } catch (error) {
       console.error(`在线安装包 ${packageName} 失败:`, error)
       return false
