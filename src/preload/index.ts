@@ -99,6 +99,24 @@ const api = {
   // 数据库相关API
   testDatabaseConnection: (config: DatabaseConfig) => {
     return ipcRenderer.invoke('test-database-connection', config)
+  },
+  // MCP相关API
+  mcpPresenter: {
+    getLocalPackageCacheStats: () => {
+      return ipcRenderer.invoke('presenter:call', 'mcpPresenter', 'getLocalPackageCacheStats')
+    },
+    checkNetworkConnection: () => {
+      return ipcRenderer.invoke('presenter:call', 'mcpPresenter', 'checkNetworkConnection')
+    },
+    clearLocalPackageCache: () => {
+      return ipcRenderer.invoke('presenter:call', 'mcpPresenter', 'clearLocalPackageCache')
+    },
+    isPackageCached: (packageName: string) => {
+      return ipcRenderer.invoke('presenter:call', 'mcpPresenter', 'isPackageCached', packageName)
+    },
+    installPackageToCache: (packageName: string) => {
+      return ipcRenderer.invoke('presenter:call', 'mcpPresenter', 'installPackageToCache', packageName)
+    }
   }
 }
 exposeElectronAPI()

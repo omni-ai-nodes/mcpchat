@@ -12,6 +12,7 @@ import fs from 'fs'
 // import { NO_PROXY, proxyConfig } from '@/presenter/proxyConfig'
 import { getInMemoryServer } from './inMemoryServers/builder'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { LocalPackageManager } from './localPackageManager'
 import {
   PromptListEntry,
   ToolCallResult,
@@ -54,6 +55,7 @@ export class McpClient {
   private connectionTimeout: NodeJS.Timeout | null = null
   private nodeRuntimePath: string | null = null
   private npmRegistry: string | null = null
+  private localPackageManager: LocalPackageManager
 
   // 缓存
   private cachedTools: Tool[] | null = null
@@ -102,6 +104,7 @@ export class McpClient {
     this.serverName = serverName
     this.serverConfig = serverConfig
     this.npmRegistry = npmRegistry
+    this.localPackageManager = new LocalPackageManager()
 
     const runtimePath = path
       .join(app.getAppPath(), 'runtime', 'node')
@@ -157,8 +160,18 @@ export class McpClient {
         this.transport = clientTransport
       } else if (this.serverConfig.type === 'gallery') {
         // Gallery 类型服务器使用 stdio 传输方式
-        const command = this.serverConfig.command as string
+        let command = this.serverConfig.command as string
         const HOME_DIR = app.getPath('home')
+
+        // 检查是否为npx命令，如果是则尝试本地化
+        if (command.startsWith('npx ')) {
+          const packageName = command.split(' ')[1]
+          const localCommand = await this.localPackageManager.getLocalCommand(packageName)
+          if (localCommand) {
+            command = localCommand
+            console.info(`Using local package for ${packageName}: ${localCommand}`)
+          }
+        }
 
         // 定义允许的环境变量白名单
         const allowedEnvVars = [
@@ -281,8 +294,18 @@ export class McpClient {
         })
       } else if (this.serverConfig.type === 'stdio') {
         // 创建合适的transport
-        const command = this.serverConfig.command as string
+        let command = this.serverConfig.command as string
         const HOME_DIR = app.getPath('home')
+
+        // 检查是否为npx命令，如果是则尝试本地化
+        if (command.startsWith('npx ')) {
+          const packageName = command.split(' ')[1]
+          const localCommand = await this.localPackageManager.getLocalCommand(packageName)
+          if (localCommand) {
+            command = localCommand
+            console.info(`Using local package for ${packageName}: ${localCommand}`)
+          }
+        }
 
         // 定义允许的环境变量白名单
         const allowedEnvVars = [

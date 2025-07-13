@@ -281,5 +281,17 @@
     "invalidParams": "Invalid parameters",
     "fetchError": "Failed to fetch server details",
     "networkError": "Network error occurred"
+  },
+  "localCache": {
+    "title": "Local Package Cache",
+    "packages": "Packages",
+    "size": "Size",
+    "clear": "Clear Cache",
+    "online": "Online",
+    "offline": "Offline",
+    "clearSuccess": "Cache Cleared",
+    "clearSuccessDesc": "Local package cache has been successfully cleared",
+    "clearError": "Clear Failed",
+    "clearErrorDesc": "Failed to clear local package cache"
   }
 }

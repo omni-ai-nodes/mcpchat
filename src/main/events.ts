@@ -92,7 +92,8 @@ export const MCP_EVENTS = {
   TOOL_CALL_RESULT: 'mcp:tool-call-result',
   SERVER_STATUS_CHANGED: 'mcp:server-status-changed',
   CLIENT_LIST_UPDATED: 'mcp:client-list-updated',
-  INITIALIZED: 'mcp:initialized' // 新增：MCP初始化完成事件
+  INITIALIZED: 'mcp:initialized', // 新增：MCP初始化完成事件
+  CACHE_UPDATED: 'mcp:cache-updated' // 新增：本地缓存更新事件
 }
 
 // 同步相关事件

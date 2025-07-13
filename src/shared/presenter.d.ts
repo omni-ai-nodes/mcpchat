@@ -833,7 +833,7 @@ export interface MCPServerConfig {
   baseUrl?: string
   customHeaders?: Record<string, string>
   customNpmRegistry?: string
-  type: 'sse' | 'stdio' | 'inmemory' | 'http'
+  type: 'sse' | 'stdio' | 'inmemory' | 'http' | 'gallery'
 }
 
 export interface MCPConfig {

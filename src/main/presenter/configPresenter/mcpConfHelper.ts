@@ -190,7 +190,7 @@ const DEFAULT_MCP_SERVERS = {
       type: 'stdio' as MCPServerType
     }
   },
-  defaultServers: ['Artifacts'], // 默认服务器列表
+  defaultServers: [], // 默认服务器列表 - 默认不启用任何服务器
   mcpEnabled: false // 默认关闭MCP功能
 }
 // 这部分mcp有系统逻辑判断是否启用，不受用户配置控制，受软件环境控制
@@ -203,7 +203,7 @@ export const SYSTEM_INMEM_MCP_SERVERS: Record<string, MCPServerConfig> = {
     icons: '📝',
     autoApprove: ['all'],
     type: 'inmemory' as MCPServerType,
-    disable: false
+    disable: true // 默认禁用自定义提示词服务
   }
 }
 

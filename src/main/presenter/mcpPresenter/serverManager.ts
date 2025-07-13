@@ -1,5 +1,6 @@
 import { IConfigPresenter } from '@shared/presenter'
 import { McpClient } from './mcpClient'
+import { LocalPackageManager } from './localPackageManager'
 import axios from 'axios'
 import { proxyConfig } from '@/presenter/proxyConfig'
 import { eventBus, SendTarget } from '@/eventbus'
@@ -17,9 +18,11 @@ export class ServerManager {
   private clients: Map<string, McpClient> = new Map()
   private configPresenter: IConfigPresenter
   private npmRegistry: string | null = null
+  private localPackageManager: LocalPackageManager
 
   constructor(configPresenter: IConfigPresenter) {
     this.configPresenter = configPresenter
+    this.localPackageManager = new LocalPackageManager()
   }
 
   // 测试npm registry速度并返回最佳选择
@@ -86,6 +89,21 @@ export class ServerManager {
   // 获取npm registry
   getNpmRegistry(): string | null {
     return this.npmRegistry
+  }
+
+  // 获取本地包管理器
+  getLocalPackageManager(): LocalPackageManager {
+    return this.localPackageManager
+  }
+
+  // 清理本地包缓存
+  async clearLocalCache(): Promise<void> {
+    return this.localPackageManager.clearCache()
+  }
+
+  // 获取缓存统计信息
+  getCacheStats(): { totalPackages: number; totalSize: number } {
+    return this.localPackageManager.getCacheStats()
   }
 
   // 获取默认服务器名称列表
@@ -165,6 +183,10 @@ export class ServerManager {
     try {
       console.info(`Starting MCP server ${name}...`)
       const npmRegistry = serverConfig.customNpmRegistry || this.npmRegistry
+      
+      // 预安装npx包（如果需要）
+      await this.preInstallPackageIfNeeded(serverConfig, npmRegistry)
+      
       // 创建并保存客户端实例，传入npm registry
       const client = new McpClient(
         name,
@@ -187,6 +209,46 @@ export class ServerManager {
       throw error
     } finally {
       eventBus.send(MCP_EVENTS.CLIENT_LIST_UPDATED, SendTarget.ALL_WINDOWS)
+    }
+  }
+
+  /**
+   * 预安装npx包（如果需要）
+   */
+  private async preInstallPackageIfNeeded(serverConfig: any, npmRegistry?: string | null): Promise<void> {
+    const command = serverConfig.command as string
+    if (!command || !command.startsWith('npx ')) {
+      return
+    }
+
+    const packageName = command.split(' ')[1]
+    if (!packageName) {
+      return
+    }
+
+    try {
+      console.info(`预检查包 ${packageName}...`)
+      
+      // 检查包是否已缓存
+      if (this.localPackageManager.isPackageCached(packageName)) {
+        console.info(`包 ${packageName} 已在本地缓存中`)
+        return
+      }
+
+      // 检查网络连接
+      const hasNetwork = await this.localPackageManager.checkNetworkConnection()
+      if (!hasNetwork) {
+        console.warn(`无网络连接，无法预安装包 ${packageName}`)
+        return
+      }
+
+      // 尝试安装到本地缓存
+      console.info(`正在预安装包 ${packageName} 到本地缓存...`)
+      await this.localPackageManager.installPackageToCache(packageName, npmRegistry || undefined)
+      console.info(`包 ${packageName} 预安装完成`)
+    } catch (error) {
+      console.warn(`预安装包 ${packageName} 失败，将在运行时尝试:`, error)
+      // 不抛出错误，允许继续启动服务器
     }
   }
 

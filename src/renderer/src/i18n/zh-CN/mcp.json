@@ -302,5 +302,17 @@
     "invalidParams": "参数无效",
     "fetchError": "获取服务器详情失败",
     "networkError": "网络错误"
+  },
+  "localCache": {
+    "title": "本地包缓存",
+    "packages": "包数量",
+    "size": "缓存大小",
+    "clear": "清理缓存",
+    "online": "在线",
+    "offline": "离线",
+    "clearSuccess": "缓存已清理",
+    "clearSuccessDesc": "本地包缓存已成功清理",
+    "clearError": "清理失败",
+    "clearErrorDesc": "清理本地包缓存失败"
   }
 }

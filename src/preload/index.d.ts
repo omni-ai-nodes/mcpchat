@@ -86,6 +86,15 @@ declare global {
   
   // 数据库相关API
   testDatabaseConnection: (config: DatabaseConfig) => Promise<DatabaseResult>
+  
+  // MCP相关API
+  mcpPresenter: {
+    getLocalPackageCacheStats: () => Promise<{ packageCount: number; totalSize: number }>
+    checkNetworkConnection: () => Promise<boolean>
+    clearLocalPackageCache: () => Promise<void>
+    isPackageCached: (packageName: string) => Promise<boolean>
+    installPackageToCache: (packageName: string) => Promise<boolean>
+  }
     }
   }
 }

@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/toast/use-toast'
 import McpServerForm from '@/components/mcp-config/mcpServerForm.vue'
 import McpServers from '@/components/mcp-config/components/McpServers.vue'
 import McpSettings from '@/components/settings/McpSettings.vue'
-import type { MCPServerConfig } from '@/types/mcp'
+import type { MCPServerConfig } from '@shared/presenter'
 import {
   Dialog,
   DialogContent,
@@ -28,8 +28,8 @@ const SelectItem = defineAsyncComponent(() => import('@/components/ui/select').t
 const SelectTrigger = defineAsyncComponent(() => import('@/components/ui/select').then(mod => mod.SelectTrigger))
 const SelectValue = defineAsyncComponent(() => import('@/components/ui/select').then(mod => mod.SelectValue))
 const Badge = defineAsyncComponent(() => import('@/components/ui/badge').then(mod => mod.Badge))
-const Switch = defineAsyncComponent(() => import('@/components/ui/switch').then(mod => mod.Switch))
-const Separator = defineAsyncComponent(() => import('@/components/ui/separator').then(mod => mod.Separator))
+// const Switch = defineAsyncComponent(() => import('@/components/ui/switch').then(mod => mod.Switch))
+// const Separator = defineAsyncComponent(() => import('@/components/ui/separator').then(mod => mod.Separator))
 const DropdownMenu = defineAsyncComponent(() => import('@/components/ui/dropdown-menu').then(mod => mod.DropdownMenu))
 const DropdownMenuContent = defineAsyncComponent(() => import('@/components/ui/dropdown-menu').then(mod => mod.DropdownMenuContent))
 const DropdownMenuItem = defineAsyncComponent(() => import('@/components/ui/dropdown-menu').then(mod => mod.DropdownMenuItem))
@@ -637,6 +637,8 @@ const handleInstallSubmit = async (name: string, config: any) => {
         type: 'gallery' // 确保类型为 gallery
       })
       console.log('服务器添加成功:', name)
+      
+
     } else {
       console.error('McpServers 组件引用不可用')
     }
@@ -745,7 +747,7 @@ const goToMcpSettings = () => {
                           :src="getServerIcon(server.icon)"
                           :alt="server.name"
                           class="w-10 h-10 rounded-lg object-cover"
-                          @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'"
+                          @error="(event) => { if (event.target) { (event.target as HTMLElement).style.display='none'; const next = (event.target as HTMLElement).nextElementSibling as HTMLElement; if (next) next.style.display='flex'; } }"
                       />
                       <div 
                           v-else
@@ -891,12 +893,12 @@ const goToMcpSettings = () => {
               <div class="flex items-center gap-4">
                 <!-- 修复图标显示 -->
                 <div class="flex-shrink-0">
-                  <img 
+                  <img
                     v-if="getServerIcon(server.icon).startsWith('http') || getServerIcon(server.icon).startsWith('data:')"
                     :src="getServerIcon(server.icon)"
                     :alt="server.name"
                     class="w-8 h-8 rounded object-cover"
-                    @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'"
+                    @error="(event) => { if (event.target) { (event.target as HTMLElement).style.display='none'; const next = (event.target as HTMLElement).nextElementSibling as HTMLElement; if (next) next.style.display='flex'; } }"
                   />
                   <div 
                     v-else

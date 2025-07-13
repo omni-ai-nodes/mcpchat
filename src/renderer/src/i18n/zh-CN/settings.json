@@ -361,7 +361,14 @@
     "maxDefaultServersReached": "最多只能设置3个默认服务器",
     "removeDefaultFirst": "请先移除一些默认服务器",
     "higressMarket": "前往 Higress MCP 安装",
-    "totalServers": "服务器总数"
+    "totalServers": "服务器总数",
+    "localCache": {
+      "title": "本地缓存",
+      "online": "在线",
+      "packages": "包数量",
+      "size": "缓存大小",
+      "clear": "清除缓存"
+    }
   },
   "about": {
     "title": "关于我们",

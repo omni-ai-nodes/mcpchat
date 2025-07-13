@@ -63,7 +63,8 @@ export const MCP_EVENTS = {
   SERVER_STOPPED: 'mcp:server-stopped',
   CONFIG_CHANGED: 'mcp:config-changed',
   TOOL_CALL_RESULT: 'mcp:tool-call-result',
-  SERVER_STATUS_CHANGED: 'mcp:server-status-changed'
+  SERVER_STATUS_CHANGED: 'mcp:server-status-changed',
+  CACHE_UPDATED: 'mcp:cache-updated' // 新增：本地缓存更新事件
 }
 // 同步相关事件
 export const SYNC_EVENTS = {

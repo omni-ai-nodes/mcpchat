@@ -128,9 +128,9 @@ export class McpPresenter implements IMCPPresenter {
         console.error('[MCP] npm registry speed test failed:', error)
       }
 
-      // 检查并启动 mcpchat-inmemory/custom-prompts-server
+      // 检查并启动 mcpchat-inmemory/custom-prompts-server（仅当未禁用时）
       const customPromptsServerName = 'mcpchat-inmemory/custom-prompts-server'
-      if (servers[customPromptsServerName]) {
+      if (servers[customPromptsServerName] && !servers[customPromptsServerName].disable) {
         console.log(`[MCP] Attempting to start custom prompts server: ${customPromptsServerName}`)
 
         try {
@@ -147,10 +147,10 @@ export class McpPresenter implements IMCPPresenter {
         }
       }
 
-      // 如果有默认服务器，尝试启动
+      // 如果有默认服务器，尝试启动（仅当未禁用时）
       if (defaultServers.length > 0) {
         for (const serverName of defaultServers) {
-          if (servers[serverName]) {
+          if (servers[serverName] && !servers[serverName].disable) {
             console.log(`[MCP] Attempting to start default server: ${serverName}`)
 
             try {
@@ -1033,5 +1033,40 @@ export class McpPresenter implements IMCPPresenter {
       }
     })
     return openaiTools
+  }
+
+  /**
+   * 清理本地包缓存
+   */
+  async clearLocalPackageCache(): Promise<void> {
+    return this.serverManager.clearLocalCache()
+  }
+
+  /**
+   * 获取本地包缓存统计信息
+   */
+  getLocalPackageCacheStats(): { totalPackages: number; totalSize: number } {
+    return this.serverManager.getCacheStats()
+  }
+
+  /**
+   * 检查包是否已在本地缓存
+   */
+  isPackageCached(packageName: string): boolean {
+    return this.serverManager.getLocalPackageManager().isPackageCached(packageName)
+  }
+
+  /**
+   * 手动安装包到本地缓存
+   */
+  async installPackageToCache(packageName: string, npmRegistry?: string): Promise<boolean> {
+    return this.serverManager.getLocalPackageManager().installPackageToCache(packageName, npmRegistry)
+  }
+
+  /**
+   * 检查网络连接状态
+   */
+  async checkNetworkConnection(): Promise<boolean> {
+    return this.serverManager.getLocalPackageManager().checkNetworkConnection()
   }
 }
