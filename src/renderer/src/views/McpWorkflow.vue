@@ -3925,6 +3925,20 @@ const getCodeEditButtonAtPosition = (x: number, y: number): WorkflowNode | null 
   return null
 }
 
+// 获取代码区域点击位置
+const getCodeAreaAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'nodejs-code' && node.codeArea) {
+      const area = node.codeArea
+      if (x >= area.x && x <= area.x + area.width && 
+          y >= area.y && y <= area.y + area.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
 // 处理代码编辑按钮点击
 const handleCodeEditButtonClick = (node: WorkflowNode) => {
   console.log('点击代码编辑按钮，节点:', node.name)
@@ -9177,6 +9191,7 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedDbTestButton = getDbTestButtonAtPosition(pos.x, pos.y)
   const clickedDbTypeSelector = getDbTypeSelectorAtPosition(pos.x, pos.y)
   const clickedCodeEditButton = getCodeEditButtonAtPosition(pos.x, pos.y)
+  const clickedCodeArea = getCodeAreaAtPosition(pos.x, pos.y)
   
   console.log('点击检测结果:', {
     clickedDbTestButton: clickedDbTestButton?.name || null,
@@ -9245,6 +9260,9 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedCodeEditButton) {
     // 处理代码编辑按钮点击
     handleCodeEditButtonClick(clickedCodeEditButton)
+  } else if (clickedCodeArea) {
+    // 处理代码区域点击，直接打开编辑对话框
+    handleCodeEditButtonClick(clickedCodeArea)
   } else if (clickedTextArea) {
     // 处理文本区域点击
     handleTextAreaClick(clickedTextArea)
