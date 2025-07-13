@@ -61,10 +61,13 @@ async function executeWorkflow(workflowData: WorkflowData) {
           result = await executeApiInputNode(node, inputData)
           break
         case 'database-input':
-          result = await executeDatabaseInputNode(node, inputData)
+          result = await executeDatabaseInputNode(node)
           break
         case 'text-output':
           result = await executeTextOutputNode(node, inputData)
+          break
+        case 'nodejs-code':
+          result = await executeNodejsCodeNode(node, inputData)
           break
         default:
           result = { output: (inputData.input as string) || '' }
@@ -764,6 +767,105 @@ async function executeTextOutputNode(node: WorkflowNode, inputData: Record<strin
   console.log(`执行文本输出节点: ${node.name || node.id}`)
   return {
     output: (inputData.input as string) || ''
+  }
+}
+
+// 执行 Node.js 代码节点
+async function executeNodejsCodeNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+  const config = node.config || {}
+  const code = (config.code as string) || ''
+  
+  console.log(`执行Node.js代码节点: ${node.name || node.id}`)
+  console.log('节点配置:', JSON.stringify(config, null, 2))
+  console.log('代码内容:', code)
+  
+  if (!code.trim()) {
+    throw new Error(`Node.js代码节点 "${node.name}" 没有代码内容`)
+  }
+  
+  try {
+    // 获取输入数据
+    const textInput = (inputData.textInput as string) || (inputData.input as string) || ''
+    const fileInput = inputData.fileInput as string || ''
+    
+    // 解析文件输入（如果有）
+    let fileInfo: { fileName?: string; filePath?: string; fileType?: string; fileSize?: number; imageData?: string; fileContent?: string } | null = null
+    if (fileInput) {
+      try {
+        fileInfo = JSON.parse(fileInput)
+      } catch (error) {
+        console.warn('解析文件输入失败:', error)
+      }
+    }
+    
+    // 构建输入对象
+    const input = {
+      text: textInput,
+      file: fileInfo,
+      data: inputData
+    }
+    
+    // 创建安全的执行环境
+    const vm = await import('vm')
+    const { Buffer } = await import('buffer')
+    const context = {
+      input,
+      console: {
+        log: (...args: unknown[]) => console.log('[Node.js代码]', ...args),
+        error: (...args: unknown[]) => console.error('[Node.js代码]', ...args),
+        warn: (...args: unknown[]) => console.warn('[Node.js代码]', ...args)
+      },
+      JSON,
+      Math,
+      Date,
+      String,
+      Number,
+      Boolean,
+      Array,
+      Object,
+      RegExp,
+      parseInt,
+      parseFloat,
+      isNaN,
+      isFinite,
+      encodeURIComponent,
+      decodeURIComponent,
+      Buffer
+    }
+    
+    // 包装代码以捕获返回值
+    const wrappedCode = `
+      (function() {
+        ${code}
+      })()
+    `
+    
+    // 执行代码
+    const result = vm.runInNewContext(wrappedCode, context, {
+      timeout: 30000, // 30秒超时
+      displayErrors: true
+    })
+    
+    // 处理返回值
+    let output = ''
+    if (result !== undefined && result !== null) {
+      if (typeof result === 'string') {
+        output = result
+      } else {
+        output = JSON.stringify(result, null, 2)
+      }
+    }
+    
+    console.log(`Node.js代码节点 ${node.name} 执行成功`)
+    
+    return {
+      output,
+      result
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error(`Node.js代码节点 ${node.name} 执行失败:`, errorMessage)
+    throw new Error(`Node.js代码执行失败: ${errorMessage}`)
   }
 }
 

@@ -704,6 +704,18 @@ interface WorkflowNode {
     width: number
     height: number
   }
+  codeArea?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  codeEditButton?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 }
 
 interface Connection {
@@ -839,6 +851,13 @@ const processNodes: NodeTemplate[] = [
     name: '模型服务',
     description: '选择和配置AI模型',
     icon: 'lucide:cpu',
+    category: 'process'
+  },
+  {
+    type: 'nodejs-code',
+    name: 'Node.js代码',
+    description: '执行自定义Node.js代码',
+    icon: 'lucide:code',
     category: 'process'
   },
   {
@@ -1093,6 +1112,8 @@ const drawNode = (node: WorkflowNode) => {
     height = (NODE_HEIGHT + 116) * scale.value  // 基础高度 + MCP服务区域高度 + 间距
   } else if (node.type === 'model-service') {
     height = (NODE_HEIGHT + 106) * scale.value  // 基础高度 + 模型选择区域高度 + 间距
+  } else if (node.type === 'nodejs-code') {
+    height = (NODE_HEIGHT + 216) * scale.value  // 基础高度 + 代码编辑区域高度 + 间距
   } else {
     height = NODE_HEIGHT * scale.value
   }
@@ -1603,6 +1624,151 @@ const drawNode = (node: WorkflowNode) => {
       node.editButton.y = (buttonY / scale.value) + offset.value.y
       node.editButton.width = buttonWidth / scale.value
       node.editButton.height = buttonHeight / scale.value
+    }
+  }
+
+  // 如果是Node.js代码节点，绘制代码编辑区域
+  if (node.type === 'nodejs-code') {
+    const codeAreaWidth = width - 16 * scale.value
+    const codeAreaHeight = 240 * scale.value
+    const codeAreaX = x + 8 * scale.value
+    const codeAreaY = y + headerHeight + 8 * scale.value
+    
+    // 绘制整体背景
+    context.fillStyle = '#1e1e1e'  // VS Code 深色主题背景
+    context.beginPath()
+    context.roundRect(codeAreaX, codeAreaY, codeAreaWidth, codeAreaHeight, 8 * scale.value)
+    context.fill()
+    
+    // 绘制边框
+    context.strokeStyle = '#3c3c3c'
+    context.lineWidth = 1 * scale.value
+    context.setLineDash([])
+    context.stroke()
+    
+    // 绘制代码编辑区域
+    const editorHeight = 200 * scale.value
+    const editorY = codeAreaY + 8 * scale.value
+    const editorX = codeAreaX + 8 * scale.value
+    const editorWidth = codeAreaWidth - 16 * scale.value
+    
+    context.fillStyle = '#0d1117'  // GitHub 深色主题背景
+    context.beginPath()
+    context.roundRect(editorX, editorY, editorWidth, editorHeight, 4 * scale.value)
+    context.fill()
+    
+    // 绘制代码编辑器边框
+    context.strokeStyle = '#21262d'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 绘制代码内容或占位符
+    const codeContent = (node.config?.code as string) || ''
+    const placeholder = `// Node.js 代码示例 - 完整的输入和返回事例
+// 获取输入数据
+const inputData = input || {};
+const { name = 'World', age = 0, items = [] } = inputData;
+
+// 数据处理逻辑
+const processedData = {
+  greeting: \`Hello, \${name}!\`,
+  isAdult: age >= 18,
+  itemCount: items.length,
+  processedItems: items.map(item => item.toUpperCase()),
+  timestamp: new Date().toISOString()
+};
+
+// 返回处理结果
+return {
+  success: true,
+  data: processedData,
+  message: \`处理完成，共处理 \${items.length} 个项目\`
+};`
+    const displayCode = codeContent || placeholder
+    
+    context.fillStyle = codeContent ? '#e6edf3' : '#7d8590'  // 有内容时亮色，占位符时暗色
+    context.font = `${10 * scale.value}px 'SF Mono', Monaco, 'Cascadia Code', monospace`
+    context.textAlign = 'left'
+    context.textBaseline = 'top'
+    
+    // 代码换行处理
+    const maxWidth = editorWidth - 16 * scale.value
+    const lineHeight = 12 * scale.value
+    const lines = displayCode.split('\n')
+    
+    lines.slice(0, 8).forEach((line, index) => {
+      // 简单的语法高亮
+      if (line.trim().startsWith('//')) {
+        context.fillStyle = '#7c3aed'  // 注释颜色
+      } else if (line.includes('function') || line.includes('const') || line.includes('let') || line.includes('var') || line.includes('return')) {
+        context.fillStyle = '#f97316'  // 关键字颜色
+      } else {
+        context.fillStyle = codeContent ? '#e6edf3' : '#7d8590'
+      }
+      
+      // 截断过长的行
+      let displayLine = line
+      if (context.measureText(line).width > maxWidth) {
+        while (context.measureText(displayLine + '...').width > maxWidth && displayLine.length > 0) {
+          displayLine = displayLine.slice(0, -1)
+        }
+        displayLine += '...'
+      }
+      
+      context.fillText(displayLine, editorX + 8 * scale.value, editorY + 8 * scale.value + index * lineHeight)
+    })
+    
+    // 存储代码编辑区域位置信息，用于点击检测
+    if (!node.codeArea) {
+      node.codeArea = {
+        x: (editorX / scale.value) + offset.value.x,
+        y: (editorY / scale.value) + offset.value.y,
+        width: editorWidth / scale.value,
+        height: editorHeight / scale.value
+      }
+    } else {
+      node.codeArea.x = (editorX / scale.value) + offset.value.x
+      node.codeArea.y = (editorY / scale.value) + offset.value.y
+      node.codeArea.width = editorWidth / scale.value
+      node.codeArea.height = editorHeight / scale.value
+    }
+    
+    // 绘制编辑按钮
+    const buttonWidth = 80 * scale.value
+    const buttonHeight = 20 * scale.value
+    const buttonX = codeAreaX + codeAreaWidth - buttonWidth - 8 * scale.value
+    const buttonY = editorY + editorHeight + 4 * scale.value
+    
+    context.fillStyle = '#238636'
+    context.beginPath()
+    context.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 4 * scale.value)
+    context.fill()
+    
+    // 按钮边框
+    context.strokeStyle = '#2ea043'
+    context.lineWidth = 1 * scale.value
+    context.stroke()
+    
+    // 按钮文字
+    context.fillStyle = '#ffffff'
+    context.font = `${10 * scale.value}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+    context.textAlign = 'center'
+    context.textBaseline = 'middle'
+    context.fillText('💻 编辑代码', buttonX + buttonWidth / 2, buttonY + buttonHeight / 2)
+    
+    // 存储按钮位置信息，用于点击检测
+    if (!node.codeEditButton) {
+      node.codeEditButton = {
+        x: (buttonX / scale.value) + offset.value.x,
+        y: (buttonY / scale.value) + offset.value.y,
+        width: buttonWidth / scale.value,
+        height: buttonHeight / scale.value
+      }
+    } else {
+      node.codeEditButton.x = (buttonX / scale.value) + offset.value.x
+      node.codeEditButton.y = (buttonY / scale.value) + offset.value.y
+      node.codeEditButton.width = buttonWidth / scale.value
+      node.codeEditButton.height = buttonHeight / scale.value
     }
   }
 
@@ -2930,6 +3096,30 @@ const addNode = (template: NodeTemplate) => {
       password: '',
       sql: 'SELECT * FROM table_name LIMIT 10'
     }
+  } else if (template.type === 'nodejs-code') {
+    // Node.js代码节点的初始配置
+    initialConfig = {
+      code: `// Node.js 代码示例 - 完整的输入和返回事例
+// 获取输入数据
+const inputData = input || {};
+const { name = 'World', age = 0, items = [] } = inputData;
+
+// 数据处理逻辑
+const processedData = {
+  greeting: \`Hello, \${name}!\`,
+  isAdult: age >= 18,
+  itemCount: items.length,
+  processedItems: items.map(item => item.toUpperCase()),
+  timestamp: new Date().toISOString()
+};
+
+// 返回处理结果
+return {
+  success: true,
+  data: processedData,
+  message: \`处理完成，共处理 \${items.length} 个项目\`
+};`
+    }
   } else if (template.type === 'mcp-service') {
     // MCP节点的初始状态：完全独立，无任何选择
     initialConfig = {
@@ -2948,10 +3138,27 @@ const addNode = (template: NodeTemplate) => {
     name: template.name,
     x: Math.random() * 400 + 200,
     y: Math.random() * 300 + 150,
-    config: initialConfig,
+    config: JSON.parse(JSON.stringify(initialConfig)), // 深拷贝配置对象，避免引用问题
     inputs: template.category === 'output' ? ['input'] : 
             (template.type === 'mcp-service' || template.type === 'model-service' ? ['text-input', 'file-input'] : ['input']),
     outputs: template.category === 'output' ? [] : ['output']
+  }
+  
+  // 特别处理Node.js代码节点，在添加到数组前确保配置正确
+  if (template.type === 'nodejs-code') {
+    // 双重验证代码配置
+    if (!newNode.config.code || typeof newNode.config.code !== 'string' || !newNode.config.code.trim()) {
+      newNode.config.code = initialConfig.code
+      console.log('Node.js节点代码配置修复:', (newNode.config.code as string).substring(0, 50) + '...')
+    }
+    console.log('Node.js节点创建完成，代码长度:', (newNode.config.code as string | undefined)?.length || 0)
+    console.log('Node.js节点完整配置:', JSON.stringify(newNode.config, null, 2))
+    
+    // 强制确保配置对象不为空
+    if (!newNode.config || Object.keys(newNode.config).length === 0) {
+      newNode.config = { code: initialConfig.code }
+      console.log('强制重置Node.js节点配置:', newNode.config)
+    }
   }
   
   workflowNodes.value.push(newNode)
@@ -2961,6 +3168,19 @@ const addNode = (template: NodeTemplate) => {
   // 同步到当前工作流
   currentWorkflow.nodes = [...workflowNodes.value]
   console.log('节点已添加:', newNode)
+  console.log('节点配置:', newNode.config)
+  
+  // 特别为Node.js节点添加额外验证
+  if (template.type === 'nodejs-code') {
+    console.log('=== Node.js节点配置验证 ===')
+    console.log('节点ID:', newNode.id)
+    console.log('节点类型:', newNode.type)
+    console.log('配置对象:', newNode.config)
+    console.log('代码内容存在:', !!newNode.config?.code)
+    console.log('代码内容类型:', typeof newNode.config?.code)
+    console.log('代码内容长度:', (newNode.config?.code as string)?.length || 0)
+    console.log('=========================')
+  }
   
   // 如果是MCP节点，确保状态完全独立
   if (template.type === 'mcp-service') {
@@ -3686,6 +3906,477 @@ const getDbTypeSelectorAtPosition = (x: number, y: number): WorkflowNode | null 
     }
   }
   return null
+}
+
+// 获取代码编辑按钮点击位置
+const getCodeEditButtonAtPosition = (x: number, y: number): WorkflowNode | null => {
+  for (const node of workflowNodes.value) {
+    if (node.type === 'nodejs-code' && node.codeEditButton) {
+      const button = node.codeEditButton
+      if (x >= button.x && x <= button.x + button.width && 
+          y >= button.y && y <= button.y + button.height) {
+        return node
+      }
+    }
+  }
+  return null
+}
+
+// 处理代码编辑按钮点击
+const handleCodeEditButtonClick = (node: WorkflowNode) => {
+  console.log('点击代码编辑按钮，节点:', node.name)
+  
+  // 默认代码模板
+  const defaultCode = `// Node.js 代码示例 - 完整的输入和返回事例
+// 获取输入数据
+const inputData = input || {};
+const { name = 'World', age = 0, items = [] } = inputData;
+
+// 数据处理逻辑
+const processedData = {
+  greeting: \`Hello, \${name}!\`,
+  isAdult: age >= 18,
+  itemCount: items.length,
+  processedItems: items.map(item => item.toUpperCase()),
+  timestamp: new Date().toISOString()
+};
+
+// 返回处理结果
+return {
+  success: true,
+  data: processedData,
+  message: \`处理完成，共处理 \${items.length} 个项目\`
+};`
+  
+  // 获取当前代码内容，如果没有代码则使用默认代码
+   let currentCode = (node.config?.code as string) || ''
+   if (!currentCode.trim()) {
+     currentCode = defaultCode
+     // 立即更新节点配置，确保有默认代码
+     updateNode(node.id, {
+       config: {
+         ...node.config,
+         code: defaultCode
+       }
+     })
+     console.log('节点没有代码内容，已设置默认代码')
+   } else {
+     // 即使有代码，也要确保节点配置是最新的
+     updateNode(node.id, {
+       config: {
+         ...node.config,
+         code: currentCode
+       }
+     })
+     console.log('确保节点代码配置同步，代码长度:', currentCode.length)
+   }
+  
+  // 创建对话框容器
+  const dialog = document.createElement('div')
+  dialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease-out;
+  `
+  
+  // 创建对话框内容
+  const dialogContent = document.createElement('div')
+  dialogContent.style.cssText = `
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-radius: 12px;
+    padding: 28px;
+    width: 900px;
+    height: 600px;
+    min-width: 800px;
+    min-height: 500px;
+    max-width: 95vw;
+    max-height: 90vh;
+    border: 1px solid #374151;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.3s ease-out;
+    position: relative;
+    resize: both;
+    overflow: hidden;
+  `
+  
+  // 创建标题区域
+  const titleContainer = document.createElement('div')
+  titleContainer.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #374151;
+  `
+  
+  const title = document.createElement('h3')
+  title.textContent = '编辑 Node.js 代码'
+  title.style.cssText = `
+    margin: 0;
+    color: #f9fafb;
+    font-size: 20px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  `
+  
+  // 添加图标
+  const titleIcon = document.createElement('span')
+  titleIcon.innerHTML = '💻'
+  titleIcon.style.cssText = `
+    font-size: 18px;
+  `
+  title.insertBefore(titleIcon, title.firstChild)
+  
+  // 创建关闭按钮
+  const closeButton = document.createElement('button')
+  closeButton.innerHTML = '✕'
+  closeButton.style.cssText = `
+    background: none;
+    border: none;
+    color: #9ca3af;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `
+  closeButton.onmouseover = () => {
+    closeButton.style.background = '#374151'
+    closeButton.style.color = '#ffffff'
+  }
+  closeButton.onmouseout = () => {
+    closeButton.style.background = 'none'
+    closeButton.style.color = '#9ca3af'
+  }
+  
+  titleContainer.appendChild(title)
+  titleContainer.appendChild(closeButton)
+  
+  // 创建代码编辑区域容器
+  const codeContainer = document.createElement('div')
+  codeContainer.style.cssText = `
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+  `
+  
+  // 创建代码区域标签
+  const codeLabel = document.createElement('label')
+  codeLabel.textContent = 'Node.js 代码'
+  codeLabel.style.cssText = `
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    display: block;
+  `
+  
+  // 创建代码编辑区域
+  const codeTextarea = document.createElement('textarea')
+  codeTextarea.value = currentCode
+  codeTextarea.style.cssText = `
+    width: 100%;
+    flex: 1;
+    min-height: 300px;
+    background: #0f172a;
+    border: 2px solid #334155;
+    border-radius: 8px;
+    padding: 16px;
+    color: #e2e8f0;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+    tab-size: 2;
+  `
+  codeTextarea.placeholder = `// Node.js 代码示例 - 完整的输入和返回事例
+// 获取输入数据
+const inputData = input || {};
+const { name = 'World', age = 0, items = [] } = inputData;
+
+// 数据处理逻辑
+const processedData = {
+  greeting: \`Hello, \${name}!\`,
+  isAdult: age >= 18,
+  itemCount: items.length,
+  processedItems: items.map(item => item.toUpperCase()),
+  timestamp: new Date().toISOString()
+};
+
+// 返回处理结果
+return {
+  success: true,
+  data: processedData,
+  message: \`处理完成，共处理 \${items.length} 个项目\`
+};`
+  
+  // 添加焦点效果
+  codeTextarea.onfocus = () => {
+    codeTextarea.style.borderColor = '#6366f1'
+    codeTextarea.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)'
+  }
+  codeTextarea.onblur = () => {
+    codeTextarea.style.borderColor = '#334155'
+    codeTextarea.style.boxShadow = 'none'
+  }
+  
+  // 支持 Tab 键缩进
+  codeTextarea.onkeydown = (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const start = codeTextarea.selectionStart
+      const end = codeTextarea.selectionEnd
+      codeTextarea.value = codeTextarea.value.substring(0, start) + '  ' + codeTextarea.value.substring(end)
+      codeTextarea.selectionStart = codeTextarea.selectionEnd = start + 2
+    }
+  }
+  
+  codeContainer.appendChild(codeLabel)
+  codeContainer.appendChild(codeTextarea)
+  
+  // 创建按钮容器
+  const buttonContainer = document.createElement('div')
+  buttonContainer.style.cssText = `
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid #374151;
+    flex-shrink: 0;
+  `
+  
+  // 创建左侧按钮组
+  const leftButtonGroup = document.createElement('div')
+  leftButtonGroup.style.cssText = `
+    display: flex;
+    gap: 8px;
+  `
+  
+  // 创建右侧按钮组
+  const rightButtonGroup = document.createElement('div')
+  rightButtonGroup.style.cssText = `
+    display: flex;
+    gap: 12px;
+  `
+  
+  // 创建格式化按钮
+  const formatButton = document.createElement('button')
+  formatButton.textContent = '格式化'
+  formatButton.style.cssText = `
+    padding: 8px 16px;
+    background: #059669;
+    border: 1px solid #10b981;
+    border-radius: 6px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    min-width: 70px;
+  `
+  
+  // 创建清空按钮
+  const clearButton = document.createElement('button')
+  clearButton.textContent = '清空'
+  clearButton.style.cssText = `
+    padding: 8px 16px;
+    background: #dc2626;
+    border: 1px solid #ef4444;
+    border-radius: 6px;
+    color: #ffffff;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    min-width: 70px;
+  `
+  
+  // 创建取消按钮
+  const cancelButton = document.createElement('button')
+  cancelButton.textContent = '取消'
+  cancelButton.style.cssText = `
+    padding: 10px 20px;
+    background: #374151;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    color: #e5e7eb;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
+  `
+  
+  // 创建保存按钮
+  const saveButton = document.createElement('button')
+  saveButton.textContent = '保存'
+  saveButton.style.cssText = `
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    border: 1px solid #6366f1;
+    border-radius: 6px;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 80px;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
+  `
+  
+  // 添加按钮功能
+  formatButton.onclick = () => {
+    // 简单的代码格式化（添加基本缩进）
+    const code = codeTextarea.value
+    const lines = code.split('\n')
+    let indentLevel = 0
+    const formattedLines = lines.map(line => {
+      const trimmed = line.trim()
+      if (trimmed.endsWith('{')) {
+        const formatted = '  '.repeat(indentLevel) + trimmed
+        indentLevel++
+        return formatted
+      } else if (trimmed.startsWith('}')) {
+        indentLevel = Math.max(0, indentLevel - 1)
+        return '  '.repeat(indentLevel) + trimmed
+      } else {
+        return '  '.repeat(indentLevel) + trimmed
+      }
+    })
+    codeTextarea.value = formattedLines.join('\n')
+  }
+  
+  clearButton.onclick = () => {
+    codeTextarea.value = ''
+    codeTextarea.focus()
+  }
+  
+  // 添加按钮悬停效果
+  formatButton.onmouseover = () => {
+    formatButton.style.background = '#047857'
+    formatButton.style.transform = 'translateY(-1px)'
+  }
+  formatButton.onmouseout = () => {
+    formatButton.style.background = '#059669'
+    formatButton.style.transform = 'translateY(0)'
+  }
+  
+  clearButton.onmouseover = () => {
+    clearButton.style.background = '#b91c1c'
+    clearButton.style.transform = 'translateY(-1px)'
+  }
+  clearButton.onmouseout = () => {
+    clearButton.style.background = '#dc2626'
+    clearButton.style.transform = 'translateY(0)'
+  }
+  
+  cancelButton.onmouseover = () => {
+    cancelButton.style.background = '#4b5563'
+    cancelButton.style.transform = 'translateY(-1px)'
+  }
+  cancelButton.onmouseout = () => {
+    cancelButton.style.background = '#374151'
+    cancelButton.style.transform = 'translateY(0)'
+  }
+  
+  saveButton.onmouseover = () => {
+    saveButton.style.background = 'linear-gradient(135deg, #5b5bf6 0%, #4338ca 100%)'
+    saveButton.style.transform = 'translateY(-1px)'
+    saveButton.style.boxShadow = '0 4px 8px rgba(99, 102, 241, 0.3)'
+  }
+  saveButton.onmouseout = () => {
+    saveButton.style.background = 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'
+    saveButton.style.transform = 'translateY(0)'
+    saveButton.style.boxShadow = '0 2px 4px rgba(99, 102, 241, 0.2)'
+  }
+  
+  // 添加事件监听
+  const closeDialog = () => {
+    dialog.style.animation = 'fadeOut 0.2s ease-in'
+    dialogContent.style.animation = 'slideOut 0.2s ease-in'
+    setTimeout(() => {
+      document.body.removeChild(dialog)
+    }, 200)
+  }
+  
+  cancelButton.onclick = closeDialog
+  closeButton.onclick = closeDialog
+  
+  saveButton.onclick = () => {
+    const newCode = codeTextarea.value.trim()
+    updateNode(node.id, {
+      config: {
+        ...node.config,
+        code: newCode
+      }
+    })
+    console.log('代码内容已更新:', newCode)
+    closeDialog()
+  }
+  
+  // 点击背景关闭
+  dialog.onclick = (e) => {
+    if (e.target === dialog) {
+      closeDialog()
+    }
+  }
+  
+  // ESC键关闭
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      closeDialog()
+      document.removeEventListener('keydown', handleKeyDown)
+    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      saveButton.click()
+    }
+  }
+  document.addEventListener('keydown', handleKeyDown)
+  
+  // 组装按钮
+  leftButtonGroup.appendChild(formatButton)
+  leftButtonGroup.appendChild(clearButton)
+  rightButtonGroup.appendChild(cancelButton)
+  rightButtonGroup.appendChild(saveButton)
+  
+  buttonContainer.appendChild(leftButtonGroup)
+  buttonContainer.appendChild(rightButtonGroup)
+  
+  // 组装对话框
+  dialogContent.appendChild(titleContainer)
+  dialogContent.appendChild(codeContainer)
+  dialogContent.appendChild(buttonContainer)
+  dialog.appendChild(dialogContent)
+  
+  // 添加到页面
+  document.body.appendChild(dialog)
+  
+  // 聚焦到代码编辑区域
+  setTimeout(() => {
+    codeTextarea.focus()
+  }, 100)
 }
 
 interface UploadedFile {
@@ -6264,7 +6955,7 @@ const handleApiUrlAreaClick = (node: WorkflowNode) => {
 const handleApiTestButtonClick = async (node: WorkflowNode) => {
   console.log('点击API测试按钮，节点:', node.name)
   
-  const config = node.config || {}
+  const config = node.config || ({} as Record<string, unknown>)
   const method = (config.method as string) || 'GET'
   const url = (config.apiUrl as string) || ''
   const jsonParams = (config.jsonParams as string) || ''
@@ -7655,7 +8346,7 @@ const handleDbTestButtonClick = async (node: WorkflowNode) => {
   console.log('节点类型:', node.type);
   console.log('按钮区域信息:', node.dbTestButton);
   
-  const config = node.config || {}
+  const config = node.config || ({} as Record<string, unknown>)
   const host = (config.host as string) || ''
   const port = (config.port as string) || ''
   const database = (config.database as string) || ''
@@ -7720,7 +8411,7 @@ const handleDbTestButtonClick = async (node: WorkflowNode) => {
     
     // 调用后端API进行真实的数据库连接和查询
     const result = await window.api.testDatabaseConnection({
-      dbType: config.dbType || 'mysql',
+      dbType: (config.dbType as string) || 'mysql',
       host,
       port: parseInt(port),
       database,
@@ -8482,6 +9173,7 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   const clickedDbSqlArea = getDbSqlAreaAtPosition(pos.x, pos.y)
   const clickedDbTestButton = getDbTestButtonAtPosition(pos.x, pos.y)
   const clickedDbTypeSelector = getDbTypeSelectorAtPosition(pos.x, pos.y)
+  const clickedCodeEditButton = getCodeEditButtonAtPosition(pos.x, pos.y)
   
   console.log('点击检测结果:', {
     clickedDbTestButton: clickedDbTestButton?.name || null,
@@ -8547,6 +9239,9 @@ const onCanvasMouseDown = (event: MouseEvent) => {
   } else if (clickedDbTypeSelector) {
     // 处理数据库类型选择器点击
     handleDbTypeSelectorClick(clickedDbTypeSelector)
+  } else if (clickedCodeEditButton) {
+    // 处理代码编辑按钮点击
+    handleCodeEditButtonClick(clickedCodeEditButton)
   } else if (clickedTextArea) {
     // 处理文本区域点击
     handleTextAreaClick(clickedTextArea)
@@ -9144,7 +9839,45 @@ const loadWorkflowFromData = async (workflowData: WorkflowData & { description?:
     // 加载工作流数据
     currentWorkflow.name = workflowData.name || ''
     currentWorkflow.description = workflowData.description || ''
-    workflowNodes.value = workflowData.nodes || []
+    
+    // 加载节点并验证Node.js代码节点的配置
+    const loadedNodes = (workflowData.nodes || []).map(node => {
+      // 特别处理Node.js代码节点，确保有代码内容
+      if (node.type === 'nodejs-code') {
+        const defaultCode = `// Node.js 代码示例 - 完整的输入和返回事例
+// 获取输入数据
+const inputData = input || {};
+const { name = 'World', age = 0, items = [] } = inputData;
+
+// 数据处理逻辑
+const processedData = {
+  greeting: \`Hello, \${name}!\`,
+  isAdult: age >= 18,
+  itemCount: items.length,
+  processedItems: items.map(item => item.toUpperCase()),
+  timestamp: new Date().toISOString()
+};
+
+// 返回处理结果
+return {
+  success: true,
+  data: processedData,
+  message: \`处理完成，共处理 \${items.length} 个项目\`
+};`
+        
+        // 检查代码配置是否存在且有效
+        if (!node.config?.code || typeof node.config.code !== 'string' || !node.config.code.trim()) {
+          console.log(`Node.js节点 ${node.id} 缺少代码内容，设置默认代码`)
+          node.config = {
+            ...node.config,
+            code: defaultCode
+          }
+        }
+      }
+      return node
+    })
+    
+    workflowNodes.value = loadedNodes
     
     // 转换连接数据格式
     connections.value = (workflowData.connections || []).map((conn: WorkflowConnection) => ({
@@ -9546,9 +10279,67 @@ const runWorkflow = async () => {
     })
 
     // 准备工作流数据 - 将响应式对象转换为普通对象以避免序列化错误
+    console.log('序列化前的节点数据:', workflowNodes.value)
+    
+    // 特别检查并修复Node.js节点的配置
+    const nodejsNodes = workflowNodes.value.filter(node => node.type === 'nodejs-code')
+    const defaultNodejsCode = `// Node.js 代码示例 - 完整的输入和返回事例
+// 获取输入数据
+const inputData = input || {};
+const { name = 'World', age = 0, items = [] } = inputData;
+
+// 数据处理逻辑
+const processedData = {
+  greeting: \`Hello, \${name}!\`,
+  isAdult: age >= 18,
+  itemCount: items.length,
+  processedItems: items.map(item => item.toUpperCase()),
+  timestamp: new Date().toISOString()
+};
+
+// 返回处理结果
+return {
+  success: true,
+  data: processedData,
+  message: \`处理完成，共处理 \${items.length} 个项目\`
+};`
+    
+    nodejsNodes.forEach(node => {
+      console.log(`=== 序列化前Node.js节点 ${node.id} ===`)
+      console.log('节点配置:', node.config)
+      console.log('代码内容:', node.config?.code)
+      console.log('代码类型:', typeof node.config?.code)
+      console.log('代码长度:', (node.config?.code as string)?.length || 0)
+      
+      // 检查并修复空的代码配置
+      if (!node.config?.code || typeof node.config.code !== 'string' || !node.config.code.trim()) {
+        console.log(`修复Node.js节点 ${node.id} 的空配置`)
+        if (!node.config) {
+          node.config = {}
+        }
+        node.config.code = defaultNodejsCode
+        console.log('已修复，新代码长度:', (node.config.code as string).length)
+      }
+      console.log('===============================')
+    })
+    
+    const serializedNodes = JSON.parse(JSON.stringify(workflowNodes.value))
+    console.log('序列化后的节点数据:', serializedNodes)
+    
+    // 检查序列化后的Node.js节点配置
+     const serializedNodejsNodes = serializedNodes.filter((node: WorkflowNode) => node.type === 'nodejs-code')
+     serializedNodejsNodes.forEach((node: WorkflowNode) => {
+      console.log(`=== 序列化后Node.js节点 ${node.id} ===`)
+      console.log('节点配置:', node.config)
+      console.log('代码内容:', node.config?.code)
+      console.log('代码类型:', typeof node.config?.code)
+      console.log('代码长度:', (node.config?.code as string)?.length || 0)
+      console.log('===============================')
+    })
+    
     const workflowData = {
       name: `运行_${new Date().toLocaleString()}`,
-      nodes: JSON.parse(JSON.stringify(workflowNodes.value)),
+      nodes: serializedNodes,
       connections: connections.value.map(conn => ({
         id: conn.id,
         sourceNodeId: conn.from,
