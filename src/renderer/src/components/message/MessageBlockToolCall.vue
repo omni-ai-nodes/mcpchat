@@ -15,7 +15,7 @@
               <div v-if="block.tool_call.server_icons.startsWith('http://') || block.tool_call.server_icons.startsWith('https://') || block.tool_call.server_icons.startsWith('data:')"
                    class="w-4 h-4 rounded flex items-center justify-center">
                 <img :src="block.tool_call.server_icons" alt="Server Icon" class="w-4 h-4 object-contain"
-                     @error="() => block.tool_call.server_icons = '📁'" />
+                     @error="() => { if (block.tool_call) block.tool_call.server_icons = '📁' }" />
               </div>
               <!-- 如果是emoji或其他文本，直接显示 -->
               <span v-else class="text-base leading-none">
@@ -56,25 +56,6 @@
           />
         </div>
       </div>
-      <!-- <transition
-        enter-active-class="transition-all duration-200"
-        enter-from-class="opacity-0 -translate-y-2"
-        enter-to-class="opacity-100 translate-y-0"
-        leave-active-class="transition-all duration-200"
-        leave-from-class="opacity-100 translate-y-0"
-        leave-to-class="opacity-0 -translate-y-2"
-      >
-        <div
-          v-if="simpleIn"
-          class="flex-row w-full gap-1 bg-muted dark:bg-background text-muted-foreground transition-colors duration-200 inline-flex max-w-[33rem] items-center cursor-pointer select-none"
-        >
-          <div class="text-xs inline-flex px-2 py-1 flex-row gap-2 items-center max-w-64">
-            <Icon icon="lucide:arrow-up-from-dot" class="w-3 h-3 text-muted-foreground shrink-0" />
-            <span class="truncate">{{ simpleIn }}</span>
-          </div>
-        </div>
-        <div v-else class="h-0"></div>
-      </transition> -->
       <div class="h-0"></div>
     </div>
 

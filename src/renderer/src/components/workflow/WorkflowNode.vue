@@ -246,7 +246,7 @@ const startPortDrag = (port: string, type: 'input' | 'output', event: MouseEvent
   emit('startConnection', props.node.id, port, type)
 }
 
-const endPortDrag = (port: string, type: 'input' | 'output', event: MouseEvent) => {
+const endPortDrag = (_port: string, _type: 'input' | 'output', event: MouseEvent) => {
   event.preventDefault()
   event.stopPropagation()
   // 端口的mouseup事件由画布处理，这里不需要额外处理

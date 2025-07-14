@@ -52,7 +52,7 @@ const args = ref(props.initialConfig?.args?.join(' ') || '')
 const env = ref(JSON.stringify(props.initialConfig?.env || {}, null, 2))
 const descriptions = ref(props.initialConfig?.descriptions || '')
 const icons = ref(props.initialConfig?.icons || '📁')
-const type = ref<'sse' | 'stdio' | 'inmemory' | 'http'>(props.initialConfig?.type || 'stdio')
+const type = ref<'sse' | 'stdio' | 'inmemory' | 'http' | 'gallery'>(props.initialConfig?.type || 'stdio')
 const baseUrl = ref(props.initialConfig?.baseUrl || '')
 const customHeaders = ref('')
 const npmRegistry = ref(props.initialConfig?.customNpmRegistry || '')
@@ -288,7 +288,8 @@ const generateJsonFromForm = (): void => {
     }
 
     // 添加权限设置
-    const autoApprove = []
+    // 修改 autoApprove 数组的类型
+    const autoApprove: Array<'all' | 'read' | 'write'> = []
     if (autoApproveAll.value) {
       autoApprove.push('all')
     } else {

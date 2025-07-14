@@ -14,7 +14,6 @@ import {
 import { useI18n } from 'vue-i18n'
 import { computed, ref, nextTick, onMounted, watch } from 'vue'
 import { Separator } from '@/components/ui/separator'
-import EmojiPicker from '@/components/ui/emoji-picker'
 
 interface ServerInfo {
   name: string

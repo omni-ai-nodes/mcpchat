@@ -46,8 +46,7 @@ electronLanguages:
   - en
   - ko
   - fr
-env:
-  VITE_MCP_SERVER_API_URL: https://api.omni-ainode.com
+
 win:
   executableName: McpChat
 nsis:
