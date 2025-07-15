@@ -27,21 +27,21 @@ interface NodeResult {
 async function executeWorkflow(workflowData: WorkflowData) {
   const executionId = `exec_${Date.now()}`
   const startTime = new Date().toISOString()
-  
+
   try {
     // 按拓扑顺序执行节点
     const executionOrder = getExecutionOrder(workflowData)
     const nodeResults = new Map<string, NodeResult>()
-    
+
     for (const nodeId of executionOrder) {
-      const node = workflowData.nodes.find(n => n.id === nodeId)
+      const node = workflowData.nodes.find((n) => n.id === nodeId)
       if (!node) continue
-      
+
       console.log(`执行节点: ${node.name} (${node.type})`)
-      
+
       // 获取输入数据
       const inputData = getNodeInputData(node, workflowData.connections, nodeResults)
-      
+
       // 执行节点
       let result: NodeResult
       switch (node.type) {
@@ -72,11 +72,11 @@ async function executeWorkflow(workflowData: WorkflowData) {
         default:
           result = { output: (inputData.input as string) || '' }
       }
-      
+
       nodeResults.set(nodeId, result)
       console.log(`节点 ${node.name} 执行完成:`, result)
     }
-    
+
     return {
       success: true,
       executionId,
@@ -108,59 +108,59 @@ function getExecutionOrder(workflowData: WorkflowData): string[] {
   const connections = workflowData.connections || []
   const visited = new Set<string>()
   const order: string[] = []
-  
+
   // 如果没有连接，返回空数组（不执行任何节点）
   if (connections.length === 0) {
     console.log('工作流中没有连接线，跳过执行')
     return []
   }
-  
+
   // 构建邻接表（双向图）
   const adjacencyList = new Map<string, Set<string>>()
-  nodes.forEach(node => adjacencyList.set(node.id, new Set()))
-  
+  nodes.forEach((node) => adjacencyList.set(node.id, new Set()))
+
   // 构建依赖图（用于拓扑排序）
   const dependencies = new Map<string, string[]>()
-  nodes.forEach(node => dependencies.set(node.id, []))
-  
-  connections.forEach(conn => {
+  nodes.forEach((node) => dependencies.set(node.id, []))
+
+  connections.forEach((conn) => {
     // 添加到邻接表（双向）
     adjacencyList.get(conn.sourceNodeId)?.add(conn.targetNodeId)
     adjacencyList.get(conn.targetNodeId)?.add(conn.sourceNodeId)
-    
+
     // 添加到依赖图（单向）
     const deps = dependencies.get(conn.targetNodeId) || []
     deps.push(conn.sourceNodeId)
     dependencies.set(conn.targetNodeId, deps)
   })
-  
+
   // 找到所有连通组件
   const visitedForComponents = new Set<string>()
   const connectedComponents: string[][] = []
-  
+
   function dfsComponent(nodeId: string, component: string[]) {
     if (visitedForComponents.has(nodeId)) return
     visitedForComponents.add(nodeId)
     component.push(nodeId)
-    
+
     const neighbors = adjacencyList.get(nodeId) || new Set()
-    neighbors.forEach(neighborId => {
-      if (nodes.find(n => n.id === neighborId)) {
+    neighbors.forEach((neighborId) => {
+      if (nodes.find((n) => n.id === neighborId)) {
         dfsComponent(neighborId, component)
       }
     })
   }
-  
+
   // 找到所有参与连接的节点
   const connectedNodes = new Set<string>()
-  connections.forEach(conn => {
+  connections.forEach((conn) => {
     connectedNodes.add(conn.sourceNodeId)
     connectedNodes.add(conn.targetNodeId)
   })
-  
+
   // 为每个连通组件进行DFS
-  connectedNodes.forEach(nodeId => {
-    if (!visitedForComponents.has(nodeId) && nodes.find(n => n.id === nodeId)) {
+  connectedNodes.forEach((nodeId) => {
+    if (!visitedForComponents.has(nodeId) && nodes.find((n) => n.id === nodeId)) {
       const component: string[] = []
       dfsComponent(nodeId, component)
       if (component.length > 0) {
@@ -168,57 +168,65 @@ function getExecutionOrder(workflowData: WorkflowData): string[] {
       }
     }
   })
-  
+
   // 如果有多个连通组件，只执行最大的那个
   if (connectedComponents.length === 0) {
     console.log('没有找到连通的节点组，跳过执行')
     return []
   }
-  
+
   // 选择最大的连通组件
-  const largestComponent = connectedComponents.reduce((largest, current) => 
+  const largestComponent = connectedComponents.reduce((largest, current) =>
     current.length > largest.length ? current : largest
   )
-  
-  console.log(`找到 ${connectedComponents.length} 个连通组件，执行最大的组件（${largestComponent.length} 个节点）`)
-  
+
+  console.log(
+    `找到 ${connectedComponents.length} 个连通组件，执行最大的组件（${largestComponent.length} 个节点）`
+  )
+
   // 对选中的连通组件进行拓扑排序
   const componentNodes = new Set(largestComponent)
-  
+
   // DFS访问（拓扑排序）
   function visit(nodeId: string) {
     if (visited.has(nodeId) || !componentNodes.has(nodeId)) return
     visited.add(nodeId)
-    
+
     const deps = dependencies.get(nodeId) || []
-    deps.forEach(depId => {
+    deps.forEach((depId) => {
       if (componentNodes.has(depId)) {
         visit(depId)
       }
     })
-    
+
     order.push(nodeId)
   }
-  
+
   // 只访问选中连通组件中的节点
-  largestComponent.forEach(nodeId => {
-    if (nodes.find(n => n.id === nodeId)) {
+  largestComponent.forEach((nodeId) => {
+    if (nodes.find((n) => n.id === nodeId)) {
       visit(nodeId)
     }
   })
-  
-  console.log(`工作流执行顺序: ${order.map(id => nodes.find(n => n.id === id)?.name || id).join(' -> ')}`)
+
+  console.log(
+    `工作流执行顺序: ${order.map((id) => nodes.find((n) => n.id === id)?.name || id).join(' -> ')}`
+  )
   return order
 }
 
 // 获取节点输入数据
-function getNodeInputData(node: WorkflowNode, connections: WorkflowConnection[], nodeResults: Map<string, NodeResult>) {
+function getNodeInputData(
+  node: WorkflowNode,
+  connections: WorkflowConnection[],
+  nodeResults: Map<string, NodeResult>
+) {
   const inputData: Record<string, unknown> = {}
-  
+
   // 查找连接到此节点的输入
-  const inputConnections = connections.filter(conn => conn.targetNodeId === node.id)
-  
-  inputConnections.forEach(conn => {
+  const inputConnections = connections.filter((conn) => conn.targetNodeId === node.id)
+
+  inputConnections.forEach((conn) => {
     const sourceResult = nodeResults.get(conn.sourceNodeId)
     if (sourceResult && sourceResult.output !== undefined) {
       // 根据目标输入端口类型存储数据
@@ -232,7 +240,7 @@ function getNodeInputData(node: WorkflowNode, connections: WorkflowConnection[],
       }
     }
   })
-  
+
   return inputData
 }
 
@@ -240,30 +248,31 @@ function getNodeInputData(node: WorkflowNode, connections: WorkflowConnection[],
 async function executeTextInputNode(node: WorkflowNode): Promise<NodeResult> {
   const config = node.config || {}
   return {
-    output: (config.textContent as string) || (config.text as string) || (config.content as string) || ''
+    output:
+      (config.textContent as string) || (config.text as string) || (config.content as string) || ''
   }
 }
 
 // 执行文件输入节点
 async function executeFileInputNode(node: WorkflowNode): Promise<NodeResult> {
   const config = node.config || {}
-  
-  let imageData = config.imageData as string || ''
-  const filePath = config.filePath as string || ''
-  
+
+  let imageData = (config.imageData as string) || ''
+  const filePath = (config.filePath as string) || ''
+
   // 如果有文件路径且是图片文件，使用FilePresenter进行优化处理
   if (filePath && config.fileType && (config.fileType as string).startsWith('image/')) {
     try {
       // 获取FilePresenter实例
       const { presenter } = await import('@/presenter')
       const filePresenter = presenter.filePresenter
-      
+
       if (filePresenter) {
         console.log(`使用FilePresenter优化处理图片: ${config.fileName}`)
-        
+
         // 使用prepareFile方法处理图片，这会自动压缩和优化
-         const preparedFile = await filePresenter.prepareFile(filePath, config.fileType as string)
-        
+        const preparedFile = await filePresenter.prepareFile(filePath, config.fileType as string)
+
         if (preparedFile && preparedFile.content) {
           imageData = preparedFile.content
           console.log(`图片已通过FilePresenter优化处理: ${config.fileName}`)
@@ -275,9 +284,11 @@ async function executeFileInputNode(node: WorkflowNode): Promise<NodeResult> {
       if (imageData && imageData.startsWith('data:image/')) {
         const imageSizeInBytes = Math.ceil(imageData.length * 0.75)
         const maxImageSize = 1 * 1024 * 1024 // 1MB限制
-        
+
         if (imageSizeInBytes > maxImageSize) {
-          console.warn(`文件输入节点 "${node.name}" 中的图片过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，已清除图片数据`)
+          console.warn(
+            `文件输入节点 "${node.name}" 中的图片过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，已清除图片数据`
+          )
           imageData = ''
         }
       }
@@ -286,38 +297,50 @@ async function executeFileInputNode(node: WorkflowNode): Promise<NodeResult> {
     // 如果没有文件路径但有图片数据，进行大小检查
     const imageSizeInBytes = Math.ceil(imageData.length * 0.75)
     const maxImageSize = 1 * 1024 * 1024 // 1MB限制
-    
+
     if (imageSizeInBytes > maxImageSize) {
-      console.warn(`文件输入节点 "${node.name}" 中的图片过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，已清除图片数据`)
+      console.warn(
+        `文件输入节点 "${node.name}" 中的图片过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，已清除图片数据`
+      )
       imageData = ''
     }
   }
-  
+
   // 返回文件信息，包括路径、类型、内容等
   const fileInfo = {
-    fileName: config.fileName as string || '',
+    fileName: (config.fileName as string) || '',
     filePath: filePath,
-    fileType: config.fileType as string || '',
-    fileSize: config.fileSize as number || 0,
+    fileType: (config.fileType as string) || '',
+    fileSize: (config.fileSize as number) || 0,
     imageData: imageData,
-    fileContent: config.fileContent as string || ''
+    fileContent: (config.fileContent as string) || ''
   }
-  
+
   return {
     output: JSON.stringify(fileInfo)
   }
 }
 
 // 执行模型服务节点
-async function executeModelServiceNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+async function executeModelServiceNode(
+  node: WorkflowNode,
+  inputData: Record<string, unknown>
+): Promise<NodeResult> {
   const config = node.config || {}
-  
+
   // 获取文本输入和文件输入
   const textInput = (inputData.textInput as string) || (inputData.input as string) || ''
-  const fileInput = inputData.fileInput as string || ''
-  
+  const fileInput = (inputData.fileInput as string) || ''
+
   // 解析文件输入（如果有）
-  let fileInfo: { fileName?: string; filePath?: string; fileType?: string; fileSize?: number; imageData?: string; fileContent?: string } | null = null
+  let fileInfo: {
+    fileName?: string
+    filePath?: string
+    fileType?: string
+    fileSize?: number
+    imageData?: string
+    fileContent?: string
+  } | null = null
   if (fileInput) {
     try {
       fileInfo = JSON.parse(fileInput)
@@ -325,61 +348,64 @@ async function executeModelServiceNode(node: WorkflowNode, inputData: Record<str
       console.warn('解析文件输入失败:', error)
     }
   }
-  
+
   // 检查是否有任何输入
   if (!textInput.trim() && !fileInfo) {
     throw new Error(`模型服务节点 "${node.name}" 没有接收到任何输入（文本或文件）`)
   }
-  
+
   try {
     // 获取presenter实例
     const { presenter } = await import('@/presenter')
     const llmproviderPresenter = presenter.llmproviderPresenter
     const configPresenter = presenter.configPresenter
-    
+
     if (!llmproviderPresenter || !configPresenter) {
       throw new Error('必要的服务未初始化')
     }
-    
-    console.log(`模型服务节点处理输入 - 文本: ${textInput.substring(0, 100)}${textInput.length > 100 ? '...' : ''}, 文件: ${fileInfo ? fileInfo.fileName || '未知文件' : '无'}`)
-    
+
+    console.log(
+      `模型服务节点处理输入 - 文本: ${textInput.substring(0, 100)}${textInput.length > 100 ? '...' : ''}, 文件: ${fileInfo ? fileInfo.fileName || '未知文件' : '无'}`
+    )
+
     // 获取节点配置的模型信息
-    const selectedProviderId = (config.selectedProviderId as string) || (config.selectedProvider as string)
+    const selectedProviderId =
+      (config.selectedProviderId as string) || (config.selectedProvider as string)
     const selectedModelId = (config.selectedModelId as string) || (config.selectedModel as string)
     const selectedPromptId = config.selectedPromptId as string
-    
+
     // 获取当前LLM配置，优先使用节点配置的模型
-    let currentProvider = selectedProviderId ? 
-      llmproviderPresenter.getProviders().find(p => p.id === selectedProviderId) :
-      llmproviderPresenter.getCurrentProvider()
-      
+    let currentProvider = selectedProviderId
+      ? llmproviderPresenter.getProviders().find((p) => p.id === selectedProviderId)
+      : llmproviderPresenter.getCurrentProvider()
+
     if (!currentProvider) {
-      const availableProviders = llmproviderPresenter.getProviders().filter(p => p.enable)
+      const availableProviders = llmproviderPresenter.getProviders().filter((p) => p.enable)
       if (availableProviders.length === 0) {
         throw new Error('没有可用的LLM提供者，请先配置并启用至少一个LLM提供者')
       }
       currentProvider = availableProviders[0]
       console.log(`自动选择LLM提供者: ${currentProvider.name}`)
     }
-    
+
     // 获取模型列表
     const models = await llmproviderPresenter.getModelList(currentProvider.id)
     if (!models || models.length === 0) {
       throw new Error('未找到可用的模型')
     }
-    
+
     // 选择模型
     let modelId = selectedModelId
-    if (!modelId || !models.find(m => m.id === modelId)) {
+    if (!modelId || !models.find((m) => m.id === modelId)) {
       modelId = models[0].id // 使用第一个可用模型
       console.log(`使用默认模型: ${modelId}`)
     } else {
       console.log(`使用配置的模型: ${modelId}`)
     }
-    
+
     // 构建消息内容
     let messageContent = textInput
-    
+
     // 如果有文件输入，添加文件信息到消息中
     if (fileInfo) {
       if (fileInfo.fileName) {
@@ -389,14 +415,14 @@ async function executeModelServiceNode(node: WorkflowNode, inputData: Record<str
         messageContent += `\n文件内容:\n${fileInfo.fileContent}`
       }
     }
-    
+
     // 如果配置了prompt，则应用prompt
     if (selectedPromptId) {
       try {
         // 通过configPresenter获取prompt内容
         const prompts = await configPresenter.getCustomPrompts()
-        const selectedPrompt = prompts.find(p => p.id === selectedPromptId)
-        
+        const selectedPrompt = prompts.find((p) => p.id === selectedPromptId)
+
         if (selectedPrompt && selectedPrompt.content) {
           // 将prompt内容与输入文本结合
           messageContent = `${selectedPrompt.content}\n\n用户输入: ${messageContent}`
@@ -408,26 +434,32 @@ async function executeModelServiceNode(node: WorkflowNode, inputData: Record<str
         console.warn('获取prompt失败，使用原始输入:', error)
       }
     }
-     
+
     // 构建消息 - 支持多模态输入
-    const messages: Array<{ role: 'user' | 'system' | 'assistant'; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> }> = []
-    
+    const messages: Array<{
+      role: 'user' | 'system' | 'assistant'
+      content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>
+    }> = []
+
     if (fileInfo && fileInfo.imageData && fileInfo.imageData.startsWith('data:image/')) {
       let processedImageData = fileInfo.imageData
-      
+
       // 如果有文件路径且是图片文件，尝试使用FilePresenter进行优化处理
       if (fileInfo.filePath && fileInfo.fileType && fileInfo.fileType.startsWith('image/')) {
         try {
           // 获取FilePresenter实例
           const { presenter } = await import('@/presenter')
           const filePresenter = presenter.filePresenter
-          
+
           if (filePresenter) {
             console.log(`使用FilePresenter优化处理图片: ${fileInfo.fileName}`)
-            
+
             // 使用prepareFile方法处理图片，这会自动压缩和优化
-             const preparedFile = await filePresenter.prepareFile(fileInfo.filePath, fileInfo.fileType)
-            
+            const preparedFile = await filePresenter.prepareFile(
+              fileInfo.filePath,
+              fileInfo.fileType
+            )
+
             if (preparedFile && preparedFile.content) {
               processedImageData = preparedFile.content
               console.log(`图片已通过FilePresenter优化处理: ${fileInfo.fileName}`)
@@ -437,13 +469,15 @@ async function executeModelServiceNode(node: WorkflowNode, inputData: Record<str
           console.warn(`FilePresenter处理图片失败，使用原始数据: ${error}`)
         }
       }
-      
+
       // 检查处理后的图片大小
       const imageSizeInBytes = Math.ceil(processedImageData.length * 0.75) // base64编码大约增加33%大小
       const maxImageSize = 1 * 1024 * 1024 // 1MB限制
-      
+
       if (imageSizeInBytes > maxImageSize) {
-        console.warn(`图片过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，跳过图片处理，仅发送文本内容`)
+        console.warn(
+          `图片过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，跳过图片处理，仅发送文本内容`
+        )
         // 仅发送文本消息，并提示图片过大
         const textWithWarning = `${messageContent}\n\n[注意：图片文件过大 (${Math.round(imageSizeInBytes / 1024 / 1024)}MB)，已跳过图片处理。建议使用较小的图片文件。]`
         messages.push({
@@ -475,39 +509,50 @@ async function executeModelServiceNode(node: WorkflowNode, inputData: Record<str
         content: messageContent
       })
     }
-     
-     console.log(`调用模型 ${modelId} 处理消息`)
-     
-     // 调用模型 - 使用 generateCompletionStandalone 支持多模态消息
-     const outputText = await llmproviderPresenter.generateCompletionStandalone(
-       currentProvider.id,
-       messages as ChatMessage[],
-       modelId
-     )
-     
-     if (!outputText || !outputText.trim()) {
-       throw new Error('模型返回了空响应')
-     }
+
+    console.log(`调用模型 ${modelId} 处理消息`)
+
+    // 调用模型 - 使用 generateCompletionStandalone 支持多模态消息
+    const outputText = await llmproviderPresenter.generateCompletionStandalone(
+      currentProvider.id,
+      messages as ChatMessage[],
+      modelId
+    )
+
+    if (!outputText || !outputText.trim()) {
+      throw new Error('模型返回了空响应')
+    }
     console.log(`模型响应: ${outputText.substring(0, 100)}${outputText.length > 100 ? '...' : ''}`)
-    
+
     return {
       output: outputText
     }
-    
   } catch (error) {
     console.error(`模型服务节点执行失败:`, error)
-    throw new Error(`模型服务节点 "${node.name}" 执行失败: ${error instanceof Error ? error.message : String(error)}`)
+    throw new Error(
+      `模型服务节点 "${node.name}" 执行失败: ${error instanceof Error ? error.message : String(error)}`
+    )
   }
 }
 
 // 执行MCP节点
-async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+async function executeMcpNode(
+  node: WorkflowNode,
+  inputData: Record<string, unknown>
+): Promise<NodeResult> {
   // 获取文本输入和文件输入
   const textInput = (inputData.textInput as string) || (inputData.input as string) || ''
-  const fileInput = inputData.fileInput as string || ''
-  
+  const fileInput = (inputData.fileInput as string) || ''
+
   // 解析文件输入（如果有）
-  let fileInfo: { fileName?: string; filePath?: string; fileType?: string; fileSize?: number; imageData?: string; fileContent?: string } | null = null
+  let fileInfo: {
+    fileName?: string
+    filePath?: string
+    fileType?: string
+    fileSize?: number
+    imageData?: string
+    fileContent?: string
+  } | null = null
   if (fileInput) {
     try {
       fileInfo = JSON.parse(fileInput)
@@ -515,25 +560,32 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
       console.warn('解析文件输入失败:', error)
     }
   }
-  
+
   // 检查是否有任何输入
   if (!textInput.trim() && !fileInfo) {
     throw new Error(`MCP节点 "${node.name}" 没有接收到任何输入（文本或文件）`)
   }
-  
+
   // 如果有图片文件，使用FilePresenter进行优化处理
-  if (fileInfo && fileInfo.imageData && fileInfo.imageData.startsWith('data:image/') && fileInfo.filePath && fileInfo.fileType && fileInfo.fileType.startsWith('image/')) {
+  if (
+    fileInfo &&
+    fileInfo.imageData &&
+    fileInfo.imageData.startsWith('data:image/') &&
+    fileInfo.filePath &&
+    fileInfo.fileType &&
+    fileInfo.fileType.startsWith('image/')
+  ) {
     try {
       // 获取FilePresenter实例
       const { presenter } = await import('@/presenter')
       const filePresenter = presenter.filePresenter
-      
+
       if (filePresenter) {
         console.log(`MCP节点使用FilePresenter优化处理图片: ${fileInfo.fileName}`)
-        
+
         // 使用prepareFile方法处理图片，这会自动压缩和优化
-         const preparedFile = await filePresenter.prepareFile(fileInfo.filePath, fileInfo.fileType)
-        
+        const preparedFile = await filePresenter.prepareFile(fileInfo.filePath, fileInfo.fileType)
+
         if (preparedFile && preparedFile.content) {
           fileInfo.imageData = preparedFile.content
           console.log(`MCP节点图片已通过FilePresenter优化处理: ${fileInfo.fileName}`)
@@ -543,7 +595,7 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
       console.warn(`MCP节点FilePresenter处理图片失败，使用原始数据: ${error}`)
     }
   }
-  
+
   // 构建完整的输入内容
   let fullInput = textInput
   if (fileInfo) {
@@ -554,61 +606,63 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
       fullInput += `\n文件内容:\n${fileInfo.fileContent}`
     }
   }
-  
+
   try {
     // 获取presenter实例
     const { presenter } = await import('@/presenter')
     const mcpPresenter = presenter.mcpPresenter
     const llmproviderPresenter = presenter.llmproviderPresenter
     const configPresenter = presenter.configPresenter
-    
+
     if (!mcpPresenter || !llmproviderPresenter || !configPresenter) {
       throw new Error('必要的服务未初始化')
     }
-    
-    console.log(`MCP节点处理输入 - 文本: ${textInput.substring(0, 100)}${textInput.length > 100 ? '...' : ''}, 文件: ${fileInfo ? fileInfo.fileName || '未知文件' : '无'}`)
-    
+
+    console.log(
+      `MCP节点处理输入 - 文本: ${textInput.substring(0, 100)}${textInput.length > 100 ? '...' : ''}, 文件: ${fileInfo ? fileInfo.fileName || '未知文件' : '无'}`
+    )
+
     // 获取当前LLM配置，如果没有当前提供者则自动选择第一个可用的
     let currentProvider = llmproviderPresenter.getCurrentProvider()
     if (!currentProvider) {
-      const availableProviders = llmproviderPresenter.getProviders().filter(p => p.enable)
+      const availableProviders = llmproviderPresenter.getProviders().filter((p) => p.enable)
       if (availableProviders.length === 0) {
         throw new Error('没有可用的LLM提供者，请先配置并启用至少一个LLM提供者')
       }
       currentProvider = availableProviders[0]
       console.log(`自动选择LLM提供者: ${currentProvider.name}`)
     }
-    
+
     const models = await llmproviderPresenter.getModelList(currentProvider.id)
     if (!models || models.length === 0) {
       throw new Error('未找到可用的模型')
     }
-    
+
     const modelId = models[0].id // 使用第一个可用模型
-    
+
     // 检查MCP是否启用
     const mcpEnabled = await mcpPresenter.getMcpEnabled()
     if (!mcpEnabled) {
       console.log('MCP未启用，正在自动启用...')
       await mcpPresenter.setMcpEnabled(true)
     }
-    
+
     // 获取所有可用的MCP工具
     let mcpTools = await mcpPresenter.getAllToolDefinitions()
     if (!mcpTools || mcpTools.length === 0) {
       // 检查是否有配置的MCP服务器
       const mcpServers = await mcpPresenter.getMcpServers()
       const enabledServers = Object.entries(mcpServers).filter(([, server]) => !server.disable)
-      
+
       if (enabledServers.length === 0) {
         throw new Error('未找到可用的MCP工具：没有启用的MCP服务器，请先在设置中配置并启用MCP服务器')
       }
-      
+
       // 尝试启动默认服务器
       console.log('未找到MCP工具，尝试启动默认服务器...')
       const defaultServers = await mcpPresenter.getMcpDefaultServers()
       const serversToStart = defaultServers.length > 0 ? defaultServers : [enabledServers[0][0]]
-      
+
       for (const serverName of serversToStart) {
         if (enabledServers.find(([name]) => name === serverName)) {
           try {
@@ -620,34 +674,37 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
           }
         }
       }
-      
+
       // 等待一段时间让服务器完全启动
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
       // 重新获取工具
       mcpTools = await mcpPresenter.getAllToolDefinitions()
       if (!mcpTools || mcpTools.length === 0) {
-        throw new Error('未找到可用的MCP工具：已尝试启动服务器但仍无法获取工具，请检查服务器配置和状态')
+        throw new Error(
+          '未找到可用的MCP工具：已尝试启动服务器但仍无法获取工具，请检查服务器配置和状态'
+        )
       }
     }
-    
+
     console.log(`找到 ${mcpTools.length} 个MCP工具`)
-    
+
     // 构建消息
     const messages = [
       {
         role: 'system' as const,
-        content: '你是一个智能助手，可以使用各种工具来帮助用户。请根据用户的输入选择合适的工具并调用它们。'
+        content:
+          '你是一个智能助手，可以使用各种工具来帮助用户。请根据用户的输入选择合适的工具并调用它们。'
       },
       {
         role: 'user' as const,
         content: fullInput
       }
     ]
-    
+
     // 生成唯一的事件ID
     const eventId = `workflow_${node.id}_${Date.now()}`
-    
+
     // 启动流式生成
     const stream = llmproviderPresenter.startStreamCompletion(
       currentProvider.id,
@@ -657,25 +714,26 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
       0.7, // temperature
       4096 // maxTokens
     )
-    
+
     let finalContent = ''
     const toolCallResults: string[] = []
-    
+
     // 处理流式响应
     for await (const event of stream) {
       if (event.type === 'response') {
         const data = event.data
-        
+
         // 收集文本内容
         if (data.content) {
           finalContent += data.content
         }
-        
+
         // 处理工具调用结果
         if (data.tool_call === 'end' && data.tool_call_response) {
-          const response = typeof data.tool_call_response === 'string' 
-            ? data.tool_call_response 
-            : JSON.stringify(data.tool_call_response)
+          const response =
+            typeof data.tool_call_response === 'string'
+              ? data.tool_call_response
+              : JSON.stringify(data.tool_call_response)
           toolCallResults.push(response)
           console.log(`工具调用完成: ${data.tool_call_name}, 结果: ${response}`)
         }
@@ -686,37 +744,45 @@ async function executeMcpNode(node: WorkflowNode, inputData: Record<string, unkn
         break
       }
     }
-    
+
     // 组合最终输出
     let output = finalContent
     if (toolCallResults.length > 0) {
       output += '\n\n工具调用结果:\n' + toolCallResults.join('\n')
     }
-    
+
     console.log(`MCP节点执行完成，输出: ${output}`)
-    
+
     return {
       output: output || fullInput
     }
   } catch (error) {
     console.error(`MCP节点执行失败:`, error)
-    throw new Error(`MCP节点 "${node.name}" 执行失败: ${error instanceof Error ? error.message : String(error)}`)
+    throw new Error(
+      `MCP节点 "${node.name}" 执行失败: ${error instanceof Error ? error.message : String(error)}`
+    )
   }
 }
 
 // 执行文本输出节点
-async function executeApiInputNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+async function executeApiInputNode(
+  node: WorkflowNode,
+  inputData: Record<string, unknown>
+): Promise<NodeResult> {
   const config = node.config || {}
   const apiUrl = config.apiUrl as string
   const method = (config.method as string) || 'GET'
   const jsonParams = (config.jsonParams as string) || ''
-  
+
   if (!apiUrl) {
     throw new Error(`API输入节点 "${node.name}" 缺少API URL配置`)
   }
-  
-  console.log(`执行API输入节点: ${node.name || node.id}, URL: ${apiUrl}, Method: ${method}`, inputData)
-  
+
+  console.log(
+    `执行API输入节点: ${node.name || node.id}, URL: ${apiUrl}, Method: ${method}`,
+    inputData
+  )
+
   try {
     const requestOptions: RequestInit = {
       method: method,
@@ -724,7 +790,7 @@ async function executeApiInputNode(node: WorkflowNode, inputData: Record<string,
         'Content-Type': 'application/json'
       }
     }
-    
+
     // 如果是POST或PUT请求且有JSON参数，添加到请求体
     if ((method === 'POST' || method === 'PUT') && jsonParams.trim()) {
       try {
@@ -734,28 +800,27 @@ async function executeApiInputNode(node: WorkflowNode, inputData: Record<string,
         throw new Error('JSON参数格式错误')
       }
     }
-    
+
     const response = await fetch(apiUrl, requestOptions)
     const responseText = await response.text()
-    
+
     let responseData
     try {
       responseData = JSON.parse(responseText)
     } catch {
       responseData = responseText
     }
-    
+
     if (!response.ok) {
       throw new Error(`API请求失败 (${response.status}): ${responseText}`)
     }
-    
+
     console.log(`API输入节点 "${node.name}" 执行成功，状态码: ${response.status}`)
-    
+
     // 返回API响应数据
     return {
       output: typeof responseData === 'string' ? responseData : JSON.stringify(responseData)
     }
-    
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '未知错误'
     console.error(`API输入节点 "${node.name}" 执行失败:`, errorMessage)
@@ -763,7 +828,10 @@ async function executeApiInputNode(node: WorkflowNode, inputData: Record<string,
   }
 }
 
-async function executeTextOutputNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+async function executeTextOutputNode(
+  node: WorkflowNode,
+  inputData: Record<string, unknown>
+): Promise<NodeResult> {
   console.log(`执行文本输出节点: ${node.name || node.id}`)
   return {
     output: (inputData.input as string) || ''
@@ -771,25 +839,35 @@ async function executeTextOutputNode(node: WorkflowNode, inputData: Record<strin
 }
 
 // 执行 Node.js 代码节点
-async function executeNodejsCodeNode(node: WorkflowNode, inputData: Record<string, unknown>): Promise<NodeResult> {
+async function executeNodejsCodeNode(
+  node: WorkflowNode,
+  inputData: Record<string, unknown>
+): Promise<NodeResult> {
   const config = node.config || {}
   const code = (config.code as string) || ''
-  
+
   console.log(`执行Node.js代码节点: ${node.name || node.id}`)
   console.log('节点配置:', JSON.stringify(config, null, 2))
   console.log('代码内容:', code)
-  
+
   if (!code.trim()) {
     throw new Error(`Node.js代码节点 "${node.name}" 没有代码内容`)
   }
-  
+
   try {
     // 获取输入数据
     const textInput = (inputData.textInput as string) || (inputData.input as string) || ''
-    const fileInput = inputData.fileInput as string || ''
-    
+    const fileInput = (inputData.fileInput as string) || ''
+
     // 解析文件输入（如果有）
-    let fileInfo: { fileName?: string; filePath?: string; fileType?: string; fileSize?: number; imageData?: string; fileContent?: string } | null = null
+    let fileInfo: {
+      fileName?: string
+      filePath?: string
+      fileType?: string
+      fileSize?: number
+      imageData?: string
+      fileContent?: string
+    } | null = null
     if (fileInput) {
       try {
         fileInfo = JSON.parse(fileInput)
@@ -797,14 +875,14 @@ async function executeNodejsCodeNode(node: WorkflowNode, inputData: Record<strin
         console.warn('解析文件输入失败:', error)
       }
     }
-    
+
     // 构建输入对象
     const input = {
       text: textInput,
       file: fileInfo,
       data: inputData
     }
-    
+
     // 创建安全的执行环境
     const vm = await import('vm')
     const { Buffer } = await import('buffer')
@@ -832,20 +910,20 @@ async function executeNodejsCodeNode(node: WorkflowNode, inputData: Record<strin
       decodeURIComponent,
       Buffer
     }
-    
+
     // 包装代码以捕获返回值
     const wrappedCode = `
       (function() {
         ${code}
       })()
     `
-    
+
     // 执行代码
     const result = vm.runInNewContext(wrappedCode, context, {
       timeout: 30000, // 30秒超时
       displayErrors: true
     })
-    
+
     // 处理返回值
     let output = ''
     if (result !== undefined && result !== null) {
@@ -855,9 +933,9 @@ async function executeNodejsCodeNode(node: WorkflowNode, inputData: Record<strin
         output = JSON.stringify(result, null, 2)
       }
     }
-    
+
     console.log(`Node.js代码节点 ${node.name} 执行成功`)
-    
+
     return {
       output,
       result
@@ -872,13 +950,14 @@ async function executeNodejsCodeNode(node: WorkflowNode, inputData: Record<strin
 // 执行数据库输入节点
 async function executeDatabaseInputNode(node: WorkflowNode): Promise<NodeResult> {
   const config = node.config || {}
-  
+
   console.log(`执行数据库输入节点: ${node.name || node.id}`, config)
-  
+
   // 构建数据库配置
   const dbType = (config.dbType as string) || 'mysql'
   const dbConfig = {
-    dbType: (dbType === 'mysql' || dbType === 'postgresql') ? dbType : 'mysql' as 'mysql' | 'postgresql',
+    dbType:
+      dbType === 'mysql' || dbType === 'postgresql' ? dbType : ('mysql' as 'mysql' | 'postgresql'),
     host: config.host as string,
     port: config.port as number,
     database: config.database as string,
@@ -886,24 +965,24 @@ async function executeDatabaseInputNode(node: WorkflowNode): Promise<NodeResult>
     password: config.password as string,
     sql: config.sql as string
   }
-  
+
   // 验证必要参数
   if (!dbConfig.host || !dbConfig.port || !dbConfig.database || !dbConfig.username) {
     throw new Error(`数据库输入节点 "${node.name}" 缺少必要的数据库连接参数`)
   }
-  
+
   if (!dbConfig.sql || !dbConfig.sql.trim()) {
     throw new Error(`数据库输入节点 "${node.name}" 缺少SQL查询语句`)
   }
-  
+
   try {
     // 使用DatabasePresenter执行查询
     const databaseResult = await presenter.databasePresenter.testConnection(dbConfig)
-    
+
     if (!databaseResult.success) {
       throw new Error(`数据库查询失败: ${databaseResult.message}`)
     }
-    
+
     // 将查询结果转换为字符串输出
     let output = ''
     if (databaseResult.data) {
@@ -915,9 +994,11 @@ async function executeDatabaseInputNode(node: WorkflowNode): Promise<NodeResult>
         output = JSON.stringify(databaseResult.data, null, 2)
       }
     }
-    
-    console.log(`数据库输入节点 ${node.name} 执行成功，返回 ${Array.isArray(databaseResult.data) ? databaseResult.data.length : 1} 条记录`)
-    
+
+    console.log(
+      `数据库输入节点 ${node.name} 执行成功，返回 ${Array.isArray(databaseResult.data) ? databaseResult.data.length : 1} 条记录`
+    )
+
     return {
       output,
       data: databaseResult.data
@@ -991,42 +1072,42 @@ export class WindowPresenter implements IWindowPresenter {
         console.error('文件数据为空')
         throw new Error('文件数据为空')
       }
-      
+
       if (typeof fileData !== 'string') {
         console.error('文件数据类型错误，期望string，实际:', typeof fileData)
         throw new Error('文件数据类型错误')
       }
-      
+
       // 检查文件大小（针对图片文件）
       if (fileData.startsWith('data:image/')) {
         const imageSizeInBytes = Math.ceil(fileData.length * 0.75) // base64编码大约增加33%大小
         const maxImageSize = 10 * 1024 * 1024 // 10MB限制
-        
+
         if (imageSizeInBytes > maxImageSize) {
           const sizeMB = Math.round(imageSizeInBytes / 1024 / 1024)
           console.warn(`图片文件过大: ${sizeMB}MB，超过10MB限制`)
           throw new Error(`图片文件过大 (${sizeMB}MB)，请使用小于10MB的图片文件`)
         }
       }
-      
+
       try {
         // 创建用户数据目录下的 APP/inputs 目录
         const userDataPath = app.getPath('userData')
         const inputsDir = path.join(userDataPath, 'APP', 'inputs')
-        
+
         if (!fs.existsSync(inputsDir)) {
           fs.mkdirSync(inputsDir, { recursive: true })
         }
-        
+
         // 生成唯一文件名（添加时间戳前缀）
         const timestamp = Date.now()
         const uniqueFileName = `${timestamp}_${fileName}`
         const filePath = path.join(inputsDir, uniqueFileName)
-        
+
         // 解析 base64 数据并保存文件
         const base64Data = fileData.replace(/^data:image\/\w+;base64,/, '')
         const buffer = Buffer.from(base64Data, 'base64')
-        
+
         fs.writeFileSync(filePath, buffer)
         return { success: true, filePath, fileName: uniqueFileName }
       } catch (error) {
@@ -1040,31 +1121,31 @@ export class WindowPresenter implements IWindowPresenter {
       try {
         const userDataPath = app.getPath('userData')
         const workflowsDir = path.join(userDataPath, 'McpWorkflow')
-        
+
         if (!fs.existsSync(workflowsDir)) {
           fs.mkdirSync(workflowsDir, { recursive: true })
         }
-        
+
         // 检查工作流名称
         if (!workflowData.name || workflowData.name.trim() === '') {
           return { success: false, error: 'MISSING_NAME', message: '请为工作流设置名称' }
         }
-        
+
         // 生成工作流文件名
         const timestamp = Date.now()
         const workflowName = workflowData.name.trim()
         const fileName = `${workflowName}_${timestamp}.json`
         const filePath = path.join(workflowsDir, fileName)
-        
+
         // 保存工作流数据
         const workflowContent = {
           ...workflowData,
           savedAt: new Date().toISOString(),
           version: '1.0'
         }
-        
+
         fs.writeFileSync(filePath, JSON.stringify(workflowContent, null, 2), 'utf8')
-        
+
         console.log('工作流已保存:', filePath)
         return { success: true, filePath, fileName }
       } catch (error) {
@@ -1074,60 +1155,63 @@ export class WindowPresenter implements IWindowPresenter {
     })
 
     // 更新工作流
-    ipcMain.handle('update-workflow', async (_event, filePath: string, workflowData: WorkflowData) => {
-      try {
-        // 检查文件是否存在
-        if (!fs.existsSync(filePath)) {
-          return { success: false, error: 'FILE_NOT_FOUND', message: '工作流文件不存在' }
-        }
-        
-        // 检查工作流名称
-        if (!workflowData.name || workflowData.name.trim() === '') {
-          return { success: false, error: 'MISSING_NAME', message: '请为工作流设置名称' }
-        }
-        
-        // 读取原有数据以保留创建时间等信息
-        let originalData = {}
+    ipcMain.handle(
+      'update-workflow',
+      async (_event, filePath: string, workflowData: WorkflowData) => {
         try {
-          const originalContent = fs.readFileSync(filePath, 'utf8')
-          originalData = JSON.parse(originalContent)
+          // 检查文件是否存在
+          if (!fs.existsSync(filePath)) {
+            return { success: false, error: 'FILE_NOT_FOUND', message: '工作流文件不存在' }
+          }
+
+          // 检查工作流名称
+          if (!workflowData.name || workflowData.name.trim() === '') {
+            return { success: false, error: 'MISSING_NAME', message: '请为工作流设置名称' }
+          }
+
+          // 读取原有数据以保留创建时间等信息
+          let originalData = {}
+          try {
+            const originalContent = fs.readFileSync(filePath, 'utf8')
+            originalData = JSON.parse(originalContent)
+          } catch (error) {
+            console.warn('无法读取原有工作流数据，将创建新的:', error)
+          }
+
+          // 更新工作流数据
+          const workflowContent = {
+            ...originalData,
+            ...workflowData,
+            updatedAt: new Date().toISOString(),
+            version: '1.0'
+          }
+
+          fs.writeFileSync(filePath, JSON.stringify(workflowContent, null, 2), 'utf8')
+
+          const fileName = path.basename(filePath)
+          console.log('工作流已更新:', filePath)
+          return { success: true, filePath, fileName }
         } catch (error) {
-          console.warn('无法读取原有工作流数据，将创建新的:', error)
+          console.error('更新工作流失败:', error)
+          throw error
         }
-        
-        // 更新工作流数据
-        const workflowContent = {
-          ...originalData,
-          ...workflowData,
-          updatedAt: new Date().toISOString(),
-          version: '1.0'
-        }
-        
-        fs.writeFileSync(filePath, JSON.stringify(workflowContent, null, 2), 'utf8')
-        
-        const fileName = path.basename(filePath)
-        console.log('工作流已更新:', filePath)
-        return { success: true, filePath, fileName }
-      } catch (error) {
-        console.error('更新工作流失败:', error)
-        throw error
       }
-    })
+    )
 
     // 获取已保存的工作流列表
     ipcMain.handle('get-workflows', async () => {
       try {
         const userDataPath = app.getPath('userData')
         const workflowsDir = path.join(userDataPath, 'McpWorkflow')
-        
+
         if (!fs.existsSync(workflowsDir)) {
           return []
         }
-        
+
         const files = fs.readdirSync(workflowsDir)
         const workflows = files
-          .filter(file => file.endsWith('.json'))
-          .map(file => {
+          .filter((file) => file.endsWith('.json'))
+          .map((file) => {
             const filePath = path.join(workflowsDir, file)
             const content = fs.readFileSync(filePath, 'utf8')
             const workflowData = JSON.parse(content)
@@ -1138,7 +1222,7 @@ export class WindowPresenter implements IWindowPresenter {
             }
           })
           .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime())
-        
+
         return workflows
       } catch (error) {
         console.error('获取工作流列表失败:', error)
@@ -1150,27 +1234,30 @@ export class WindowPresenter implements IWindowPresenter {
     ipcMain.handle('run-workflow', async (_event, workflowData: WorkflowData) => {
       try {
         console.log('开始运行工作流:', workflowData.name || '未命名工作流')
-        
+
         // 验证工作流数据
         if (!workflowData.nodes || workflowData.nodes.length === 0) {
           throw new Error('工作流中没有节点')
         }
-        
+
         // 验证MCP节点配置
-        const mcpNodes = workflowData.nodes.filter(node => node.type === 'mcp-service')
+        const mcpNodes = workflowData.nodes.filter((node) => node.type === 'mcp-service')
         for (const node of mcpNodes) {
           const config = node.config || {}
-          const hasSelectedServer = config.selectedServerName || 
-                                   (config.selectedServers && Array.isArray(config.selectedServers) && config.selectedServers.length > 0)
-          
+          const hasSelectedServer =
+            config.selectedServerName ||
+            (config.selectedServers &&
+              Array.isArray(config.selectedServers) &&
+              config.selectedServers.length > 0)
+
           if (!hasSelectedServer) {
             throw new Error(`MCP节点 "${node.name}" 未配置服务器`)
           }
         }
-        
+
         // 执行工作流
         const executionResult = await executeWorkflow(workflowData)
-        
+
         console.log('工作流执行完成:', executionResult)
         return executionResult
       } catch (error) {
@@ -1196,15 +1283,15 @@ export class WindowPresenter implements IWindowPresenter {
     ipcMain.handle('deploy-workflow', async (_event, workflowData: WorkflowData) => {
       try {
         console.log('开始部署工作流:', workflowData.name || '未命名工作流')
-        
+
         // 创建部署目录
         const userDataPath = app.getPath('userData')
         const deploymentsDir = path.join(userDataPath, 'APP', 'deployments')
-        
+
         if (!fs.existsSync(deploymentsDir)) {
           fs.mkdirSync(deploymentsDir, { recursive: true })
         }
-        
+
         // 生成部署配置
         const deploymentConfig = {
           ...workflowData,
@@ -1213,12 +1300,12 @@ export class WindowPresenter implements IWindowPresenter {
           status: 'deployed',
           version: '1.0'
         }
-        
+
         const deploymentFileName = `deployment_${deploymentConfig.deploymentId}.json`
         const deploymentPath = path.join(deploymentsDir, deploymentFileName)
-        
+
         fs.writeFileSync(deploymentPath, JSON.stringify(deploymentConfig, null, 2), 'utf8')
-        
+
         console.log('工作流部署完成:', deploymentPath)
         return {
           success: true,
@@ -1237,24 +1324,24 @@ export class WindowPresenter implements IWindowPresenter {
       try {
         const userDataPath = app.getPath('userData')
         const inputsDir = path.join(userDataPath, 'APP', 'inputs')
-        
+
         console.log('检查上传文件目录:', inputsDir)
-        
+
         if (!fs.existsSync(inputsDir)) {
           console.log('上传文件目录不存在')
           return []
         }
-        
+
         const files = fs.readdirSync(inputsDir)
         console.log('目录中的所有文件:', files)
-        
+
         const imageFiles = files.filter((file: string) => {
           const ext = path.extname(file).toLowerCase()
           return ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'].includes(ext)
         })
-        
+
         console.log('筛选出的图片文件:', imageFiles)
-        
+
         return imageFiles.map((file: string) => {
           const filePath = path.join(inputsDir, file)
           const stats = fs.statSync(filePath)
@@ -1272,21 +1359,27 @@ export class WindowPresenter implements IWindowPresenter {
     })
 
     // 读取已上传的文件
-     ipcMain.handle('read-uploaded-file', async (_event, filePath: string) => {
-       try {
-         const fileBuffer = fs.readFileSync(filePath)
-         const base64 = fileBuffer.toString('base64')
-         const ext = path.extname(filePath).toLowerCase()
-         const mimeType = ext === '.png' ? 'image/png' : 
-                         ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' :
-                         ext === '.gif' ? 'image/gif' :
-                         ext === '.webp' ? 'image/webp' : 'image/png'
-         return `data:${mimeType};base64,${base64}`
-       } catch (error) {
-         console.error('读取文件失败:', error)
-         throw error
-       }
-     })
+    ipcMain.handle('read-uploaded-file', async (_event, filePath: string) => {
+      try {
+        const fileBuffer = fs.readFileSync(filePath)
+        const base64 = fileBuffer.toString('base64')
+        const ext = path.extname(filePath).toLowerCase()
+        const mimeType =
+          ext === '.png'
+            ? 'image/png'
+            : ext === '.jpg' || ext === '.jpeg'
+              ? 'image/jpeg'
+              : ext === '.gif'
+                ? 'image/gif'
+                : ext === '.webp'
+                  ? 'image/webp'
+                  : 'image/png'
+        return `data:${mimeType};base64,${base64}`
+      } catch (error) {
+        console.error('读取文件失败:', error)
+        throw error
+      }
+    })
 
     // 获取LLM提供者列表
     ipcMain.handle('get-llm-providers', async () => {
@@ -1996,11 +2089,20 @@ export class WindowPresenter implements IWindowPresenter {
       )
       shellWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/shell/index.html')
     } else {
-      // 生产模式下加载打包后的 HTML 文件
-      console.log(
-        `Loading packaged renderer file: ${join(__dirname, '../renderer/shell/index.html')}`
-      )
-      shellWindow.loadFile(join(__dirname, '../renderer/shell/index.html'))
+      // 生产模式下加载打包后的 HTML 文件，方案2：先检查文件是否存在
+      const htmlPath = join(__dirname, '../renderer/shell/index.html')
+      if (fs.existsSync(htmlPath)) {
+        console.log(`Loading packaged renderer file: ${htmlPath}`)
+        shellWindow.loadFile(htmlPath)
+      } else {
+        console.error('HTML文件不存在:', htmlPath)
+        // 可以选择加载一个本地错误页面，或显示错误信息
+        shellWindow.loadURL('data:text/html,<h1>页面加载失败：未找到 index.html</h1>')
+      }
+      // 监听页面加载失败
+      shellWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error('页面加载失败:', errorCode, errorDescription)
+      })
     }
 
     // --- 处理初始标签页创建或激活 ---
@@ -2183,7 +2285,7 @@ export class WindowPresenter implements IWindowPresenter {
   }
 
   /**
-   * 向“默认”标签页发送消息。
+   * 向"默认"标签页发送消息。
    * 优先级：焦点窗口的活动标签页 > 第一个窗口的活动标签页 > 第一个窗口的第一个标签页。
    * @param channel 消息通道。
    * @param switchToTarget 发送消息后是否切换到目标窗口和标签页。默认为 false。
