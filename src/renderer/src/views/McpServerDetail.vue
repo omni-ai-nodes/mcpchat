@@ -13,7 +13,7 @@
               :src="serverDetail.Logo"
               :alt="serverDetail?.Name || 'Server'"
               class="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover"
-              @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'"
+              @error="($event.target as HTMLImageElement).style.display='none'; (($event.target as HTMLImageElement).nextElementSibling as HTMLElement).style.display='flex'"
             />
             <div 
               v-else

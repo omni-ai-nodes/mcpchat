@@ -1,4 +1,4 @@
-import mysql, { Pool, PoolConnection } from 'mysql2/promise'
+import mysql, { Pool, PoolOptions } from 'mysql2/promise'
 
 export interface DatabaseConfig {
   dbType: 'mysql' | 'postgresql'
@@ -34,7 +34,7 @@ export class DatabasePresenter {
       return this.pools.get(poolKey)!
     }
 
-    const pool = mysql.createPool({
+    const poolOptions: PoolOptions = {
       host: config.host,
       port: config.port,
       user: config.username,
@@ -43,10 +43,10 @@ export class DatabasePresenter {
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
-      acquireTimeout: 60000,
-      timeout: 60000
-    })
 
+    }
+
+    const pool = mysql.createPool(poolOptions)
     this.pools.set(poolKey, pool)
     return pool
   }
@@ -78,7 +78,7 @@ export class DatabasePresenter {
 
   // 测试数据库连接并执行查询
   async testConnection(config: DatabaseConfig): Promise<DatabaseResult> {
-    const startTime = Date.now()
+
     
     try {
       console.log('开始测试数据库连接...', config)

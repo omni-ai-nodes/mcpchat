@@ -52,7 +52,7 @@ const args = ref(props.initialConfig?.args?.join(' ') || '')
 const env = ref(JSON.stringify(props.initialConfig?.env || {}, null, 2))
 const descriptions = ref(props.initialConfig?.descriptions || '')
 const icons = ref(props.initialConfig?.icons || '📁')
-const type = ref<'sse' | 'stdio' | 'inmemory' | 'http'>(props.initialConfig?.type || 'stdio')
+const type = ref<'sse' | 'stdio' | 'inmemory' | 'http' | 'gallery'>(props.initialConfig?.type || 'stdio')
 const baseUrl = ref(props.initialConfig?.baseUrl || '')
 const customHeaders = ref('')
 const npmRegistry = ref(props.initialConfig?.customNpmRegistry || '')
@@ -290,10 +290,10 @@ const generateJsonFromForm = (): void => {
     // 添加权限设置
     const autoApprove = []
     if (autoApproveAll.value) {
-      autoApprove.push('all')
+      autoApprove.push('all' as never)
     } else {
-      if (autoApproveRead.value) autoApprove.push('read')
-      if (autoApproveWrite.value) autoApprove.push('write')
+      if (autoApproveRead.value) autoApprove.push('read' as never)
+      if (autoApproveWrite.value) autoApprove.push('write' as never)
     }
     if (autoApprove.length > 0) {
       serverConfig.autoApprove = autoApprove
@@ -647,7 +647,7 @@ watch(
       env.value = JSON.stringify(newConfig.env || {}, null, 2)
       descriptions.value = newConfig.descriptions || ''
       icons.value = newConfig.icons || '📁'
-      type.value = newConfig.type || 'stdio'
+      type.value = newConfig.type as 'sse' | 'stdio' | 'inmemory' | 'http' || 'stdio'
       baseUrl.value = newConfig.baseUrl || ''
       npmRegistry.value = newConfig.customNpmRegistry || ''
 

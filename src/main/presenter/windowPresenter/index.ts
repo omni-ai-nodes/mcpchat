@@ -2100,7 +2100,7 @@ export class WindowPresenter implements IWindowPresenter {
         shellWindow.loadURL('data:text/html,<h1>页面加载失败：未找到 index.html</h1>')
       }
       // 监听页面加载失败
-      shellWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+      shellWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
         console.error('页面加载失败:', errorCode, errorDescription)
       })
     }

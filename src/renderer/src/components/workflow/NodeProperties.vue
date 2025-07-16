@@ -6,7 +6,7 @@
         v-model="localNode.name"
         class="property-input"
         type="text"
-        @input="updateProperty('name', $event.target.value)"
+        @input="updateProperty('name', ($event.target as HTMLInputElement).value)"
       />
     </div>
 
@@ -21,7 +21,7 @@
         v-model="localNode.config.description"
         class="property-input property-textarea"
         placeholder="输入节点描述..."
-        @input="updateConfig('description', $event.target.value)"
+        @input="updateConfig('description', ($event.target as HTMLTextAreaElement).value)"
       />
     </div>
 
@@ -34,7 +34,7 @@
           class="property-input"
           type="text"
           placeholder="选择文件路径..."
-          @input="updateConfig('filePath', $event.target.value)"
+          @input="updateConfig('filePath', ($event.target as HTMLInputElement).value)"
         />
       </div>
       <div class="property-group">
@@ -42,7 +42,7 @@
         <select 
           v-model="localNode.config.fileType"
           class="property-input"
-          @change="updateConfig('fileType', $event.target.value)"
+          @change="updateConfig('fileType', ($event.target as HTMLSelectElement).value)"
         >
           <option value="text">文本文件</option>
           <option value="json">JSON文件</option>
@@ -59,7 +59,7 @@
           v-model="localNode.config.defaultText"
           class="property-input property-textarea"
           placeholder="输入默认文本..."
-          @input="updateConfig('defaultText', $event.target.value)"
+          @input="updateConfig('defaultText', ($event.target as HTMLTextAreaElement).value)"
         />
       </div>
     </template>
@@ -72,7 +72,7 @@
           class="property-input"
           type="url"
           placeholder="https://api.example.com/data"
-          @input="updateConfig('apiUrl', $event.target.value)"
+          @input="updateConfig('apiUrl', ($event.target as HTMLInputElement).value)"
         />
       </div>
       <div class="property-group">
@@ -80,7 +80,7 @@
         <select 
           v-model="localNode.config.method"
           class="property-input"
-          @change="updateConfig('method', $event.target.value)"
+          @change="updateConfig('method', ($event.target as HTMLSelectElement).value)"
         >
           <option value="GET">GET</option>
           <option value="POST">POST</option>
@@ -94,7 +94,7 @@
           v-model="localNode.config.headers"
           class="property-input property-textarea"
           placeholder='{"Content-Type": "application/json"}'
-          @input="updateConfig('headers', $event.target.value)"
+          @input="updateConfig('headers', ($event.target as HTMLTextAreaElement).value)"
         />
       </div>
       <div v-if="localNode.config.method === 'POST' || localNode.config.method === 'PUT'" class="property-group">
@@ -104,7 +104,7 @@
           class="property-input property-textarea"
           placeholder='{"key": "value", "param": "data"}'
           rows="6"
-          @input="updateConfig('jsonParams', $event.target.value)"
+          @input="updateConfig('jsonParams', ($event.target as HTMLTextAreaElement).value)"
         />
         <div class="property-hint">请输入有效的JSON格式参数</div>
       </div>
@@ -131,7 +131,7 @@
         <select 
           v-model="localNode.config.transformType"
           class="property-input"
-          @change="updateConfig('transformType', $event.target.value)"
+          @change="updateConfig('transformType', ($event.target as HTMLSelectElement).value)"
         >
           <option value="uppercase">转大写</option>
           <option value="lowercase">转小写</option>
@@ -146,7 +146,7 @@
           v-model="localNode.config.findText"
           class="property-input"
           type="text"
-          @input="updateConfig('findText', $event.target.value)"
+          @input="updateConfig('findText', ($event.target as HTMLInputElement).value)"
         />
       </div>
       <div v-if="localNode.config.transformType === 'replace'" class="property-group">
@@ -155,7 +155,7 @@
           v-model="localNode.config.replaceText"
           class="property-input"
           type="text"
-          @input="updateConfig('replaceText', $event.target.value)"
+          @input="updateConfig('replaceText', ($event.target as HTMLInputElement).value)"
         />
       </div>
     </template>
@@ -166,7 +166,7 @@
         <select 
           v-model="localNode.config.conditionType"
           class="property-input"
-          @change="updateConfig('conditionType', $event.target.value)"
+          @change="updateConfig('conditionType', ($event.target as HTMLSelectElement).value)"
         >
           <option value="equals">等于</option>
           <option value="contains">包含</option>
@@ -181,7 +181,7 @@
           v-model="localNode.config.compareValue"
           class="property-input"
           type="text"
-          @input="updateConfig('compareValue', $event.target.value)"
+          @input="updateConfig('compareValue', ($event.target as HTMLInputElement).value)"
         />
       </div>
     </template>
@@ -232,7 +232,7 @@
           max="2"
           step="0.1"
           placeholder="0.7"
-          @input="updateConfig('temperature', Number($event.target.value))"
+          @input="updateConfig('temperature', Number(($event.target as HTMLInputElement).value))"
         />
       </div>
       <div class="property-group">
@@ -244,7 +244,7 @@
           min="1"
           max="4096"
           placeholder="2048"
-          @input="updateConfig('maxTokens', Number($event.target.value))"
+          @input="updateConfig('maxTokens', Number(($event.target as HTMLInputElement).value))"
         />
       </div>
     </template>
@@ -258,7 +258,7 @@
             v-model.number="localNode.x"
             class="position-input"
             type="number"
-            @input="updateProperty('x', Number($event.target.value))"
+            @input="updateProperty('x', Number(($event.target as HTMLInputElement).value))"
           />
         </div>
         <div class="position-input-group">
@@ -267,7 +267,7 @@
             v-model.number="localNode.y"
             class="position-input"
             type="number"
-            @input="updateProperty('y', Number($event.target.value))"
+            @input="updateProperty('y', Number(($event.target as HTMLInputElement).value))"
           />
         </div>
       </div>
@@ -292,15 +292,23 @@ import { ref, watch, reactive, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { LLM_PROVIDER, MODEL_META } from '@shared/presenter'
 
+interface WorkflowNodeConfig {
+  description?: string;
+  defaultText?: string;
+  headers?: string;
+  jsonParams?: string;
+  [key: string]: unknown; // Allow other properties
+}
+
 interface WorkflowNode {
   id: string
   type: string
   name: string
   x: number
   y: number
-  config: Record<string, unknown>
-  inputs: (string | { name: string })[]
-  outputs: (string | { name: string })[]
+  config: WorkflowNodeConfig
+  inputs?: (string | { name: string })[]
+  outputs?: (string | { name: string })[]
 }
 
 interface Props {

@@ -557,8 +557,8 @@ interface WorkflowNode {
   x: number
   y: number
   config: Record<string, unknown>
-  inputs: (string | { name: string })[]
-  outputs: (string | { name: string })[]
+  inputs?: (string | { name: string })[]
+  outputs?: (string | { name: string })[]
   uploadButton?: {
     x: number
     y: number
@@ -1300,13 +1300,13 @@ const drawNode = (node: WorkflowNode) => {
   context.stroke()
   
   // 绘制输入端口
-  node.inputs.forEach(() => {
+  node.inputs?.forEach(() => {
     const portY = y + headerHeight / 2
     drawPort(x - PORT_RADIUS * scale.value, portY, 'input')
   })
   
   // 绘制输出端口
-  node.outputs.forEach(() => {
+  node.outputs?.forEach(() => {
     const portY = y + headerHeight / 2
     drawPort(x + width + PORT_RADIUS * scale.value, portY, 'output')
   })
@@ -3506,7 +3506,7 @@ class ConnectionManager {
   }
   
   // 获取端口位置
-  getPortPosition(nodeId: string, port: string, type: 'input' | 'output'): { x: number, y: number } | null {
+  getPortPosition(nodeId: string, _port: string, type: 'input' | 'output'): { x: number, y: number } | null {
     const node = workflowNodes.value.find(n => n.id === nodeId)
     if (!node) return null
     
@@ -4442,49 +4442,16 @@ interface WorkflowData {
   deploymentConfig?: Record<string, unknown>
 }
 
-// 数据库相关类型定义
-interface DatabaseConfig {
-  dbType: string
-  host: string
-  port: number
-  database: string
-  username: string
-  password: string
-  sql?: string | null
-}
 
-interface DatabaseResult {
-  success: boolean
-  message: string
-  data?: unknown
-  error?: string
-}
 
-interface WindowAPI {
-  getUploadedFiles: () => Promise<UploadedFile[]>
-  readUploadedFile: (filePath: string) => Promise<string>
-  saveUploadedFile: (fileName: string, fileData: string) => Promise<{ success: boolean; filePath: string; fileName: string }>
-  saveWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; filePath: string; fileName: string }>
-  updateWorkflow: (filePath: string, workflowData: WorkflowData) => Promise<{ success: boolean; filePath: string; fileName: string }>
-  getWorkflows: () => Promise<Array<{ name: string; filePath: string; savedAt: string }>>
-  loadWorkflow: (filePath: string) => Promise<{ success: boolean; workflowData: WorkflowData }>
-  runWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; executionId: string; startTime: string; results: { processedNodes: number; processedConnections: number; nodeResults: Record<string, { output: string }> }; error?: string }>
-  deployWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; deploymentId: string; timestamp: string }>
-  testDatabaseConnection: (config: DatabaseConfig) => Promise<DatabaseResult>
-}
 
-declare global {
-  interface Window {
-    api: WindowAPI
-  }
-}
 
 const handleFileNameAreaClick = async (node: WorkflowNode) => {
   console.log('点击文件名区域，节点:', node.name)
   
   try {
     // 获取已上传的文件列表
-    const uploadedFiles: UploadedFile[] = await window.api.getUploadedFiles()
+    const uploadedFiles: UploadedFile[] = (await window.api.getUploadedFiles() as unknown) as UploadedFile[]
     console.log('获取到的上传文件列表:', uploadedFiles)
     
     // 总是显示文件选择对话框，即使没有文件也显示上传按钮
@@ -9151,28 +9118,28 @@ const handleModelServiceSelectClick = (node: WorkflowNode) => {
 const getPortAtCanvasPosition = (x: number, y: number): { node: WorkflowNode, port: string, type: 'input' | 'output' } | null => {
   for (const node of workflowNodes.value) {
     // 检查输入端口
-    for (let i = 0; i < node.inputs.length; i++) {
+    for (let i = 0; i < (node.inputs?.length || 0); i++) {
       // 使用与 drawPort 相同的位置计算逻辑
       const portX = node.x - PORT_RADIUS
       const portY = node.y + (20 + i * 20)
       
       const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
       if (distance <= PORT_RADIUS * 2) {
-        const portName = typeof node.inputs[i] === 'string' ? node.inputs[i] as string : (node.inputs[i] as { name: string }).name
-        return { node, port: portName, type: 'input' }
+        const portName = typeof node.inputs?.[i] === 'object' ? (node.inputs[i] as { name: string })?.name || '' : node.inputs?.[i] || ''
+        return { node, port: typeof portName === 'object' ? portName.name : portName, type: 'input' }
       }
     }
     
     // 检查输出端口
-    for (let i = 0; i < node.outputs.length; i++) {
+    for (let i = 0; i < (node.outputs?.length || 0); i++) {
       // 使用与 drawPort 相同的位置计算逻辑
       const portX = node.x + NODE_WIDTH + PORT_RADIUS
       const portY = node.y + (20 + i * 20)
       
       const distance = Math.sqrt((x - portX) ** 2 + (y - portY) ** 2)
       if (distance <= PORT_RADIUS * 2) {
-        const portName = typeof node.outputs[i] === 'string' ? node.outputs[i] as string : (node.outputs[i] as { name: string }).name
-        return { node, port: portName, type: 'output' }
+        const portName = typeof node.outputs?.[i] === 'object' ? (node.outputs[i] as { name: string })?.name || '' : node.outputs?.[i] || ''
+        return { node, port: typeof portName === 'object' ? portName.name : portName, type: 'output' }
       }
     }
   }
@@ -9867,7 +9834,7 @@ const saveWorkflow = async () => {
 const loadWorkflowList = async () => {
   try {
     const result = await window.api.getWorkflows()
-    savedWorkflows.value = result
+    savedWorkflows.value = result.workflows
   } catch (error) {
     console.error('加载工作流列表时发生错误:', error)
   }
@@ -9956,11 +9923,11 @@ const loadSelectedWorkflow = async () => {
   
   try {
     const result = await window.api.loadWorkflow(selectedWorkflowPath.value)
-    if (result.success && result.workflowData) {
-      const workflow = result.workflowData
+    if (result.success && result.workflow) {
+      const workflow = result.workflow
       
       // 使用统一的加载函数
-      await loadWorkflowFromData(workflow)
+      await loadWorkflowFromData(workflow as WorkflowData)
       
       toast({
         title: '成功',
@@ -10192,7 +10159,7 @@ const formatDate = (dateStr: string) => {
 }
 
 // 替换 prompt() 的对话框函数
-const showWorkflowNamePrompt = (message: string, defaultValue = ''): Promise<string | null> => {
+const showWorkflowNamePrompt = (_message: string, defaultValue = ''): Promise<string | null> => {
   return new Promise((resolve) => {
     workflowNameInput.value = defaultValue
     workflowNameDialogCallback.value = resolve

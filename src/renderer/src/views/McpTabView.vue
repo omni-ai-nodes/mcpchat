@@ -95,12 +95,7 @@ const inMemoryServers = computed(() => {
   })
 })
 
-const regularServers = computed(() => {
-  return mcpStore.serverList.filter((server) => {
-    const config = mcpStore.config.mcpServers[server.name]
-    return config?.type !== 'inmemory'
-  })
-})
+
 
 // 计算属性：获取每个服务器的工具数量
 const getServerToolsCount = (serverName: string) => {
@@ -133,19 +128,7 @@ const handleEditServer = async (serverName: string, serverConfig: Partial<MCPSer
   }
 }
 
-const handleRemoveServer = async (serverName: string) => {
-  const config = mcpStore.config.mcpServers[serverName]
-  if (config?.type === 'inmemory') {
-    toast({
-      title: t('settings.mcp.cannotRemoveBuiltIn'),
-      description: t('settings.mcp.builtInServerCannotBeRemoved'),
-      variant: 'destructive'
-    })
-    return
-  }
-  selectedServer.value = serverName
-  isRemoveConfirmDialogOpen.value = true
-}
+
 
 const confirmRemoveServer = async () => {
   const serverName = selectedServer.value
@@ -178,7 +161,7 @@ const handleToggleDefaultServer = async (serverName: string) => {
   } catch (error) {
     toast({
       title: t('common.error.operationFailed'),
-      description: error.message,
+      description: (error as Error).message,
       variant: 'destructive'
     })
   }

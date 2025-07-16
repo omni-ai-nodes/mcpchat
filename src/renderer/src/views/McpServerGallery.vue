@@ -2,6 +2,7 @@
 import { ref, computed, defineAsyncComponent, onMounted, watch, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import debounce from 'lodash.debounce'
 import { useRouter } from 'vue-router'
 import { useMcpStore } from '@/stores/mcp'
 import { useToast } from '@/components/ui/toast/use-toast'
@@ -99,7 +100,7 @@ const pageSize = ref(10)
 const searchQuery = ref('')
 const filterStatus = ref('all')
 const viewMode = ref<'grid' | 'list'>('grid')
-const showAddDialog = ref(false)
+
 
 // 编辑和删除服务器相关状态
 const isEditServerDialogOpen = ref(false)
@@ -263,10 +264,13 @@ onMounted(() => {
 })
 
 // 监听搜索查询变化，实现实时搜索
-watch(searchQuery, (newQuery) => {
-  // 重置到第一页并执行搜索
+const debouncedFetchServers = debounce((newQuery: string) => {
   fetchServers(1, pageSize.value, newQuery)
-}, { debounce: 500 }) // 添加防抖，避免频繁请求
+}, 500)
+
+watch(searchQuery, (newQuery) => {
+  debouncedFetchServers(newQuery)
+})
 
 // 修改翻页函数以支持搜索
 const goToPageWithSearch = (page: number) => {
@@ -320,7 +324,7 @@ const filteredServers = computed(() => {
 })
 
 // 状态相关函数
-const getStatusText = (status: string, server?: ServerItem) => {
+const getStatusText = (status: string, _server?: ServerItem) => {
   switch (status) {
     case 'running':
       return t('mcp.mcpGallery.running')
@@ -336,7 +340,7 @@ const getStatusText = (status: string, server?: ServerItem) => {
   }
 }
 
-const getStatusDotClass = (status: string, server?: ServerItem) => {
+const getStatusDotClass = (status: string, _server?: ServerItem) => {
   switch (status) {
     case 'running':
       return 'bg-green-500'
@@ -352,7 +356,7 @@ const getStatusDotClass = (status: string, server?: ServerItem) => {
   }
 }
 
-const getStatusTextClass = (status: string, server?: ServerItem) => {
+const getStatusTextClass = (status: string, _server?: ServerItem) => {
   switch (status) {
     case 'running':
       return 'text-green-600'
@@ -368,10 +372,7 @@ const getStatusTextClass = (status: string, server?: ServerItem) => {
   }
 }
 
-// 服务器操作函数
-const addServer = () => {
-  showAddDialog.value = true
-}
+
 
 const editServer = (server: ServerItem) => {
   // 检查服务器是否已安装到本地
@@ -559,17 +560,9 @@ const toggleServer = async (server: ServerItem) => {
   }
 }
 
-const viewTools = (server: ServerItem) => {
-  console.log('查看工具:', server)
-}
 
-const viewPrompts = (server: ServerItem) => {
-  console.log('查看提示词:', server)
-}
 
-const viewResources = (server: ServerItem) => {
-  console.log('查看资源:', server)
-}
+
 
 // 安装对话框状态
 const isInstallDialogOpen = ref(false)

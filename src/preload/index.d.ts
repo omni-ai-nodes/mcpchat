@@ -8,8 +8,8 @@ interface WorkflowNode {
   x: number
   y: number
   config: Record<string, unknown>
-  inputs?: string[]
-  outputs?: string[]
+  inputs?: (string | { name: string; })[]
+  outputs?: (string | { name: string; })[]
 }
 
 interface WorkflowConnection {
@@ -36,7 +36,9 @@ interface WorkflowExecutionResult {
   results: {
     processedNodes: number
     processedConnections: number
+    nodeResults?: Record<string, { output: string }>
   }
+  error?: string
 }
 
 interface WorkflowDeploymentResult {
@@ -73,12 +75,14 @@ declare global {
       getPathForFile(file: File): string
       getWindowId(): number | null
       getWebContentsId(): number
+      // sendPortDrag: (port: string, type: 'input' | 'output', event: MouseEvent) => void
       saveUploadedFile: (fileName: string, fileData: string) => Promise<{ success: boolean; filePath: string; fileName: string }>
   getUploadedFiles: () => Promise<string[]>
   readUploadedFile: (filePath: string) => Promise<string>
   
   // 工作流相关API
   saveWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; filePath?: string; fileName?: string; error?: string; message?: string }>
+  updateWorkflow: (filePath: string, workflowData: WorkflowData) => Promise<{ success: boolean; filePath?: string; fileName?: string; error?: string; message?: string }>
   getWorkflows: () => Promise<{ success: boolean; workflows: Array<{ name: string; filePath: string; savedAt: string }>; error?: string }>
   loadWorkflow: (filePath: string) => Promise<{ success: boolean; workflow?: WorkflowData; error?: string }>
   runWorkflow: (workflowData: WorkflowData) => Promise<WorkflowExecutionResult>

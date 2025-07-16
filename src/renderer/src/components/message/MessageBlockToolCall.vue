@@ -14,8 +14,8 @@
               <!-- 如果是图片URL，显示图片 -->
               <div v-if="block.tool_call.server_icons.startsWith('http://') || block.tool_call.server_icons.startsWith('https://') || block.tool_call.server_icons.startsWith('data:')"
                    class="w-4 h-4 rounded flex items-center justify-center">
-                <img :src="block.tool_call.server_icons" alt="Server Icon" class="w-4 h-4 object-contain"
-                     @error="() => block.tool_call.server_icons = '📁'" />
+                <img :src="block.tool_call?.server_icons" alt="Server Icon" class="w-4 h-4 object-contain"
+                     @error="() => { if (block.tool_call) block.tool_call.server_icons = '📁' }" />
               </div>
               <!-- 如果是emoji或其他文本，直接显示 -->
               <span v-else class="text-base leading-none">
