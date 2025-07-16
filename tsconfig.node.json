@@ -11,8 +11,6 @@
     "resolveJsonModule": false,
     "types": ["electron-vite/node"],
     "baseUrl": ".",
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
     "paths": {
       "@/*": [
         "src/main/*"
