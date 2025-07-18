@@ -73,11 +73,18 @@ export default defineConfig({
       })
     ],
     build: {
-      minify: 'esbuild',
+      minify: false,
       rollupOptions: {
         input: {
           shell: resolve('src/renderer/shell/index.html'),
           index: resolve('src/renderer/index.html')
+        },
+        output: {
+          // 完全禁用代码分割以避免模块初始化顺序问题
+          manualChunks: undefined,
+          // 确保模块导出顺序正确，避免初始化问题
+          preserveModules: false,
+          exports: 'named'
         }
       }
     }

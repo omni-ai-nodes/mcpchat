@@ -163,9 +163,9 @@ const handleGoSettings = () => {
   }
 }
 
-getInitComplete()
-
-onMounted(() => {
+onMounted(async () => {
+  // 检查初始化状态
+  await getInitComplete()
   devicePresenter.getDeviceInfo().then((deviceInfo) => {
     isMacOS.value = deviceInfo.platform === 'darwin'
   })

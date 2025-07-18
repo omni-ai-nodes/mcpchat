@@ -48,6 +48,7 @@ electronLanguages:
   - fr
 win:
   executableName: McpChat
+  icon: false
 nsis:
   artifactName: ${name}-${version}-windows-${arch}.${ext}
   shortcutName: ${productName}

@@ -1227,6 +1227,9 @@ export const useSettingsStore = defineStore('settings', () => {
     await configP.setContentProtectionEnabled(enabled)
   }
 
+  // 日志开关状态
+  const loggingEnabled = ref<boolean>(false)
+
   // 设置投屏保护监听器
   const setupContentProtectionListener = () => {
     // 监听投屏保护变更事件
@@ -1237,9 +1240,6 @@ export const useSettingsStore = defineStore('settings', () => {
       }
     )
   }
-
-  // 日志开关状态
-  const loggingEnabled = ref<boolean>(false)
 
   // 设置日志开关状态
   const setLoggingEnabled = async (enabled: boolean) => {

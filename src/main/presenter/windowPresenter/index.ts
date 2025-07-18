@@ -2089,19 +2089,131 @@ export class WindowPresenter implements IWindowPresenter {
       )
       shellWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/shell/index.html')
     } else {
-      // 生产模式下加载打包后的 HTML 文件，方案2：先检查文件是否存在
-      const htmlPath = join(__dirname, '../renderer/shell/index.html')
-      if (fs.existsSync(htmlPath)) {
-        console.log(`Loading packaged renderer file: ${htmlPath}`)
-        shellWindow.loadFile(htmlPath)
-      } else {
-        console.error('HTML文件不存在:', htmlPath)
-        // 可以选择加载一个本地错误页面，或显示错误信息
-        shellWindow.loadURL('data:text/html,<h1>页面加载失败：未找到 index.html</h1>')
+      // 生产模式下加载打包后的 HTML 文件
+      console.log(`Current __dirname: ${__dirname}`)
+      console.log(`Process resourcesPath: ${process.resourcesPath}`)
+      console.log(`App path: ${app.getAppPath()}`)
+      
+      // 在生产环境中，文件被打包到asar中，需要使用正确的路径
+      const possiblePaths = [
+        // 标准asar路径 - 从main目录到renderer/shell
+        join(__dirname, '../renderer/shell/index.html'),
+        // 如果在asar外部
+        join(process.resourcesPath, 'app/out/renderer/shell/index.html'),
+        // 备用路径 - 考虑不同的目录结构
+        join(__dirname, '../../renderer/shell/index.html'),
+        join(__dirname, '../../../out/renderer/shell/index.html'),
+        // 从app根目录开始的路径
+        join(app.getAppPath(), 'out/renderer/shell/index.html'),
+        // 最后的备用方案
+        join(__dirname, '../renderer/index.html')
+      ]
+      
+      let loaded = false
+      for (const htmlPath of possiblePaths) {
+        console.log(`Trying to load: ${htmlPath}`)
+        try {
+          if (fs.existsSync(htmlPath)) {
+            console.log(`Found shell page at: ${htmlPath}`)
+            await shellWindow.loadFile(htmlPath)
+            loaded = true
+            break
+          } else {
+            console.log(`File not found at: ${htmlPath}`)
+          }
+        } catch (error) {
+          console.error(`Failed to load ${htmlPath}:`, error)
+        }
       }
+      
+      if (!loaded) {
+        console.error('All shell page loading attempts failed')
+        // 尝试加载一个基本的HTML页面作为错误页面
+        const errorHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>McpChat - Error</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
+              .error { color: red; margin: 20px 0; }
+            </style>
+          </head>
+          <body>
+            <h1>McpChat</h1>
+            <div class="error">Failed to load application. Please check the installation.</div>
+            <p>Current directory: ${__dirname}</p>
+            <p>Resources path: ${process.resourcesPath}</p>
+          </body>
+          </html>
+        `
+        shellWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errorHtml)}`)
+      }
+      
       // 监听页面加载失败
       shellWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
         console.error('页面加载失败:', errorCode, errorDescription)
+      })
+      
+      // 监听渲染器进程的控制台消息
+      shellWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+        console.log(`[Renderer Console ${level}] ${message} (${sourceId}:${line})`)
+      })
+      
+      // 监听渲染器进程的错误
+      shellWindow.webContents.on('render-process-gone', (event, details) => {
+        console.error('渲染器进程崩溃:', details)
+      })
+      
+      // 监听未捕获的异常
+      shellWindow.webContents.on('unresponsive', () => {
+        console.error('渲染器进程无响应')
+      })
+      
+      // 监听 DOM 内容加载完成
+      shellWindow.webContents.on('dom-ready', () => {
+        console.log('DOM 内容加载完成')
+        // 延迟执行调试代码，确保Vue应用有时间挂载
+        setTimeout(() => {
+          shellWindow.webContents.executeJavaScript(`
+            console.log('=== DOM DEBUG START ===');
+            console.log('Document title:', document.title);
+            console.log('Body innerHTML length:', document.body.innerHTML.length);
+            console.log('App element exists:', !!document.getElementById('app'));
+            const appElement = document.getElementById('app');
+            if (appElement) {
+              console.log('App element innerHTML length:', appElement.innerHTML.length);
+              console.log('App element children count:', appElement.children.length);
+              console.log('App element computed style display:', window.getComputedStyle(appElement).display);
+              console.log('App element computed style visibility:', window.getComputedStyle(appElement).visibility);
+              console.log('App element computed style opacity:', window.getComputedStyle(appElement).opacity);
+              console.log('App element computed style height:', window.getComputedStyle(appElement).height);
+              console.log('App element computed style width:', window.getComputedStyle(appElement).width);
+              if (appElement.children.length > 0) {
+                console.log('First child element:', appElement.children[0].tagName);
+                console.log('First child computed style display:', window.getComputedStyle(appElement.children[0]).display);
+              }
+              // 检查页面内容
+              console.log('App element first 200 chars:', appElement.innerHTML.substring(0, 200));
+              // 检查是否有Vue Router
+              if (window.__VUE_ROUTER__) {
+                console.log('Current route:', window.__VUE_ROUTER__.currentRoute.value.path);
+              }
+              // 检查是否有可见的内容元素
+              const visibleElements = Array.from(appElement.querySelectorAll('*')).filter(el => {
+                const style = window.getComputedStyle(el);
+                return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+              });
+              console.log('Visible elements count:', visibleElements.length);
+              if (visibleElements.length > 0) {
+                console.log('First visible element:', visibleElements[0].tagName, visibleElements[0].className);
+              }
+            }
+            console.log('=== DOM DEBUG END ===');
+          `).catch(err => {
+            console.error('执行调试脚本失败:', err)
+          })
+        }, 2000)
       })
     }
 

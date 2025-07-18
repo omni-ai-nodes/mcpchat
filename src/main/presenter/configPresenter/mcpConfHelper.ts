@@ -17,182 +17,189 @@ export type MCPServerType = 'stdio' | 'sse' | 'inmemory' | 'http'
 // const filesystemPath = path.join(app.getAppPath(), 'resources', 'mcp', 'filesystem.mjs')
 
 // 抽取inmemory类型的服务为常量
-const DEFAULT_INMEMORY_SERVERS: Record<string, MCPServerConfig> = {
-  buildInFileSystem: {
-    args: [app.getPath('home')],
-    descriptions: 'McpChat内置文件系统mcp服务',
-    icons: '📁',
-    autoApprove: ['read'],
-    type: 'inmemory' as MCPServerType,
-    command: 'filesystem',
-    env: {},
-    disable: true
-  },
-  Artifacts: {
-    args: [],
-    descriptions: 'McpChat内置 artifacts mcp服务',
-    icons: '🎨',
-    autoApprove: ['all'],
-    type: 'inmemory' as MCPServerType,
-    command: 'artifacts',
-    env: {},
-    disable: true
-  },
-  bochaSearch: {
-    args: [],
-    descriptions: 'McpChat内置博查搜索服务',
-    icons: '🔍',
-    autoApprove: ['all'],
-    type: 'inmemory' as MCPServerType,
-    command: 'bochaSearch',
-    env: {
-      apiKey: 'YOUR_BOCHA_API_KEY' // 需要用户提供实际的API Key
+// 使用函数来延迟app.getPath调用，避免同步阻塞
+function getDefaultInMemoryServers(): Record<string, MCPServerConfig> {
+  return {
+    buildInFileSystem: {
+      args: [app.getPath('home')],
+      descriptions: 'McpChat内置文件系统mcp服务',
+      icons: '📁',
+      autoApprove: ['read'],
+      type: 'inmemory' as MCPServerType,
+      command: 'filesystem',
+      env: {},
+      disable: true
     },
-    disable: false
-  },
-  braveSearch: {
-    args: [],
-    descriptions: 'McpChat内置Brave搜索服务',
-    icons: '🦁',
-    autoApprove: ['all'],
-    type: 'inmemory' as MCPServerType,
-    command: 'braveSearch',
-    env: {
-      apiKey: 'YOUR_BRAVE_API_KEY' // 需要用户提供实际的API Key
+    Artifacts: {
+      args: [],
+      descriptions: 'McpChat内置 artifacts mcp服务',
+      icons: '🎨',
+      autoApprove: ['all'],
+      type: 'inmemory' as MCPServerType,
+      command: 'artifacts',
+      env: {},
+      disable: true
     },
-    disable: false
-  },
-  difyKnowledge: {
-    args: [],
-    descriptions: 'McpChat内置Dify知识库检索服务',
-    icons: '📚',
-    autoApprove: ['all'],
-    type: 'inmemory' as MCPServerType,
-    command: 'difyKnowledge',
-    env: {
-      configs: [
-        {
-          description: 'this is a description for the current knowledge base',
-          apiKey: 'YOUR_DIFY_API_KEY',
-          datasetId: 'YOUR_DATASET_ID',
-          endpoint: 'http://localhost:3000/v1'
-        }
-      ]
+    bochaSearch: {
+      args: [],
+      descriptions: 'McpChat内置博查搜索服务',
+      icons: '🔍',
+      autoApprove: ['all'],
+      type: 'inmemory' as MCPServerType,
+      command: 'bochaSearch',
+      env: {
+        apiKey: 'YOUR_BOCHA_API_KEY' // 需要用户提供实际的API Key
+      },
+      disable: false
     },
-    disable: false
-  },
-  imageServer: {
-    args: [],
-    descriptions: 'Image processing MCP service',
-    icons: '🖼️',
-    autoApprove: ['read_image_base64', 'read_multiple_images_base64'], // Auto-approve reading, require confirmation for uploads
-    type: 'inmemory' as MCPServerType,
-    command: 'image', // We need to map this command to the ImageServer class later
-    env: {},
-    disable: false
-  },
-  powerpack: {
-    args: [],
-    descriptions: 'McpChat内置增强工具包',
-    icons: '🛠️',
-    autoApprove: ['all'],
-    type: 'inmemory' as MCPServerType,
-    command: 'powerpack',
-    env: {},
-    disable: false
-  },
-  ragflowKnowledge: {
-    args: [],
-    descriptions: 'McpChat内置RAGFlow知识库检索服务',
-    icons: '📚',
-    autoApprove: ['all'],
-    type: 'inmemory' as MCPServerType,
-    command: 'ragflowKnowledge',
-    env: {
-      configs: [
-        {
-          description: '默认RAGFlow知识库',
-          apiKey: 'YOUR_RAGFLOW_API_KEY',
-          datasetIds: ['YOUR_DATASET_ID'],
-          endpoint: 'http://localhost:8000'
-        }
-      ]
+    braveSearch: {
+      args: [],
+      descriptions: 'McpChat内置Brave搜索服务',
+      icons: '🦁',
+      autoApprove: ['all'],
+      type: 'inmemory' as MCPServerType,
+      command: 'braveSearch',
+      env: {
+        apiKey: 'YOUR_BRAVE_API_KEY' // 需要用户提供实际的API Key
+      },
+      disable: false
     },
-    disable: false
-  },
-  fastGptKnowledge: {
-    args: [],
-    descriptions: 'McpChat内置FastGPT知识库检索服务',
-    icons: '📚',
-    autoApprove: ['all'],
-    type: 'inmemory' as MCPServerType,
-    command: 'fastGptKnowledge',
-    env: {
-      configs: [
-        {
-          description: 'this is a description for the current knowledge base',
-          apiKey: 'YOUR_FastGPT_API_KEY',
-          datasetId: 'YOUR_DATASET_ID',
-          endpoint: 'http://localhost:3000/api'
-        }
-      ]
+    difyKnowledge: {
+      args: [],
+      descriptions: 'McpChat内置Dify知识库检索服务',
+      icons: '📚',
+      autoApprove: ['all'],
+      type: 'inmemory' as MCPServerType,
+      command: 'difyKnowledge',
+      env: {
+        configs: [
+          {
+            description: 'this is a description for the current knowledge base',
+            apiKey: 'YOUR_DIFY_API_KEY',
+            datasetId: 'YOUR_DATASET_ID',
+            endpoint: 'http://localhost:3000/v1'
+          }
+        ]
+      },
+      disable: false
     },
-    disable: false
-  },
-  'mcpchat-inmemory/deep-research-server': {
-    args: [],
-    descriptions:
-      'McpChat内置深度研究服务，使用博查搜索(注意该服务需要较长的上下文模型，请勿在短上下文的模型中使用)',
-    icons: '🔬',
-    autoApprove: ['all'],
-    type: 'inmemory' as MCPServerType,
-    command: 'mcpchat-inmemory/deep-research-server',
-    env: {
-      BOCHA_API_KEY: 'YOUR_BOCHA_API_KEY'
+    imageServer: {
+      args: [],
+      descriptions: 'Image processing MCP service',
+      icons: '🖼️',
+      autoApprove: ['read_image_base64', 'read_multiple_images_base64'], // Auto-approve reading, require confirmation for uploads
+      type: 'inmemory' as MCPServerType,
+      command: 'image', // We need to map this command to the ImageServer class later
+      env: {},
+      disable: false
     },
-    disable: false
-  },
-  'mcpchat-inmemory/auto-prompting-server': {
-    args: [],
-    descriptions: 'McpChat内置自动模板提示词服务',
-    icons: '📜',
-    autoApprove: ['all'],
-    type: 'inmemory' as MCPServerType,
-    command: 'mcpchat-inmemory/auto-prompting-server',
-    env: {},
-    disable: false
-  },
-  'mcpchat-inmemory/conversation-search-server': {
-    args: [],
-    descriptions: 'McpChat built-in conversation history search service',
-    icons: '🔍',
-    autoApprove: ['all'],
-    type: 'inmemory' as MCPServerType,
-    command: 'mcpchat-inmemory/conversation-search-server',
-    env: {},
-    disable: false
+    powerpack: {
+      args: [],
+      descriptions: 'McpChat内置增强工具包',
+      icons: '🛠️',
+      autoApprove: ['all'],
+      type: 'inmemory' as MCPServerType,
+      command: 'powerpack',
+      env: {},
+      disable: false
+    },
+    ragflowKnowledge: {
+      args: [],
+      descriptions: 'McpChat内置RAGFlow知识库检索服务',
+      icons: '📚',
+      autoApprove: ['all'],
+      type: 'inmemory' as MCPServerType,
+      command: 'ragflowKnowledge',
+      env: {
+        configs: [
+          {
+            description: '默认RAGFlow知识库',
+            apiKey: 'YOUR_RAGFLOW_API_KEY',
+            datasetIds: ['YOUR_DATASET_ID'],
+            endpoint: 'http://localhost:8000'
+          }
+        ]
+      },
+      disable: false
+    },
+    fastGptKnowledge: {
+      args: [],
+      descriptions: 'McpChat内置FastGPT知识库检索服务',
+      icons: '📚',
+      autoApprove: ['all'],
+      type: 'inmemory' as MCPServerType,
+      command: 'fastGptKnowledge',
+      env: {
+        configs: [
+          {
+            description: 'this is a description for the current knowledge base',
+            apiKey: 'YOUR_FastGPT_API_KEY',
+            datasetId: 'YOUR_DATASET_ID',
+            endpoint: 'http://localhost:3000/api'
+          }
+        ]
+      },
+      disable: false
+    },
+    'mcpchat-inmemory/deep-research-server': {
+      args: [],
+      descriptions:
+        'McpChat内置深度研究服务，使用博查搜索(注意该服务需要较长的上下文模型，请勿在短上下文的模型中使用)',
+      icons: '🔬',
+      autoApprove: ['all'],
+      type: 'inmemory' as MCPServerType,
+      command: 'mcpchat-inmemory/deep-research-server',
+      env: {
+        BOCHA_API_KEY: 'YOUR_BOCHA_API_KEY'
+      },
+      disable: false
+    },
+    'mcpchat-inmemory/auto-prompting-server': {
+      args: [],
+      descriptions: 'McpChat内置自动模板提示词服务',
+      icons: '📜',
+      autoApprove: ['all'],
+      type: 'inmemory' as MCPServerType,
+      command: 'mcpchat-inmemory/auto-prompting-server',
+      env: {},
+      disable: false
+    },
+    'mcpchat-inmemory/conversation-search-server': {
+      args: [],
+      descriptions: 'McpChat built-in conversation history search service',
+      icons: '🔍',
+      autoApprove: ['all'],
+      type: 'inmemory' as MCPServerType,
+      command: 'mcpchat-inmemory/conversation-search-server',
+      env: {},
+      disable: false
+    }
   }
 }
 
-const DEFAULT_MCP_SERVERS = {
-  mcpServers: {
-    // 先定义内置MCP服务器
-    ...DEFAULT_INMEMORY_SERVERS,
-    // 之后是默认的三方MCP服务器
-    memory: {
-      command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-memory'],
-      env: {},
-      descriptions: '内存存储服务',
-      icons: '🧠',
-      autoApprove: ['all'],
-      disable: true,
-      type: 'stdio' as MCPServerType
-    }
-  },
-  defaultServers: [], // 默认服务器列表 - 默认不启用任何服务器
-  mcpEnabled: false // 默认关闭MCP功能
+function getDefaultMcpServers() {
+  return {
+    mcpServers: {
+      // 先定义内置MCP服务器
+      ...getDefaultInMemoryServers(),
+      // 之后是默认的三方MCP服务器
+      memory: {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-memory'],
+        env: {},
+        descriptions: '内存存储服务',
+        icons: '🧠',
+        autoApprove: ['all'],
+        disable: true,
+        type: 'stdio' as MCPServerType
+      }
+    },
+    defaultServers: [], // 默认服务器列表 - 默认不启用任何服务器
+    mcpEnabled: false // 默认关闭MCP功能
+  }
 }
+
+const DEFAULT_MCP_SERVERS = getDefaultMcpServers()
 // 这部分mcp有系统逻辑判断是否启用，不受用户配置控制，受软件环境控制
 export const SYSTEM_INMEM_MCP_SERVERS: Record<string, MCPServerConfig> = {
   'mcpchat-inmemory/custom-prompts-server': {
@@ -208,93 +215,125 @@ export const SYSTEM_INMEM_MCP_SERVERS: Record<string, MCPServerConfig> = {
 }
 
 export class McpConfHelper {
-  private mcpStore: ElectronStore<IMcpSettings>
+  private mcpStore: ElectronStore<IMcpSettings> | null = null
 
   constructor() {
-    // 初始化MCP设置存储
-    this.mcpStore = new ElectronStore<IMcpSettings>({
-      name: 'mcp-settings',
-      defaults: {
-        mcpServers: DEFAULT_MCP_SERVERS.mcpServers,
-        defaultServers: DEFAULT_MCP_SERVERS.defaultServers,
-        mcpEnabled: DEFAULT_MCP_SERVERS.mcpEnabled
-      }
-    })
+    // 延迟初始化ElectronStore，避免同步阻塞
+  }
+
+  private initializeStore(): ElectronStore<IMcpSettings> {
+    if (!this.mcpStore) {
+      // 使用setImmediate确保异步初始化
+      this.mcpStore = new ElectronStore<IMcpSettings>({
+        name: 'mcp-settings',
+        defaults: {
+          mcpServers: DEFAULT_MCP_SERVERS.mcpServers,
+          defaultServers: DEFAULT_MCP_SERVERS.defaultServers,
+          mcpEnabled: DEFAULT_MCP_SERVERS.mcpEnabled
+        }
+      })
+    }
+    return this.mcpStore
   }
 
   // 获取MCP服务器配置
   getMcpServers(): Promise<Record<string, MCPServerConfig>> {
-    const storedServers = this.mcpStore.get('mcpServers') || DEFAULT_MCP_SERVERS.mcpServers
+    // 使用 setImmediate 确保异步执行，避免阻塞
+    return new Promise<Record<string, MCPServerConfig>>((resolve) => {
+      setImmediate(() => {
+        try {
+          const mcpStore = this.initializeStore()
+          const storedServers = mcpStore.get('mcpServers') || DEFAULT_MCP_SERVERS.mcpServers
 
-    // 检查并补充缺少的inmemory服务
-    const updatedServers = { ...storedServers }
-    let hasChanges = false
+          // 检查并补充缺少的inmemory服务
+          const updatedServers = { ...storedServers }
+          let hasChanges = false
 
-    // 遍历所有默认的inmemory服务，确保它们都存在并更新默认配置
-    for (const [serverName, serverConfig] of Object.entries(DEFAULT_INMEMORY_SERVERS)) {
-      if (!updatedServers[serverName]) {
-        console.log(`添加缺少的inmemory服务: ${serverName}`)
-        updatedServers[serverName] = serverConfig
-        hasChanges = true
-      } else {
-        // 更新已存在服务的默认配置（如disable状态）
-        if (updatedServers[serverName].disable !== serverConfig.disable) {
-          console.log(`更新inmemory服务 ${serverName} 的disable状态: ${updatedServers[serverName].disable} -> ${serverConfig.disable}`)
-          updatedServers[serverName] = {
-            ...updatedServers[serverName],
-            disable: serverConfig.disable
+          // 遍历所有默认的inmemory服务，确保它们都存在并更新默认配置
+          for (const [serverName, serverConfig] of Object.entries(getDefaultInMemoryServers())) {
+            if (!updatedServers[serverName]) {
+              console.log(`添加缺少的inmemory服务: ${serverName}`)
+              updatedServers[serverName] = serverConfig
+              hasChanges = true
+            } else {
+              // 更新已存在服务的默认配置（如disable状态）
+              if (updatedServers[serverName].disable !== serverConfig.disable) {
+                console.log(`更新inmemory服务 ${serverName} 的disable状态: ${updatedServers[serverName].disable} -> ${serverConfig.disable}`)
+                updatedServers[serverName] = {
+                  ...updatedServers[serverName],
+                  disable: serverConfig.disable
+                }
+                hasChanges = true
+              }
+            }
           }
-          hasChanges = true
-        }
-      }
-    }
 
-    // 遍历所有系统内存服务，确保它们都存在并更新默认配置
-    for (const [serverName, serverConfig] of Object.entries(SYSTEM_INMEM_MCP_SERVERS)) {
-      if (!updatedServers[serverName]) {
-        console.log(`添加缺少的系统内存服务: ${serverName}`)
-        updatedServers[serverName] = serverConfig
-        hasChanges = true
-      } else {
-        // 更新已存在服务的默认配置（如disable状态）
-        if (updatedServers[serverName].disable !== serverConfig.disable) {
-          console.log(`更新系统内存服务 ${serverName} 的disable状态: ${updatedServers[serverName].disable} -> ${serverConfig.disable}`)
-          updatedServers[serverName] = {
-            ...updatedServers[serverName],
-            disable: serverConfig.disable
+          // 遍历所有系统内存服务，确保它们都存在并更新默认配置
+          for (const [serverName, serverConfig] of Object.entries(SYSTEM_INMEM_MCP_SERVERS)) {
+            if (!updatedServers[serverName]) {
+              console.log(`添加缺少的系统内存服务: ${serverName}`)
+              updatedServers[serverName] = serverConfig
+              hasChanges = true
+            } else {
+              // 更新已存在服务的默认配置（如disable状态）
+              if (updatedServers[serverName].disable !== serverConfig.disable) {
+                console.log(`更新系统内存服务 ${serverName} 的disable状态: ${updatedServers[serverName].disable} -> ${serverConfig.disable}`)
+                updatedServers[serverName] = {
+                  ...updatedServers[serverName],
+                  disable: serverConfig.disable
+                }
+                hasChanges = true
+              }
+            }
           }
-          hasChanges = true
+
+          // 如果有变化，更新存储
+          if (hasChanges) {
+            mcpStore.set('mcpServers', updatedServers)
+          }
+
+          resolve(updatedServers)
+        } catch (error) {
+          console.error('Failed to get MCP servers:', error)
+          resolve(DEFAULT_MCP_SERVERS.mcpServers)
         }
-      }
-    }
-
-    // 如果有变化，更新存储
-    if (hasChanges) {
-      this.mcpStore.set('mcpServers', updatedServers)
-    }
-
-    return Promise.resolve(updatedServers)
+      })
+    })
   }
 
   // 设置MCP服务器配置
   async setMcpServers(servers: Record<string, MCPServerConfig>): Promise<void> {
-    this.mcpStore.set('mcpServers', servers)
+    const mcpStore = this.initializeStore()
+    mcpStore.set('mcpServers', servers)
     eventBus.emit(MCP_EVENTS.CONFIG_CHANGED, {
       mcpServers: servers,
-      defaultServers: this.mcpStore.get('defaultServers') || [],
-      mcpEnabled: this.mcpStore.get('mcpEnabled')
+      defaultServers: mcpStore.get('defaultServers') || [],
+      mcpEnabled: mcpStore.get('mcpEnabled')
     })
   }
 
   // 获取默认服务器列表
   getMcpDefaultServers(): Promise<string[]> {
-    return Promise.resolve(this.mcpStore.get('defaultServers') || [])
+    // 使用 setImmediate 确保异步执行，避免阻塞
+    return new Promise<string[]>((resolve) => {
+      setImmediate(() => {
+        try {
+          const mcpStore = this.initializeStore()
+          const defaultServers = mcpStore.get('defaultServers') || []
+          resolve(defaultServers)
+        } catch (error) {
+          console.error('Failed to get MCP default servers:', error)
+          resolve([])
+        }
+      })
+    })
   }
 
   // 添加默认服务器
   async addMcpDefaultServer(serverName: string): Promise<void> {
-    const defaultServers = this.mcpStore.get('defaultServers') || []
-    const mcpServers = this.mcpStore.get('mcpServers') || {}
+    const mcpStore = this.initializeStore()
+    const defaultServers = mcpStore.get('defaultServers') || []
+    const mcpServers = mcpStore.get('mcpServers') || {}
 
     // 检测并清理失效的服务器
     const validDefaultServers = defaultServers.filter((server) => {
@@ -315,30 +354,32 @@ export class McpConfHelper {
       validDefaultServers.length !== defaultServers.length ||
       !defaultServers.includes(serverName)
     ) {
-      this.mcpStore.set('defaultServers', validDefaultServers)
+      mcpStore.set('defaultServers', validDefaultServers)
       eventBus.send(MCP_EVENTS.CONFIG_CHANGED, SendTarget.ALL_WINDOWS, {
         mcpServers: mcpServers,
         defaultServers: validDefaultServers,
-        mcpEnabled: this.mcpStore.get('mcpEnabled')
+        mcpEnabled: mcpStore.get('mcpEnabled')
       })
     }
   }
 
   // 移除默认服务器
   async removeMcpDefaultServer(serverName: string): Promise<void> {
-    const defaultServers = this.mcpStore.get('defaultServers') || []
+    const mcpStore = this.initializeStore()
+    const defaultServers = mcpStore.get('defaultServers') || []
     const updatedServers = defaultServers.filter((name) => name !== serverName)
-    this.mcpStore.set('defaultServers', updatedServers)
+    mcpStore.set('defaultServers', updatedServers)
     eventBus.send(MCP_EVENTS.CONFIG_CHANGED, SendTarget.ALL_WINDOWS, {
-      mcpServers: this.mcpStore.get('mcpServers'),
+      mcpServers: mcpStore.get('mcpServers'),
       defaultServers: updatedServers,
-      mcpEnabled: this.mcpStore.get('mcpEnabled')
+      mcpEnabled: mcpStore.get('mcpEnabled')
     })
   }
 
   // 切换服务器的默认状态
   async toggleMcpDefaultServer(serverName: string): Promise<void> {
-    const defaultServers = this.mcpStore.get('defaultServers') || []
+    const mcpStore = this.initializeStore()
+    const defaultServers = mcpStore.get('defaultServers') || []
     if (defaultServers.includes(serverName)) {
       await this.removeMcpDefaultServer(serverName)
     } else {
@@ -348,17 +389,19 @@ export class McpConfHelper {
 
   // 设置MCP启用状态
   async setMcpEnabled(enabled: boolean): Promise<void> {
-    this.mcpStore.set('mcpEnabled', enabled)
+    const mcpStore = this.initializeStore()
+    mcpStore.set('mcpEnabled', enabled)
     eventBus.send(MCP_EVENTS.CONFIG_CHANGED, SendTarget.ALL_WINDOWS, {
-      mcpServers: this.mcpStore.get('mcpServers'),
-      defaultServers: this.mcpStore.get('defaultServers'),
+      mcpServers: mcpStore.get('mcpServers'),
+      defaultServers: mcpStore.get('defaultServers'),
       mcpEnabled: enabled
     })
   }
 
   // 获取MCP启用状态
   getMcpEnabled(): Promise<boolean> {
-    return Promise.resolve(this.mcpStore.get('mcpEnabled') ?? DEFAULT_MCP_SERVERS.mcpEnabled)
+    const mcpStore = this.initializeStore()
+    return Promise.resolve(mcpStore.get('mcpEnabled') ?? getDefaultMcpServers().mcpEnabled)
   }
 
   // 添加MCP服务器
@@ -415,12 +458,13 @@ export class McpConfHelper {
     // 更新服务器配置
     await this.setMcpServers(updatedServers)
 
-    // 恢复默认服务器设置
-    this.mcpStore.set('defaultServers', DEFAULT_MCP_SERVERS.defaultServers)
+    // 确保默认服务器存在
+    const mcpStore = this.initializeStore()
+    mcpStore.set('defaultServers', getDefaultMcpServers().defaultServers)
     eventBus.send(MCP_EVENTS.CONFIG_CHANGED, SendTarget.ALL_WINDOWS, {
       mcpServers: updatedServers,
-      defaultServers: DEFAULT_MCP_SERVERS.defaultServers,
-      mcpEnabled: this.mcpStore.get('mcpEnabled')
+      defaultServers: getDefaultMcpServers().defaultServers,
+      mcpEnabled: mcpStore.get('mcpEnabled')
     })
   }
 
@@ -428,21 +472,22 @@ export class McpConfHelper {
     console.log('onUpgrade', oldVersion)
     if (oldVersion && compare(oldVersion, '0.0.12', '<=')) {
       // 将旧版本的defaultServer迁移到新版本的defaultServers
-      const oldDefaultServer = this.mcpStore.get('defaultServer') as string | undefined
+      const mcpStore = this.initializeStore()
+      const oldDefaultServer = mcpStore.get('defaultServer') as string | undefined
       if (oldDefaultServer) {
         console.log(`迁移旧版本defaultServer: ${oldDefaultServer}到defaultServers`)
-        const defaultServers = this.mcpStore.get('defaultServers') || []
+        const defaultServers = mcpStore.get('defaultServers') || []
         if (!defaultServers.includes(oldDefaultServer)) {
           defaultServers.push(oldDefaultServer)
-          this.mcpStore.set('defaultServers', defaultServers)
+          mcpStore.set('defaultServers', defaultServers)
         }
         // 删除旧的defaultServer字段，防止重复迁移
-        this.mcpStore.delete('defaultServer')
+        mcpStore.delete('defaultServer')
       }
 
       // 迁移 filesystem 服务器到 buildInFileSystem
-      try {
-        const mcpServers = this.mcpStore.get('mcpServers') || {}
+        try {
+          const mcpServers = mcpStore.get('mcpServers') || {}
         // console.log('mcpServers', mcpServers)
         if (mcpServers.filesystem) {
           console.log('检测到旧版本的 filesystem MCP 服务器，开始迁移到 buildInFileSystem')
@@ -474,16 +519,16 @@ export class McpConfHelper {
 
           delete mcpServers.filesystem
           // 更新 mcpServers
-          this.mcpStore.set('mcpServers', mcpServers)
+          mcpStore.set('mcpServers', mcpServers)
 
           // 如果 filesystem 是默认服务器，将 buildInFileSystem 添加到默认服务器列表
-          const defaultServers = this.mcpStore.get('defaultServers') || []
+          const defaultServers = mcpStore.get('defaultServers') || []
           if (
             defaultServers.includes('filesystem') &&
             !defaultServers.includes('buildInFileSystem')
           ) {
             defaultServers.push('buildInFileSystem')
-            this.mcpStore.set('defaultServers', defaultServers)
+            mcpStore.set('defaultServers', defaultServers)
           }
 
           console.log('迁移 filesystem 到 buildInFileSystem 完成')

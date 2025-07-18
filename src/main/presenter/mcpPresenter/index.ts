@@ -96,10 +96,10 @@ export class McpPresenter implements IMCPPresenter {
       await this.checkAndManageCustomPromptsServer()
     })
 
-    // 延迟初始化，确保其他组件已经准备好
-    setTimeout(() => {
-      this.initialize()
-    }, 1000)
+    // 异步初始化，不阻塞构造函数
+    this.initialize().catch(error => {
+      console.error('[MCP] Failed to initialize MCP Presenter:', error)
+    })
   }
 
   private async initialize() {
@@ -117,67 +117,72 @@ export class McpPresenter implements IMCPPresenter {
         this.configPresenter.getMcpDefaultServers()
       ])
 
-      // 先测试npm registry速度
-      console.log('[MCP] Testing npm registry speed...')
-      try {
-        await this.serverManager.testNpmRegistrySpeed()
+      // 立即启动默认服务器，不等待npm测试
+      console.log('[MCP] Starting default servers...')
+      await this.startDefaultServersAsync(servers, defaultServers)
+
+      // 异步测试npm registry速度，在后台进行
+      console.log('[MCP] Starting npm registry speed test in background...')
+      this.serverManager.testNpmRegistrySpeed().then(() => {
         console.log(
           `[MCP] npm registry speed test completed, selected best registry: ${this.serverManager.getNpmRegistry()}`
         )
-      } catch (error) {
+      }).catch(error => {
         console.error('[MCP] npm registry speed test failed:', error)
-      }
+      })
 
-      // 检查并启动 mcpchat-inmemory/custom-prompts-server（仅当未禁用时）
-      const customPromptsServerName = 'mcpchat-inmemory/custom-prompts-server'
-      if (servers[customPromptsServerName] && !servers[customPromptsServerName].disable) {
-        console.log(`[MCP] Attempting to start custom prompts server: ${customPromptsServerName}`)
-
-        try {
-          await this.serverManager.startServer(customPromptsServerName)
-          console.log(`[MCP] Custom prompts server ${customPromptsServerName} started successfully`)
-
-          // 通知渲染进程服务器已启动
-          eventBus.send(MCP_EVENTS.SERVER_STARTED, SendTarget.ALL_WINDOWS, customPromptsServerName)
-        } catch (error) {
-          console.error(
-            `[MCP] Failed to start custom prompts server ${customPromptsServerName}:`,
-            error
-          )
-        }
-      }
-
-      // 如果有默认服务器，尝试启动（仅当未禁用时）
-      if (defaultServers.length > 0) {
-        for (const serverName of defaultServers) {
-          if (servers[serverName] && !servers[serverName].disable) {
-            console.log(`[MCP] Attempting to start default server: ${serverName}`)
-
-            try {
-              await this.serverManager.startServer(serverName)
-              console.log(`[MCP] Default server ${serverName} started successfully`)
-
-              // 通知渲染进程服务器已启动
-              eventBus.send(MCP_EVENTS.SERVER_STARTED, SendTarget.ALL_WINDOWS, serverName)
-            } catch (error) {
-              console.error(`[MCP] Failed to start default server ${serverName}:`, error)
-            }
-          }
-        }
-      }
+      // 检查并管理自定义提示词服务器
+      await this.checkAndManageCustomPromptsServer()
 
       // 标记初始化完成并发出事件
       this.isInitialized = true
       console.log('[MCP] Initialization completed')
       eventBus.send(MCP_EVENTS.INITIALIZED, SendTarget.ALL_WINDOWS)
-
-      // 检查并管理自定义提示词服务器
-      await this.checkAndManageCustomPromptsServer()
     } catch (error) {
       console.error('[MCP] Initialization failed:', error)
       // 即使初始化失败也标记为已完成，避免系统卡在未初始化状态
       this.isInitialized = true
       eventBus.send(MCP_EVENTS.INITIALIZED, SendTarget.ALL_WINDOWS)
+    }
+  }
+
+  private async startDefaultServersAsync(servers: Record<string, MCPServerConfig>, defaultServers: string[]) {
+    // 检查并启动 mcpchat-inmemory/custom-prompts-server（仅当未禁用时）
+    const customPromptsServerName = 'mcpchat-inmemory/custom-prompts-server'
+    if (servers[customPromptsServerName] && !servers[customPromptsServerName].disable) {
+      console.log(`[MCP] Attempting to start custom prompts server: ${customPromptsServerName}`)
+
+      try {
+        await this.serverManager.startServer(customPromptsServerName)
+        console.log(`[MCP] Custom prompts server ${customPromptsServerName} started successfully`)
+
+        // 通知渲染进程服务器已启动
+        eventBus.send(MCP_EVENTS.SERVER_STARTED, SendTarget.ALL_WINDOWS, customPromptsServerName)
+      } catch (error) {
+        console.error(
+          `[MCP] Failed to start custom prompts server ${customPromptsServerName}:`,
+          error
+        )
+      }
+    }
+
+    // 如果有默认服务器，尝试启动（仅当未禁用时）
+    if (defaultServers.length > 0) {
+      for (const serverName of defaultServers) {
+        if (servers[serverName] && !servers[serverName].disable) {
+          console.log(`[MCP] Attempting to start default server: ${serverName}`)
+
+          try {
+            await this.serverManager.startServer(serverName)
+            console.log(`[MCP] Default server ${serverName} started successfully`)
+
+            // 通知渲染进程服务器已启动
+            eventBus.send(MCP_EVENTS.SERVER_STARTED, SendTarget.ALL_WINDOWS, serverName)
+          } catch (error) {
+            console.error(`[MCP] Failed to start default server ${serverName}:`, error)
+          }
+        }
+      }
     }
   }
 

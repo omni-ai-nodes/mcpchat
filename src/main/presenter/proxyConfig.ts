@@ -69,10 +69,26 @@ export class ProxyConfig {
 
       // 系统代理模式
       session.defaultSession.setProxy({ mode: 'system' })
-      const proxyString = await session.defaultSession.resolveProxy('https://www.google.com')
-      const [protocol, address] = proxyString.split(';')[0].split(' ')
-      console.log('proxy url', protocol, address)
-      this.proxyUrl = protocol === 'PROXY' ? `http://${address}` : null
+      
+      // 为resolveProxy添加超时机制，避免在网络环境不好时阻塞
+      const resolveProxyWithTimeout = (url: string, timeoutMs: number = 5000): Promise<string> => {
+        return Promise.race([
+          session.defaultSession.resolveProxy(url),
+          new Promise<string>((_, reject) => {
+            setTimeout(() => reject(new Error('Proxy resolution timeout')), timeoutMs)
+          })
+        ])
+      }
+      
+      try {
+        const proxyString = await resolveProxyWithTimeout('https://www.google.com', 5000)
+        const [protocol, address] = proxyString.split(';')[0].split(' ')
+        console.log('proxy url', protocol, address)
+        this.proxyUrl = protocol === 'PROXY' ? `http://${address}` : null
+      } catch (error) {
+        console.warn('Failed to resolve system proxy, using direct connection:', error)
+        this.proxyUrl = null
+      }
 
       if (this.proxyUrl) {
         process.env.http_proxy = this.proxyUrl
@@ -192,7 +208,7 @@ export class ProxyConfig {
   }
 
   // 从配置初始化代理设置
-  initFromConfig(mode: ProxyMode, customUrl: string): void {
+  async initFromConfig(mode: ProxyMode, customUrl: string): Promise<void> {
     this.mode = mode
     // 如果是自定义模式，验证URL有效性
     if (mode === ProxyMode.CUSTOM && customUrl) {
@@ -203,7 +219,7 @@ export class ProxyConfig {
         this.mode = ProxyMode.SYSTEM
       }
     }
-    this.resolveProxy()
+    await this.resolveProxy()
   }
 }
 export const proxyConfig = new ProxyConfig()
