@@ -868,7 +868,17 @@ export class ConfigPresenter implements IConfigPresenter {
   // 获取所有自定义 prompts
   async getCustomPrompts(): Promise<Prompt[]> {
     try {
-      return this.customPromptsStore.get('prompts') || []
+      // 使用 setImmediate 确保异步执行，避免阻塞
+      return await new Promise<Prompt[]>((resolve) => {
+        setImmediate(() => {
+          try {
+            const prompts = this.customPromptsStore.get('prompts') || []
+            resolve(prompts)
+          } catch {
+            resolve([])
+          }
+        })
+      })
     } catch {
       return []
     }
@@ -876,10 +886,20 @@ export class ConfigPresenter implements IConfigPresenter {
 
   // 保存自定义 prompts
   async setCustomPrompts(prompts: Prompt[]): Promise<void> {
-    await this.customPromptsStore.set('prompts', prompts)
-
-    // 通知MCP系统检查并启动/停止自定义提示词服务器（仅主进程内部）
-    eventBus.sendToMain(CONFIG_EVENTS.CUSTOM_PROMPTS_SERVER_CHECK_REQUIRED)
+    // 使用 setImmediate 确保异步执行，避免阻塞
+    return new Promise<void>((resolve) => {
+      setImmediate(() => {
+        try {
+          this.customPromptsStore.set('prompts', prompts)
+          // 通知MCP系统检查并启动/停止自定义提示词服务器（仅主进程内部）
+          eventBus.sendToMain(CONFIG_EVENTS.CUSTOM_PROMPTS_SERVER_CHECK_REQUIRED)
+          resolve()
+        } catch (error) {
+          console.error('Failed to set custom prompts:', error)
+          resolve()
+        }
+      })
+    })
   }
 
   // 添加单个 prompt

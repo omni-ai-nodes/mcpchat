@@ -30,7 +30,7 @@ if (process.platform === 'darwin') {
 presenter.deeplinkPresenter.init()
 
 // 等待 Electron 初始化完成
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.wefonk.mcpchat')
 
@@ -44,7 +44,10 @@ app.whenReady().then(() => {
   // 从配置中读取代理设置并初始化
   const proxyMode = presenter.configPresenter.getProxyMode() as ProxyMode
   const customProxyUrl = presenter.configPresenter.getCustomProxyUrl()
-  proxyConfig.initFromConfig(proxyMode as ProxyMode, customProxyUrl)
+  // 异步初始化代理配置，避免阻塞应用启动
+  await proxyConfig.initFromConfig(proxyMode as ProxyMode, customProxyUrl).catch(error => {
+    console.warn('Proxy initialization failed:', error)
+  })
 
   // 在开发环境中为新创建的窗口添加 F12 DevTools 支持，生产环境忽略 CmdOrControl + R
   app.on('browser-window-created', (_, window) => {

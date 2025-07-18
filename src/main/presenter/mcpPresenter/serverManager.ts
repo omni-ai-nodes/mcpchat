@@ -184,8 +184,11 @@ export class ServerManager {
       console.info(`Starting MCP server ${name}...`)
       const npmRegistry = serverConfig.customNpmRegistry || this.npmRegistry
       
-      // 预安装npx包（如果需要）
-      await this.preInstallPackageIfNeeded(serverConfig, npmRegistry)
+      // 预安装npx包（如果需要）- 完全异步执行，不阻塞启动
+      // 使用 setImmediate 确保完全异步
+      setImmediate(() => {
+        this.preInstallPackageIfNeeded(serverConfig, npmRegistry)
+      })
       
       // 创建并保存客户端实例，传入npm registry
       const client = new McpClient(
@@ -213,9 +216,9 @@ export class ServerManager {
   }
 
   /**
-   * 预安装npx包（如果需要）
+   * 预安装npx包（如果需要）- 异步执行，不阻塞服务器启动
    */
-  private async preInstallPackageIfNeeded(serverConfig: any, npmRegistry?: string | null): Promise<void> {
+  private preInstallPackageIfNeeded(serverConfig: any, npmRegistry?: string | null): void {
     const command = serverConfig.command as string
     if (!command || !command.startsWith('npx ')) {
       return
@@ -226,30 +229,29 @@ export class ServerManager {
       return
     }
 
-    try {
-      console.info(`预检查包 ${packageName}...`)
-      
-      // 检查包是否已缓存
-      if (this.localPackageManager.isPackageCached(packageName)) {
-        console.info(`包 ${packageName} 已在本地缓存中`)
-        return
-      }
+    // 异步执行预安装，不阻塞服务器启动
+    (async () => {
+      try {
+        console.info(`预检查包 ${packageName}...`)
+        
+        // 检查包是否已缓存
+        if (this.localPackageManager.isPackageCached(packageName)) {
+          console.info(`包 ${packageName} 已在本地缓存中`)
+          return
+        }
 
-      // 检查网络连接
-      const hasNetwork = await this.localPackageManager.checkNetworkConnection()
-      if (!hasNetwork) {
-        console.warn(`无网络连接，无法预安装包 ${packageName}`)
-        return
-      }
+        // 跳过网络检查，直接尝试安装（避免阻塞）
+        // 如果网络不可用，安装会自然失败，不影响服务器启动
 
-      // 尝试安装到本地缓存
-      console.info(`正在预安装包 ${packageName} 到本地缓存...`)
-      await this.localPackageManager.installPackageToCache(packageName, npmRegistry || undefined)
-      console.info(`包 ${packageName} 预安装完成`)
-    } catch (error) {
-      console.warn(`预安装包 ${packageName} 失败，将在运行时尝试:`, error)
-      // 不抛出错误，允许继续启动服务器
-    }
+        // 尝试安装到本地缓存
+        console.info(`正在预安装包 ${packageName} 到本地缓存...`)
+        await this.localPackageManager.installPackageToCache(packageName, npmRegistry || undefined)
+        console.info(`包 ${packageName} 预安装完成`)
+      } catch (error) {
+        console.warn(`预安装包 ${packageName} 失败，将在运行时尝试:`, error)
+        // 不抛出错误，允许继续启动服务器
+      }
+    })()
   }
 
   // 处理并发送MCP连接错误通知

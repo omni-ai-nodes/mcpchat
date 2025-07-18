@@ -29,8 +29,6 @@ export const useThemeStore = defineStore('theme', () => {
     }
   }
 
-  initTheme()
-
   // 监听系统主题变化事件
   const handleSystemThemeChange = (_event: IpcRendererEvent, isDarkMode: boolean) => {
     // 只有在系统模式下才跟随系统主题变化
@@ -74,6 +72,9 @@ export const useThemeStore = defineStore('theme', () => {
     else if (themeMode.value === 'dark') setThemeMode('system')
     else setThemeMode('light')
   }
+
+  // 初始化主题
+  initTheme()
 
   return {
     isDark,

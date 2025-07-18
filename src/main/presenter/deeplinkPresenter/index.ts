@@ -81,7 +81,18 @@ export class DeeplinkPresenter implements IDeeplinkPresenter {
     // 处理 Windows 上协议被调用的情况
     const gotTheLock = app.requestSingleInstanceLock()
     if (!gotTheLock) {
-      app.quit()
+      console.log('Another instance is already running, quitting this instance.')
+      // 在开发模式下，给出更详细的信息而不是立即退出
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Development mode: Another instance detected. This might cause issues.')
+        console.warn('If you are sure no other instance is running, try killing all node/electron processes.')
+        // 延迟退出，给用户时间看到日志
+        setTimeout(() => {
+          app.quit()
+        }, 2000)
+      } else {
+        app.quit()
+      }
     } else {
       app.on('second-instance', (_event, commandLine) => {
         // 用户尝试运行第二个实例，我们应该聚焦到我们的窗口

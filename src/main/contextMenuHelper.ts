@@ -1,4 +1,4 @@
-import { BrowserWindow, Menu, MenuItemConstructorOptions, WebContents, dialog, net } from 'electron'
+import { BrowserWindow, Menu, MenuItemConstructorOptions, WebContents, dialog, net, app } from 'electron'
 import path from 'path'
 import sharp from 'sharp'
 
@@ -226,6 +226,29 @@ export default function contextMenu(options: ContextMenuOptions): () => void {
           options.webContents.send('context-menu-ask-ai', params.selectionText)
         }
       })
+    }
+
+    // 如果没有任何菜单项，添加一些基础菜单项
+    if (menuItems.length === 0) {
+      // 添加刷新页面选项
+      menuItems.push({
+        id: 'reload',
+        label: options.labels?.reload || '刷新页面',
+        click: () => {
+          options.webContents.reload()
+        }
+      })
+
+      // 添加开发者工具选项（仅在开发模式下）
+      if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+        menuItems.push({
+          id: 'devtools',
+          label: options.labels?.devtools || '开发者工具',
+          click: () => {
+            options.webContents.toggleDevTools()
+          }
+        })
+      }
     }
 
     // 允许用户在菜单前添加项目

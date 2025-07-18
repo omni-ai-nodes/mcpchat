@@ -81,11 +81,11 @@ export const useTabStore = defineStore('tab', () => {
 
     // console.log('tabsData', tabsData)
     if (tabsData.length <= 0) {
-      // await addTab({
-      //   name: 'New Tab',
-      //   icon: 'lucide:plus',
-      //   viewType: 'chat'
-      // })
+      await addTab({
+        name: 'New Tab',
+        icon: 'lucide:plus',
+        viewType: 'chat'
+      })
     } else {
       tabs.value = tabsData
       for (const tab of tabsData) {
