@@ -13,7 +13,15 @@
               :src="serverDetail.Logo"
               :alt="serverDetail?.Name || 'Server'"
               class="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover"
-              @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'"
+              @error="
+                if ($event.target) {
+                  ($event.target as HTMLElement).style.display = 'none';
+                  const nextSibling = ($event.target as HTMLElement).nextElementSibling as HTMLElement;
+                  if (nextSibling) {
+                    nextSibling.style.display = 'flex';
+                  }
+                }
+              "
             />
             <div 
               v-else

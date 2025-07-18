@@ -26,7 +26,7 @@
             'connectable': props.isConnecting && props.connectionStart?.nodeId !== props.node.id && props.connectionStart?.type === 'output'
           }"
           @mousedown.stop="startPortDrag(input, 'input', $event)"
-          @mouseup.stop="endPortDrag(input, 'input', $event)"
+          @mouseup.stop="endPortDrag($event)"
           :title="`输入端口: ${input}`"
         >
           <div class="port-dot"></div>
@@ -51,7 +51,7 @@
             'connectable': props.isConnecting && props.connectionStart?.nodeId !== props.node.id && props.connectionStart?.type === 'input'
           }"
           @mousedown.stop="startPortDrag(output, 'output', $event)"
-          @mouseup.stop="endPortDrag(output, 'output', $event)"
+          @mouseup.stop="endPortDrag($event)"
           :title="`输出端口: ${output}`"
         >
           <div class="port-dot"></div>
@@ -246,7 +246,7 @@ const startPortDrag = (port: string, type: 'input' | 'output', event: MouseEvent
   emit('startConnection', props.node.id, port, type)
 }
 
-const endPortDrag = (port: string, type: 'input' | 'output', event: MouseEvent) => {
+const endPortDrag = (event: MouseEvent) => {
   event.preventDefault()
   event.stopPropagation()
   // 端口的mouseup事件由画布处理，这里不需要额外处理

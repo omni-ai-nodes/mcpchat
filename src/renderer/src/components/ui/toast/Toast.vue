@@ -25,7 +25,7 @@ const toastVariants = cva(
 
 type ToastVariants = VariantProps<typeof toastVariants>
 
-interface ToastProps extends ToastRootProps {
+export interface ToastProps extends ToastRootProps {
   class?: HTMLAttributes['class']
   variant?: ToastVariants['variant']
   onOpenChange?: ((value: boolean) => void) | undefined

@@ -3328,7 +3328,7 @@ class ConnectionManager {
       this.connectionStart.value = { nodeId, port, type }
       this.clearSelection()
       
-      const startPos = this.getPortPosition(nodeId, port, type)
+      const startPos = this.getPortPosition(nodeId, type)
       if (startPos) {
         this.tempConnection.value = {
           x1: startPos.x,
@@ -3461,7 +3461,6 @@ class ConnectionManager {
     // 设置临时连接线起始位置
     const startPos = this.getPortPosition(
       this.connectionStart.value.nodeId,
-      this.connectionStart.value.port,
       this.connectionStart.value.type
     )
     
@@ -3506,7 +3505,7 @@ class ConnectionManager {
   }
   
   // 获取端口位置
-  getPortPosition(nodeId: string, port: string, type: 'input' | 'output'): { x: number, y: number } | null {
+  getPortPosition(nodeId: string, type: 'input' | 'output'): { x: number, y: number } | null {
     const node = workflowNodes.value.find(n => n.id === nodeId)
     if (!node) return null
     
@@ -3524,9 +3523,9 @@ class ConnectionManager {
   // 获取连接线端点坐标
   getConnectionEndpoint(connection: Connection, endpoint: 'from' | 'to') {
     if (endpoint === 'from') {
-      return this.getPortPosition(connection.from, connection.fromPort, 'output') || { x: 0, y: 0 }
+      return this.getPortPosition(connection.from, 'output') || { x: 0, y: 0 }
     } else {
-      return this.getPortPosition(connection.to, connection.toPort, 'input') || { x: 0, y: 0 }
+      return this.getPortPosition(connection.to, 'input') || { x: 0, y: 0 }
     }
   }
   
@@ -4471,6 +4470,11 @@ interface WindowAPI {
   runWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; executionId: string; startTime: string; results: { processedNodes: number; processedConnections: number; nodeResults: Record<string, { output: string }> }; error?: string }>
   deployWorkflow: (workflowData: WorkflowData) => Promise<{ success: boolean; deploymentId: string; timestamp: string }>
   testDatabaseConnection: (config: DatabaseConfig) => Promise<DatabaseResult>
+  getWindowId: () => number
+  copyText: (text: string) => void
+  getPathForFile: (file: File) => Promise<string>
+  getWebContentsId: () => number
+  copyImage: (imageData: string) => void
 }
 
 declare global {
@@ -9367,7 +9371,7 @@ const onCanvasMouseMoveCanvas = (event: MouseEvent) => {
       
       if (isValidConnection) {
         // 如果是有效连接，吸附到端口位置
-        const portPos = connectionManager.getPortPosition(hoveredPort.node.id, hoveredPort.port, hoveredPort.type)
+        const portPos = connectionManager.getPortPosition(hoveredPort.node.id, hoveredPort.type)
         if (portPos) {
           isBoundarySnap = true
           connectionManager.tempConnection.value.x2 = portPos.x
@@ -10192,7 +10196,7 @@ const formatDate = (dateStr: string) => {
 }
 
 // 替换 prompt() 的对话框函数
-const showWorkflowNamePrompt = (message: string, defaultValue = ''): Promise<string | null> => {
+const showWorkflowNamePrompt = (defaultValue = ''): Promise<string | null> => {
   return new Promise((resolve) => {
     workflowNameInput.value = defaultValue
     workflowNameDialogCallback.value = resolve

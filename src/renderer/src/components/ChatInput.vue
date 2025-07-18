@@ -381,7 +381,7 @@ const handlePaste = async (e: ClipboardEvent) => {
           }
         } else {
           // 处理其他类型的文件
-          const path = window.api.getPathForFile(file)
+          const path = await window.api.getPathForFile(file)
           const mimeType = await filePresenter.getMimeType(path)
           const fileInfo: MessageFile = await filePresenter.prepareFile(path, mimeType)
           if (fileInfo) {
@@ -436,7 +436,7 @@ const handleFileSelect = async (e: Event) => {
           }
         } else {
           // 处理其他类型的文件
-          const path = window.api.getPathForFile(file)
+          const path = await window.api.getPathForFile(file)
           const mimeType = await filePresenter.getMimeType(path)
           const fileInfo: MessageFile = await filePresenter.prepareFile(path, mimeType)
           if (fileInfo) {
@@ -816,7 +816,7 @@ const handleDrop = async (e: DragEvent) => {
             selectedFiles.value.push(fileInfo)
           }
         } else {
-          const path = window.api.getPathForFile(file)
+          const path = await window.api.getPathForFile(file)
           if (file.type === '') {
             const isDirectory = await filePresenter.isDirectory(path)
             if (isDirectory) {

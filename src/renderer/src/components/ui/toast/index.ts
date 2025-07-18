@@ -6,6 +6,7 @@ export { default as ToastProvider } from './ToastProvider.vue'
 export { default as ToastTitle } from './ToastTitle.vue'
 export { default as ToastViewport } from './ToastViewport.vue'
 export { toast, useToast } from './use-toast'
+export type { ToastProps } from './Toast.vue'
 
 // Export Toaster last to avoid circular dependency issues
 export { default as Toaster } from './Toaster.vue'

@@ -1,5 +1,5 @@
-import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { defineStore } from 'pinia'
 import { usePresenter } from '@/composables/usePresenter'
 import { TabData } from '@shared/presenter'
 import { TAB_EVENTS } from '@/events'
