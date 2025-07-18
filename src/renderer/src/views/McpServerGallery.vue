@@ -46,17 +46,17 @@ const mcpServersRef = ref<InstanceType<typeof McpServers> | null>(null)
 
 // API返回的服务器数据类型
 interface ApiServerItem {
-  Id: number
-  Name: string
-  Logo: string
-  By: string
-  Introdution: string
-  Github: string
-  DeployJson: string
-  Content: string
-  Tools: string
-  CreatedAt: string
-  UpdatedAt: string
+  id: number
+  name: string
+  logo: string
+  by: string
+  introduction: string
+  github: string
+  deploy_json: string
+  content: string
+  tools: string
+  created_at: string
+  updated_at: string
 }
 
 // API响应类型
@@ -64,7 +64,7 @@ interface ApiResponse {
   code: number
   msg: string
   data: {
-    Infos: ApiServerItem[]
+    infos: ApiServerItem[]
     total_pages: number
   }
 }
@@ -190,11 +190,11 @@ const fetchServers = async (page: number = 1, size: number = 10, searchName: str
     
     if (data.code === 200) {
       // 将API数据映射为组件需要的格式
-      servers.value = data.data.Infos.map(item => ({
-        id: item.Id.toString(),
-        name: item.Name,
-        icon: getServerIcon(item.Logo), // 处理图标
-        description: item.Introdution,
+      servers.value = data.data.infos.map(item => ({
+        id: item.id.toString(),
+        name: item.name,
+        icon: getServerIcon(item.logo), // 处理图标
+        description: item.introduction,
         type: 'stdio' as const, // 显示By内容而不是http/local
         status: 'not_installed' as const, // 默认状态为未安装
         isRunning: false,
@@ -202,8 +202,8 @@ const fetchServers = async (page: number = 1, size: number = 10, searchName: str
         toolsCount: 0, // 可以根据需要解析Tools字段
         promptsCount: 0,
         resourcesCount: 0,
-        github: item.Github,
-        deployJson: item.DeployJson // 保留部署配置信息
+        github: item.github,
+        deployJson: item.deploy_json // 保留部署配置信息
       }))
       
       totalPages.value = data.data.total_pages
