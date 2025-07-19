@@ -14,7 +14,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { MCPServerConfig } from '@shared/presenter'
+import type { MCPServerConfig } from '@shared/presenter'
 import { EmojiPicker } from '@/components/ui/emoji-picker'
 import { useToast } from '@/components/ui/toast'
 import { Icon } from '@iconify/vue'
@@ -52,7 +52,7 @@ const args = ref(props.initialConfig?.args?.join(' ') || '')
 const env = ref(JSON.stringify(props.initialConfig?.env || {}, null, 2))
 const descriptions = ref(props.initialConfig?.descriptions || '')
 const icons = ref(props.initialConfig?.icons || '📁')
-const type = ref<'sse' | 'stdio' | 'inmemory' | 'http' | 'gallery'>(props.initialConfig?.type || 'stdio')
+const type = ref<'sse' | 'stdio' | 'inmemory' | 'http' | 'gallery' | 'mcp_gallery'>(props.initialConfig?.type || 'stdio')
 const baseUrl = ref(props.initialConfig?.baseUrl || '')
 const customHeaders = ref('')
 const npmRegistry = ref(props.initialConfig?.customNpmRegistry || '')
@@ -246,12 +246,25 @@ const toggleJsonEditMode = (): void => {
 // 从当前表单生成JSON配置
 const generateJsonFromForm = (): void => {
   try {
-    const config: any = {
+    const config: { mcpServers: Record<string, MCPServerConfig> } = {
       mcpServers: {
         [name.value || 'server']: {
           command: command.value,
           args: args.value ? args.value.split(' ').filter(arg => arg.trim()) : [],
-          type: type.value || 'stdio'
+          type: type.value || 'stdio',
+          env: JSON.parse(env.value || '{}'),
+          descriptions: descriptions.value,
+          icons: icons.value,
+          autoApprove: autoApproveAll.value
+            ? ['all']
+            : [autoApproveRead.value ? 'read' : '', autoApproveWrite.value ? 'write' : ''].filter(Boolean),
+          baseUrl: baseUrl.value,
+          customHeaders: customHeaders.value
+            ? Object.fromEntries(
+                customHeaders.value.split('\n').map(line => line.split('=').map(s => s.trim()))
+              )
+            : undefined,
+          customNpmRegistry: npmRegistry.value
         }
       }
     }
@@ -279,7 +292,7 @@ const generateJsonFromForm = (): void => {
 
     // 添加baseUrl（如果适用）
     if (showBaseUrl.value && baseUrl.value) {
-      serverConfig.url = baseUrl.value
+      serverConfig.baseUrl = baseUrl.value
     }
 
     // 添加自定义headers（如果适用）

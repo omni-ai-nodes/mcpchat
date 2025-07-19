@@ -822,7 +822,20 @@ export interface ProgressResponse {
 }
 
 // MCP相关类型定义
-export interface MCPServerConfig {
+export interface GalleryServerDetail {
+  Logo?: string;
+  Name?: string;
+  By?: string;
+  Github?: string;
+  DeployJson?: string;
+  Introdution?: string;
+  Content?: string;
+  Tools?: string;
+  CreatedAt?: number;
+  UpdatedAt?: number;
+}
+
+export interface MCPServerConfig extends GalleryServerDetail {
   command: string
   args: string[]
   env: Record<string, unknow>
@@ -833,7 +846,7 @@ export interface MCPServerConfig {
   baseUrl?: string
   customHeaders?: Record<string, string>
   customNpmRegistry?: string
-  type: 'sse' | 'stdio' | 'inmemory' | 'http' | 'gallery'
+  type: 'sse' | 'stdio' | 'inmemory' | 'http' | 'gallery' | 'mcp_gallery'
 }
 
 export interface MCPConfig {

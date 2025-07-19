@@ -158,7 +158,7 @@ export class McpClient {
         const _server = getInMemoryServer(this.serverName, _args, _env)
         _server.startServer(serverTransport)
         this.transport = clientTransport
-      } else if (this.serverConfig.type === 'gallery') {
+      } else if (this.serverConfig.type === 'mcp_gallery') {
         // Gallery 类型服务器使用 stdio 传输方式
         let command = this.serverConfig.command as string
         const HOME_DIR = app.getPath('home')
@@ -291,7 +291,7 @@ export class McpClient {
           env.npm_config_registry = this.npmRegistry
         }
 
-        console.log('gallery mcp env', env)
+        console.log('mcp_gallery mcp env', env)
         this.transport = new StdioClientTransport({
           command,
           args,

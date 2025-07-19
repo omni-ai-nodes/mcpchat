@@ -49,6 +49,7 @@ interface Emits {
   (e: 'viewTools'): void
   (e: 'viewPrompts'): void
   (e: 'viewResources'): void
+  (e: 'update:server-icon', value: string): void
 }
 
 const props = defineProps<Props>()
@@ -85,7 +86,7 @@ const getServerTypeLabel = (type?: string) => {
   switch (type) {
     case 'http':
       return 'HTTP'
-    case 'gallery':
+    case 'mcp_gallery':
       return 'Gallery'
     case 'inmemory':
     default:
@@ -174,7 +175,7 @@ watch(watchDescription, () => {
             <div v-if="server.icons && (server.icons.startsWith('http://') || server.icons.startsWith('https://') || server.icons.startsWith('data:'))"
                  class="w-8 h-8 rounded border flex items-center justify-center bg-muted">
               <img :src="server.icons" alt="Server Icon" class="w-8 h-8 object-contain"
-                   @error="() => server.icons = '📁'" />
+                   @error="() => $emit('update:server-icon', '📁')" />
             </div>
             <!-- 如果是emoji，显示emoji -->
             <div v-else-if="server.icons && !server.icons.startsWith('http://') && !server.icons.startsWith('https://') && !server.icons.startsWith('data:')"

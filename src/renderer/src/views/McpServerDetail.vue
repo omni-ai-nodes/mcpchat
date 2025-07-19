@@ -148,11 +148,11 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t">
               <div>
                 <h3 class="text-sm font-medium text-muted-foreground mb-1">{{ t('mcp.serverDetail.createdAt') }}</h3>
-                <p class="text-sm break-words">{{ formatDate(serverDetail.CreatedAt) }}</p>
+                <p class="text-sm break-words">{{ serverDetail?.CreatedAt ? formatDate(serverDetail.CreatedAt) : 'N/A' }}</p>
               </div>
               <div>
                 <h3 class="text-sm font-medium text-muted-foreground mb-1">{{ t('mcp.serverDetail.updatedAt') }}</h3>
-                <p class="text-sm break-words">{{ formatDate(serverDetail.UpdatedAt) }}</p>
+                <p class="text-sm break-words">{{ serverDetail?.UpdatedAt ? formatDate(serverDetail.UpdatedAt) : 'N/A' }}</p>
               </div>
             </div>
           </div>
@@ -206,7 +206,8 @@ const { t } = useI18n()
 // 响应式数据
 const loading = ref(false)
 const error = ref('')
-const serverDetail = ref<any>(null)
+import type { MCPServerConfig } from '@shared/presenter';
+const serverDetail = ref<MCPServerConfig | null>(null)
 const activeTab = ref('quickstart')
 
 // 安装对话框状态
@@ -294,7 +295,7 @@ const installServer = () => {
           
           // 添加 icons 字段，使用 ServerItem 的 icon
           if (!serverConfig.icons) {
-            serverConfig.icons = serverDetail.value.Logo || '🔧'
+            serverConfig.icons = serverDetail.value?.Logo || '🔧'
           }
           
           // 添加默认 type 字段
@@ -303,7 +304,7 @@ const installServer = () => {
           }
           // 添加 简介
           if (!serverConfig.descriptions) {
-            serverConfig.descriptions = serverDetail.value.Introdution || ''
+            serverConfig.descriptions = serverDetail.value?.Introdution || ''
           }
         })
       }
@@ -326,7 +327,7 @@ const installServer = () => {
 }
 
 // 处理表单提交
-const handleInstallSubmit = async (name: string, config: any) => {
+const handleInstallSubmit = async (name: string, config: MCPServerConfig) => {
   console.log('安装服务器配置:', name, config)
   
   try {
@@ -334,7 +335,7 @@ const handleInstallSubmit = async (name: string, config: any) => {
     if (mcpServersRef.value) {
       await mcpServersRef.value.handleAddServer(name, {
         ...config,
-        type: 'gallery' // 确保类型为 gallery
+        type: 'mcp_gallery' // 确保类型为 mcp_gallery
       })
       console.log('服务器添加成功:', name)
     } else {
@@ -385,13 +386,12 @@ const formatJson = (jsonStr: string) => {
   }
 }
 
-// 格式化日期
-const formatDate = (dateStr: string) => {
-  try {
-    return new Date(dateStr).toLocaleString()
-  } catch {
-    return dateStr
+const formatDate = (timestamp: number | undefined): string => {
+  if (typeof timestamp === 'undefined') {
+    return 'N/A';
   }
+  const date = new Date(timestamp * 1000) // 将秒转换为毫秒
+  return date.toLocaleString()
 }
 
 // 组件挂载时获取数据

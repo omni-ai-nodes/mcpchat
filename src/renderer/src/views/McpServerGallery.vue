@@ -114,7 +114,7 @@ const isServerInstalled = (server: ServerItem): boolean => {
     return local.name === server.name || 
            local.name.includes(server.name) || 
            server.name.includes(local.name) ||
-           (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+           (local.type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
   })
   return !!localServer
 }
@@ -128,7 +128,7 @@ const syncServerStatuses = () => {
       return local.name === server.name || 
              local.name.includes(server.name) || 
              server.name.includes(local.name) ||
-             (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+             (local.type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
     })
     
     if (localServer) {
@@ -137,9 +137,9 @@ const syncServerStatuses = () => {
       server.isRunning = localServer.isRunning
       server.isDefault = localServer.isDefault
       // 可以从本地服务获取更多信息，如工具数量等
-      if (localServer.type === 'gallery') {
+      if (localServer.type === 'mcp_gallery') {
         // 对于gallery类型的服务，确保状态正确同步
-        server.type = 'gallery'
+        server.type = 'mcp_gallery'
       }
     } else {
       // 如果未找到本地服务，设置为未安装状态
@@ -165,7 +165,8 @@ const fetchServers = async (page: number = 1, size: number = 10, searchName: str
   loading.value = true
   try {
     const apiUrl = import.meta.env.VITE_MCP_SERVER_API_URL || 'https://api.omni-ainode.com'
-    const requestBody: any = {
+    interface RequestBody { page_size: number; current_page: number; name?: string; }
+    const requestBody: RequestBody = {
       page_size: size,
       current_page: page
     }
@@ -382,7 +383,7 @@ const editServer = (server: ServerItem) => {
     return local.name === server.name || 
            local.name.includes(server.name) || 
            server.name.includes(local.name) ||
-           (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+           (local.type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
   })
   
   if (!localServer) {
@@ -454,7 +455,7 @@ const deleteServer = (server: ServerItem) => {
     return local.name === server.name || 
            local.name.includes(server.name) || 
            server.name.includes(local.name) ||
-           (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+           (local.type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
   })
   
   if (!localServer) {
@@ -531,7 +532,7 @@ const toggleServer = async (server: ServerItem) => {
       return local.name === server.name || 
              local.name.includes(server.name) || 
              server.name.includes(local.name) ||
-             (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+             (local.type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
     })
     
     if (localServer) {
@@ -629,7 +630,7 @@ const installServer = (server: ServerItem) => {
 }
 
 // 处理表单提交
-const handleInstallSubmit = async (name: string, config: any) => {
+const handleInstallSubmit = async (name: string, config: MCPServerConfig) => {
   console.log('安装服务器配置:', name, config)
   
   try {
@@ -637,7 +638,7 @@ const handleInstallSubmit = async (name: string, config: any) => {
     if (mcpServersRef.value) {
       await mcpServersRef.value.handleAddServer(name, {
         ...config,
-        type: 'gallery' // 确保类型为 gallery
+        type: 'mcp_gallery' // 确保类型为 mcp_gallery
       })
       console.log('服务器添加成功:', name)
       

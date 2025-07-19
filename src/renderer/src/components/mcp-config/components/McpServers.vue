@@ -72,14 +72,14 @@ const inMemoryServers = computed(() => {
 const galleryServers = computed(() => {
   return mcpStore.serverList.filter((server) => {
     const config = mcpStore.config.mcpServers[server.name]
-    return config?.type === 'gallery'
+    return config?.type === 'mcp_gallery'
   })
 })
 
 const regularServers = computed(() => {
   return mcpStore.serverList.filter((server) => {
     const config = mcpStore.config.mcpServers[server.name]
-    return config?.type !== 'inmemory' && config?.type !== 'gallery'
+    return config?.type !== 'inmemory' && config?.type !== 'mcp_gallery'
   })
 })
 
