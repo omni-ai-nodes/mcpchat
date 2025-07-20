@@ -4,6 +4,7 @@ import { IDeeplinkPresenter, MCPServerConfig } from '@shared/presenter'
 import path from 'path'
 import { DEEPLINK_EVENTS, MCP_EVENTS, WINDOW_EVENTS } from '@/events'
 import { eventBus, SendTarget } from '@/eventbus'
+import { gitDownloadManager } from '@/lib/gitDownloadManager'
 
 interface MCPInstallConfig {
   mcpServers: Record<
@@ -18,6 +19,7 @@ interface MCPInstallConfig {
       disable?: boolean
       url?: string
       type?: 'sse' | 'stdio' | 'http'
+      github?: string // GitHub仓库URL，用于node命令时下载代码
     }
   >
 }
@@ -211,7 +213,8 @@ export class DeeplinkPresenter implements IDeeplinkPresenter {
   }
 
   async handleMcpInstall(params: URLSearchParams): Promise<void> {
-    console.log('Processing mcp/install command, parameters:', Object.fromEntries(params.entries()))
+    console.log('[DeeplinkPresenter] 开始处理MCP安装命令, parameters:', Object.fromEntries(params.entries()))
+    console.log('[DeeplinkPresenter] 参数详情:', JSON.stringify(Object.fromEntries(params.entries()), null, 2))
 
     // 获取 JSON 数据
     const jsonBase64 = params.get('code')
@@ -300,6 +303,64 @@ export class DeeplinkPresenter implements IDeeplinkPresenter {
           type: determinedType
         }
 
+        // 处理GitHub下载逻辑
+        let processedCommand = determinedType === 'stdio' ? determinedCommand! : defaultConfig.command!
+        let processedArgs = serverConfig.args || defaultConfig.args!
+        
+        console.log(`[DeeplinkPresenter] 开始处理GitHub下载逻辑，服务器: ${serverName}`)
+        console.log(`[DeeplinkPresenter] 原始command: ${determinedCommand}`)
+        console.log(`[DeeplinkPresenter] 原始args: ${JSON.stringify(processedArgs)}`)
+        console.log(`[DeeplinkPresenter] GitHub字段: ${serverConfig.github}`)
+        console.log(`[DeeplinkPresenter] 服务器类型: ${determinedType}`)
+        
+        // 如果配置中有github字段且command是Node.js相关命令，则下载GitHub仓库
+        const isNodeCommand = determinedCommand && (
+          determinedCommand === 'node' ||
+          determinedCommand.includes('node') ||
+          determinedCommand.includes('npm') ||
+          determinedCommand.includes('npx') ||
+          determinedCommand.endsWith('node') ||
+          determinedCommand.endsWith('npm') ||
+          determinedCommand.endsWith('npx')
+        )
+        console.log(`[DeeplinkPresenter] 是否为Node.js命令: ${isNodeCommand}`)
+        
+        if (serverConfig.github && determinedType === 'stdio' && isNodeCommand) {
+          try {
+            console.log(`[DeeplinkPresenter] 检测到GitHub字段，开始下载仓库: ${serverConfig.github}`)
+            console.log(`[DeeplinkPresenter] 传递服务器名称作为目标名称: ${serverName}`)
+            // 传递服务器名称作为目标名称以便重命名
+            const repoPath = await gitDownloadManager.downloadRepository(serverConfig.github, serverName)
+            console.log(`[DeeplinkPresenter] GitHub仓库下载完成，路径: ${repoPath}`)
+            
+            // 更新command和args以使用下载的代码
+            // 假设主文件在仓库根目录，如果args中有相对路径，则转换为绝对路径
+            console.log(`[DeeplinkPresenter] 开始更新args，原始args长度: ${processedArgs.length}`)
+            if (processedArgs.length > 0) {
+              // 将第一个参数（通常是主文件）转换为绝对路径
+              const mainFile = processedArgs[0]
+              console.log(`[DeeplinkPresenter] 主文件: ${mainFile}`)
+              const absoluteMainFile = path.isAbsolute(mainFile) ? mainFile : path.join(repoPath, mainFile)
+              console.log(`[DeeplinkPresenter] 绝对路径主文件: ${absoluteMainFile}`)
+              processedArgs = [absoluteMainFile, ...processedArgs.slice(1)]
+              console.log(`[DeeplinkPresenter] 更新后的args: ${JSON.stringify(processedArgs)}`)
+            } else {
+              console.log(`[DeeplinkPresenter] args为空，跳过更新`)
+            }
+            
+            console.log(`[DeeplinkPresenter] GitHub仓库下载完成，最终args: ${JSON.stringify(processedArgs)}`)
+          } catch (error) {
+            console.error(`[DeeplinkPresenter] 下载GitHub仓库失败: ${error}`)
+            console.error(`[DeeplinkPresenter] 错误详情:`, error)
+            throw new Error(`Failed to download GitHub repository: ${error}`)
+          }
+        } else {
+          console.log(`[DeeplinkPresenter] 跳过GitHub下载，原因:`)
+          console.log(`[DeeplinkPresenter] - 有GitHub字段: ${!!serverConfig.github}`)
+          console.log(`[DeeplinkPresenter] - 是stdio类型: ${determinedType === 'stdio'}`)
+          console.log(`[DeeplinkPresenter] - 是Node.js命令: ${isNodeCommand}`)
+        }
+
         // Merge configuration
         const finalConfig: MCPServerConfig = {
           env: {
@@ -315,11 +376,12 @@ export class DeeplinkPresenter implements IDeeplinkPresenter {
           icons: serverConfig.icons || defaultConfig.icons!,
           autoApprove: serverConfig.autoApprove || defaultConfig.autoApprove!,
           disable: serverConfig.disable ?? defaultConfig.disable!,
-          args: serverConfig.args || defaultConfig.args!,
+          args: processedArgs,
           type: determinedType, // Use the determined type
           // Set command or baseUrl based on type, prioritizing provided values
-          command: determinedType === 'stdio' ? determinedCommand! : defaultConfig.command!,
-          baseUrl: determinedType === 'sse' ? determinedUrl! : defaultConfig.baseUrl!
+          command: processedCommand,
+          baseUrl: determinedType === 'sse' ? determinedUrl! : defaultConfig.baseUrl!,
+          github: serverConfig.github // 保存github字段
         }
 
         // 安装 MCP 服务器
@@ -332,10 +394,17 @@ export class DeeplinkPresenter implements IDeeplinkPresenter {
             [serverName]: finalConfig
           }
         }
+        
+        console.log(`[DeeplinkPresenter] 准备保存MCP服务器配置:`)
+        console.log(`[DeeplinkPresenter] 最终配置:`, JSON.stringify(resultServerConfig, null, 2))
+        
         // 如果配置中指定了该服务器为默认服务器，则添加到默认服务器列表
         eventBus.sendToRenderer(DEEPLINK_EVENTS.MCP_INSTALL, SendTarget.DEFAULT_TAB, {
           mcpConfig: JSON.stringify(resultServerConfig)
         })
+        
+        console.log(`[DeeplinkPresenter] MCP服务器 "${serverName}" 安装完成`)
+        console.log(`[DeeplinkPresenter] 安装过程结束`)
       }
       console.log('All MCP servers processing completed')
     } catch (error) {

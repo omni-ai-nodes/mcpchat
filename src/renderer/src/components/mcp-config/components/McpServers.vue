@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -61,6 +61,31 @@ watch(isAddServerDialogOpen, (newIsAddServerDialogOpen) => {
     settingsStore.clearMcpInstallCache()
   }
 })
+
+// 监听配置变化，重新加载
+watch(
+  () => mcpStore.config,
+  () => {
+    // 清理缓存
+    settingsStore.clearMcpInstallCache()
+    // 重新检查gallery服务器目录
+    checkGalleryServerDirectories()
+  }
+)
+
+// 监听服务器列表变化，重新检查目录
+watch(
+  () => mcpStore.serverList,
+  () => {
+    checkGalleryServerDirectories()
+  },
+  { deep: true }
+)
+
+// 组件挂载时检查目录
+onMounted(() => {
+  checkGalleryServerDirectories()
+})
 // 计算属性：区分内置服务、MCP广场服务和普通服务
 const inMemoryServers = computed(() => {
   return mcpStore.serverList.filter((server) => {
@@ -70,11 +95,20 @@ const inMemoryServers = computed(() => {
 })
 
 const galleryServers = computed(() => {
+  // 直接返回所有gallery类型的服务器，不进行目录检查过滤
+  // 这样与McpServerGallery.vue的逻辑保持一致
   return mcpStore.serverList.filter((server) => {
     const config = mcpStore.config.mcpServers[server.name]
     return config?.mcp_type === 'mcp_gallery'
   })
 })
+
+// 移除不必要的过滤逻辑，简化为空函数以保持兼容性
+const checkGalleryServerDirectories = async () => {
+  // 不再进行目录检查和过滤，让MCP广场显示所有已配置的gallery服务
+  // 这样与McpServerGallery.vue的行为保持一致
+  console.log('MCP广场服务器列表已更新')
+}
 
 const regularServers = computed(() => {
   return mcpStore.serverList.filter((server) => {
@@ -104,6 +138,7 @@ const handleAddServer = async (serverName: string, serverConfig: MCPServerConfig
   if (result.success) {
     isAddServerDialogOpen.value = false
   }
+  return result
 }
 
 const handleEditServer = async (serverName: string, serverConfig: Partial<MCPServerConfig>) => {

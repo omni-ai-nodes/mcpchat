@@ -117,6 +117,12 @@ const api = {
     installPackageToCache: (packageName: string) => {
       return ipcRenderer.invoke('presenter:call', 'mcpPresenter', 'installPackageToCache', packageName)
     }
+  },
+  // 通用 Presenter 调用接口
+  presenter: {
+    call: (presenterName: string, method: string, ...args: unknown[]) => {
+      return ipcRenderer.invoke('presenter:call', presenterName, method, ...args)
+    }
   }
 }
 exposeElectronAPI()

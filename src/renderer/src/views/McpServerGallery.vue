@@ -42,8 +42,10 @@ const router = useRouter()
 const mcpStore = useMcpStore()
 const { toast } = useToast()
 
-// McpServers 组件引用
+// 引用 McpServers 组件
 const mcpServersRef = ref<InstanceType<typeof McpServers> | null>(null)
+// 引用安装表单组件
+const installFormRef = ref<any>(null)
 
 // API返回的服务器数据类型
 interface ApiServerItem {
@@ -121,10 +123,11 @@ const isServerInstalled = (server: ServerItem): boolean => {
 }
 
 // 同步服务状态的函数
-const syncServerStatuses = () => {
-  servers.value.forEach(server => {
+const syncServerStatuses = async () => {
+  console.log('同步服务状态，当前本地服务列表:', mcpStore.serverList.map(s => ({ name: s.name, type: s.type, isRunning: s.isRunning })))
+  
+  for (const server of servers.value) {
     // 检查该服务是否已安装到本地配置中
-    // 使用与toggleServer相同的匹配逻辑
     const localServer = mcpStore.serverList.find(local => {
       return local.name === server.name || 
              local.name.includes(server.name) || 
@@ -133,8 +136,32 @@ const syncServerStatuses = () => {
     })
     
     if (localServer) {
+      console.log(`找到匹配的本地服务: ${server.name} -> ${localServer.name}, 运行状态: ${localServer.isRunning}`)
+      
+      // 检查是否为GitHub类型的服务器且需要检查代码下载状态
+      // npx类型的服务器不需要检查目录，因为它们通过包管理器运行
+       let isCodeDownloaded = true
+       if (server.github && localServer.github && !localServer.command?.startsWith('npx ')) {
+         try {
+           // 传递服务器名称作为targetName，因为下载时可能使用了服务器名称重命名仓库
+           isCodeDownloaded = await window.api.presenter.call('mcpPresenter', 'isGitHubRepositoryDownloaded', localServer.github, localServer.name)
+         } catch (error) {
+           console.warn('检查GitHub仓库下载状态失败:', error)
+           isCodeDownloaded = false
+         }
+       }
+      
       // 如果找到本地服务，同步其状态
-      server.status = localServer.isRunning ? 'running' : (localServer.isLoading ? 'loading' : 'stopped')
+      if (localServer.isRunning) {
+        server.status = 'running'
+      } else if (localServer.isLoading) {
+        server.status = 'loading'
+      } else if (isCodeDownloaded) {
+        server.status = 'stopped'
+      } else {
+        server.status = 'not_installed'
+      }
+      
       server.isRunning = localServer.isRunning
       server.isDefault = localServer.isDefault
       // 可以从本地服务获取更多信息，如工具数量等
@@ -147,7 +174,7 @@ const syncServerStatuses = () => {
       server.isRunning = false
       server.isDefault = false
     }
-  })
+  }
 }
 
 // 监听mcpStore的服务状态变化
@@ -157,6 +184,11 @@ watch(() => mcpStore.serverStatuses, () => {
 
 // 监听mcpStore的服务列表变化
 watch(() => mcpStore.serverList, () => {
+  syncServerStatuses()
+}, { deep: true })
+
+// 监听mcpStore的配置变化
+watch(() => mcpStore.config, () => {
   syncServerStatuses()
 }, { deep: true })
 
@@ -528,7 +560,7 @@ const confirmRemoveServer = async () => {
 const toggleServer = async (server: ServerItem) => {
   try {
     // 检查该服务是否已安装到本地配置中
-    // 尝试多种匹配方式：精确匹配、包含匹配、被包含匹配
+    // 使用与syncServerStatuses相同的匹配逻辑
     const localServer = mcpStore.serverList.find(local => {
       return local.name === server.name || 
              local.name.includes(server.name) || 
@@ -592,7 +624,7 @@ const installServer = (server: ServerItem) => {
       // 解析原始 JSON 配置
       const deployConfig = JSON.parse(server.deployJson)
       
-      // 自动为每个服务器配置添加 icons 和 type 字段
+      // 自动为每个服务器配置添加 icons、type、github 等字段
       if (deployConfig.mcpServers) {
         Object.keys(deployConfig.mcpServers).forEach(serverKey => {
           const serverConfig = deployConfig.mcpServers[serverKey]
@@ -606,9 +638,15 @@ const installServer = (server: ServerItem) => {
           if (!serverConfig.type) {
             serverConfig.type = 'stdio'
           }
+          
           // 添加 简介
           if (!serverConfig.descriptions) {
             serverConfig.descriptions = server.description
+          }
+          
+          // 添加 GitHub 字段，使用 ServerItem 的 github
+          if (!serverConfig.github && server.github) {
+            serverConfig.github = server.github
           }
         })
       }
@@ -637,18 +675,54 @@ const handleInstallSubmit = async (name: string, config: MCPServerConfig) => {
   try {
     // 调用 McpServers 组件的 handleAddServer 方法
     if (mcpServersRef.value) {
-      await mcpServersRef.value.handleAddServer(name, {
+      const result = await mcpServersRef.value.handleAddServer(name, {
         ...config,
         mcp_type: 'mcp_gallery',
       })
-      console.log('服务器添加成功:', name)
       
-
+      if (result && result.success) {
+        console.log('服务器添加成功:', name)
+        
+        // 显示成功通知
+        toast({
+          title: t('mcp.mcpGallery.installSuccess'),
+          description: `服务器 "${name}" 安装成功`,
+          variant: 'default'
+        })
+        
+        // 等待一段时间确保后端配置更新完成，然后手动触发状态同步
+        await new Promise(resolve => setTimeout(resolve, 500))
+        await nextTick()
+        syncServerStatuses()
+        
+      } else {
+        console.error('服务器添加失败:', name)
+        toast({
+          title: t('mcp.mcpGallery.installFailed'),
+          description: `服务器 "${name}" 安装失败`,
+          variant: 'destructive'
+        })
+      }
     } else {
       console.error('McpServers 组件引用不可用')
+      toast({
+        title: t('mcp.mcpGallery.installFailed'),
+        description: 'MCP服务组件不可用',
+        variant: 'destructive'
+      })
     }
   } catch (error) {
     console.error('添加服务器时发生错误:', error)
+    toast({
+      title: t('mcp.mcpGallery.installFailed'),
+      description: `安装过程中发生错误: ${error}`,
+      variant: 'destructive'
+    })
+  } finally {
+    // 重置表单的提交状态
+    if (installFormRef.value) {
+      installFormRef.value.isSubmitting = false
+    }
   }
   
   // 关闭弹窗
@@ -1080,6 +1154,7 @@ const goToMcpSettings = () => {
         </DialogDescription>
       </DialogHeader>
       <McpServerForm
+        ref="installFormRef"
         :default-json-config="prefilledJsonConfig"
         @submit="handleInstallSubmit"
       />

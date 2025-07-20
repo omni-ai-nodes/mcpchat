@@ -20,6 +20,7 @@ import { OpenAI } from 'openai'
 import { ToolListUnion, Type, FunctionDeclaration } from '@google/genai'
 import { CONFIG_EVENTS } from '@/events'
 import { presenter } from '@/presenter'
+import { gitDownloadManager } from '@/lib/gitDownloadManager'
 
 // 定义MCP工具接口
 interface MCPTool {
@@ -83,6 +84,7 @@ export class McpPresenter implements IMCPPresenter {
   private toolManager: ToolManager
   private configPresenter: IConfigPresenter
   private isInitialized: boolean = false
+  private gitDownloadManager = gitDownloadManager
 
   constructor(configPresenter?: IConfigPresenter) {
     console.log('Initializing MCP Presenter')
@@ -987,6 +989,16 @@ export class McpPresenter implements IMCPPresenter {
 
   async resetToDefaultServers(): Promise<void> {
     await this.configPresenter?.getMcpConfHelper().resetToDefaultServers()
+  }
+
+  /**
+   * 检查GitHub仓库是否已下载到本地
+   * @param githubUrl GitHub仓库URL
+   * @param targetName 目标名称，如果与仓库名不同则检查重命名后的路径
+   * @returns Promise<boolean> 是否已下载
+   */
+  async isGitHubRepositoryDownloaded(githubUrl: string, targetName?: string): Promise<boolean> {
+    return this.gitDownloadManager.isRepositoryDownloaded(githubUrl, targetName)
   }
 
   /**

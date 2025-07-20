@@ -79,6 +79,8 @@
     "autoApproveWrite": "写入",
     "autoApproveHelp": "选择需要自动授权的操作类型，无需用户确认即可执行",
     "submit": "提交",
+    "submitting": "安装中...",
+    "submitError": "提交失败",
     "add": "添加",
     "update": "更新",
     "cancel": "取消",
@@ -95,7 +97,11 @@
     "addFolder": "添加文件夹",
     "selectFolder": "选择文件夹",
     "selectFolderError": "选择文件夹失败",
-    "noFoldersSelected": "未选择任何文件夹"
+    "noFoldersSelected": "未选择任何文件夹",
+    "github": "GitHub 仓库 URL",
+    "githubPlaceholder": "输入 GitHub 仓库 URL，例如：https://github.com/user/repo",
+    "npmRegistry": "自定义npm Registry",
+    "npmRegistryPlaceholder": "设置自定义 npm registry，留空系统会自动选择最快的"
   },
   "deleteServer": "删除服务器",
   "editServer": "编辑服务器",
@@ -267,7 +273,9 @@
     "installDialog": {
       "title": "安装MCP服务器",
       "description": "配置并安装新的MCP服务器到您的系统中"
-    }
+    },
+    "installSuccess": "服务器安装成功",
+    "installFailed": "服务器安装失败"
   },
   "workflow": {
     "title": "Mcp工作流",

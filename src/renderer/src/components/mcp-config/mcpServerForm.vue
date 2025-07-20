@@ -45,6 +45,9 @@ const emit = defineEmits<{
   submit: [serverName: string, config: MCPServerConfig]
 }>()
 
+// 提交状态
+const isSubmitting = ref(false)
+
 // 表单状态
 const name = ref(props.serverName || '')
 const command = ref(props.initialConfig?.command || 'npx')
@@ -56,6 +59,7 @@ const type = ref<'sse' | 'stdio' | 'inmemory' | 'http' | 'gallery' | 'mcp_galler
 const baseUrl = ref(props.initialConfig?.baseUrl || '')
 const customHeaders = ref('')
 const npmRegistry = ref(props.initialConfig?.customNpmRegistry || '')
+const github = ref(props.initialConfig?.github || '')
 
 // 模型选择相关
 const modelSelectOpen = ref(false)
@@ -191,6 +195,9 @@ const parseJsonConfig = (): void => {
     } else {
       customHeaders.value = '' // 默认空字符串
     }
+
+    // 填充 github 字段
+    github.value = serverConfig.github || ''
 
     // 权限设置
     autoApproveAll.value = serverConfig.autoApprove?.includes('all') || false
@@ -500,8 +507,12 @@ const focusArgsInput = (): void => {
 }
 
 // 提交表单
-const handleSubmit = (): void => {
-  if (!isFormValid.value) return
+const handleSubmit = async (): Promise<void> => {
+  if (!isFormValid.value || isSubmitting.value) return
+  
+  isSubmitting.value = true
+  
+  try {
 
   // 处理自动授权设置
   const autoApprove: string[] = []
@@ -576,12 +587,8 @@ const handleSubmit = (): void => {
     }
   }
 
-  // 填充 customHeaders (如果存在)
-  if (serverConfig.customHeaders) {
-    customHeaders.value = formatJsonHeaders(serverConfig.customHeaders) // 加载时格式化为 Key=Value
-  } else {
-    customHeaders.value = '' // 默认空字符串
-  }
+  // 注释：这段代码是错误的，应该移除
+  // 在提交时不应该重新设置 customHeaders.value
 
   // 添加 customNpmRegistry 字段（仅当显示npm registry输入框且有值时）
   if (showNpmRegistryInput.value && npmRegistry.value.trim()) {
@@ -590,7 +597,21 @@ const handleSubmit = (): void => {
     serverConfig.customNpmRegistry = ''
   }
 
+  // 添加 github 字段（如果有值）
+  if (github.value.trim()) {
+    serverConfig.github = github.value.trim()
+  }
+
   emit('submit', name.value.trim(), serverConfig)
+  } catch (error) {
+    console.error('提交表单时发生错误:', error)
+    toast({
+      title: t('settings.mcp.serverForm.submitError'),
+      description: String(error),
+      variant: 'destructive'
+    })
+    isSubmitting.value = false
+  }
 }
 
 const placeholder = `mcp配置示例
@@ -663,6 +684,7 @@ watch(
       type.value = newConfig.type || 'stdio'
       baseUrl.value = newConfig.baseUrl || ''
       npmRegistry.value = newConfig.customNpmRegistry || ''
+      github.value = newConfig.github || ''
 
       // Format customHeaders from initialConfig
       if (newConfig.customHeaders) {
@@ -729,7 +751,8 @@ HTTP-Referer=mcpchatai.cn`
 defineExpose({
   parseJsonConfig,
   handleSubmit,
-  jsonConfig
+  jsonConfig,
+  isSubmitting
 })
 </script>
 
@@ -1079,6 +1102,23 @@ defineExpose({
             "
           />
         </div>
+        
+        <!-- GitHub 仓库 URL (仅在命令为 node 时显示) -->
+        <div v-if="command === 'node'" class="space-y-2">
+          <Label class="text-xs text-muted-foreground" for="github-url">
+            {{ t('settings.mcp.serverForm.github') || 'GitHub 仓库 URL' }}
+          </Label>
+          <Input
+            id="github-url"
+            v-model="github"
+            :placeholder="
+              t('settings.mcp.serverForm.githubPlaceholder') ||
+              '输入 GitHub 仓库 URL，例如：https://github.com/user/repo'
+            "
+            :disabled="isFieldReadOnly"
+          />
+        </div>
+
         <!-- 自动授权选项 -->
         <div class="space-y-3">
           <Label class="text-xs text-muted-foreground">{{
@@ -1154,8 +1194,10 @@ defineExpose({
       <Button type="button" variant="outline" size="sm" @click="toggleJsonEditMode">
         {{ isJsonEditMode ? t('settings.mcp.serverForm.backToForm') : t('settings.mcp.serverForm.editJson') }}
       </Button>
-      <Button type="submit" size="sm" :disabled="!isFormValid">
-        {{ t('settings.mcp.serverForm.submit') }}
+      <Button type="submit" size="sm" :disabled="!isFormValid || isSubmitting">
+        <Icon v-if="isSubmitting" icon="lucide:loader-2" class="w-4 h-4 mr-2 animate-spin" />
+        <span v-if="isSubmitting">安装中...</span>
+        <span v-if="!isSubmitting">{{ t('settings.mcp.serverForm.submit') }}</span>
       </Button>
     </div>
   </form>

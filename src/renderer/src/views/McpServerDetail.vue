@@ -288,7 +288,7 @@ const installServer = () => {
       // 解析原始 JSON 配置
       const deployConfig = JSON.parse(serverDetail.value.DeployJson)
       
-      // 自动为每个服务器配置添加 icons 和 type 字段
+      // 自动为每个服务器配置添加 icons、type、github 等字段
       if (deployConfig.mcpServers) {
         Object.keys(deployConfig.mcpServers).forEach(serverKey => {
           const serverConfig = deployConfig.mcpServers[serverKey]
@@ -302,9 +302,15 @@ const installServer = () => {
           if (!serverConfig.type) {
             serverConfig.type = 'stdio'
           }
+          
           // 添加 简介
           if (!serverConfig.descriptions) {
             serverConfig.descriptions = serverDetail.value?.Introdution || ''
+          }
+          
+          // 添加 GitHub 字段，使用 ServerDetail 的 Github
+          if (!serverConfig.github && serverDetail.value.Github) {
+            serverConfig.github = serverDetail.value.Github
           }
         })
       }
