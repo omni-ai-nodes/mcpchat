@@ -166,8 +166,9 @@ const syncServerStatuses = async () => {
       console.log(`找到匹配的本地服务: ${server.name} -> ${localServer.name}, 运行状态: ${localServer.isRunning}`)
       
       // 检查是否为GitHub类型的服务器且需要检查代码下载状态
+      // npx类型的服务器不需要检查目录，因为它们通过包管理器运行
        let isCodeDownloaded = true
-       if (server.github && localServer.github) {
+       if (server.github && localServer.github && !localServer.command?.startsWith('npx ')) {
          try {
            // 传递服务器名称作为targetName，因为下载时可能使用了服务器名称重命名仓库
            isCodeDownloaded = await window.api.presenter.call('mcpPresenter', 'isGitHubRepositoryDownloaded', localServer.github, localServer.name)

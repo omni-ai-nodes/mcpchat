@@ -166,8 +166,8 @@ export class McpClient {
         let args = this.serverConfig.args as string[]
         const HOME_DIR = app.getPath('home')
 
-        // 检查是否有github字段，如果有则先下载代码
-        if (this.serverConfig.github) {
+        // 检查是否有github字段，如果有则先下载代码（npx命令除外）
+        if (this.serverConfig.github && command !== 'npx') {
           const githubUrl = this.serverConfig.github as string
           // 如果是node命令，传递服务器名称作为目标名称以便重命名
           const targetName = command === 'node' ? this.serverName : undefined
