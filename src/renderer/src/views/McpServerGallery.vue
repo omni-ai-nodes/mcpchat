@@ -533,7 +533,7 @@ const toggleServer = async (server: ServerItem) => {
       return local.name === server.name || 
              local.name.includes(server.name) || 
              server.name.includes(local.name) ||
-             (local.type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+             (local.mcp_type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
     })
     
     if (localServer) {

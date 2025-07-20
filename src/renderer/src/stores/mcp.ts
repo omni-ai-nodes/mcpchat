@@ -269,7 +269,7 @@ export const useMcpStore = defineStore('mcp', () => {
         }
         
         // 检查是否为 gallery 类型的服务器
-        if (serverConfig?.type === 'mcp_gallery') {
+        if (serverConfig?.mcp_type === 'mcp_gallery') {
           // 对于 gallery 类型，直接通过 SDK 启动
           await startGalleryServer(serverName)
         } else {
