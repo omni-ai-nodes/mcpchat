@@ -334,27 +334,45 @@ const nextPage = () => {
 
 // 计算属性：过滤后的服务器列表（仅保留状态过滤，搜索已移至服务端）
 const filteredServers = computed(() => {
-  let filtered = servers.value
+  if (filterStatus.value === 'running' || filterStatus.value === 'stopped' || filterStatus.value === 'error') {
+    // 对于已安装状态，从本地服务器列表获取
+    return mcpStore.serverList
+      .filter(s => s.mcp_type === 'mcp_gallery' && 
+        ((filterStatus.value === 'running' && s.isRunning) ||
+         (filterStatus.value === 'stopped' && !s.isRunning && !s.isLoading) ||
+         (filterStatus.value === 'error' && s.errorMessage)) // 假设有errorMessage表示错误
+      )
+      .map(s => ({
+        id: s.name,
+        name: s.name,
+        icon: s.icons || '🔧',
+        description: s.descriptions || '',
+        type: s.type || '',
+        status: s.isRunning ? 'running' : (s.isLoading ? 'loading' : (s.errorMessage ? 'error' : 'stopped')),
+        isRunning: s.isRunning,
+        isDefault: s.isDefault,
+        isGallery: true,
+        toolsCount: 0,
+        promptsCount: 0,
+        resourcesCount: 0,
+        github: s.github,
+        deployJson: ''
+      }));
+  } else {
+    let filtered = servers.value;
 
-  // 状态过滤（保留客户端状态过滤）
-  if (filterStatus.value !== 'all') {
-    filtered = filtered.filter(server => {
-      switch (filterStatus.value) {
-        case 'running':
-          return server.status === 'running'
-        case 'stopped':
-          return server.status === 'stopped'
-        case 'error':
-          return server.status === 'error'
-        case 'not_installed':
-          return server.status === 'not_installed'
-        default:
-          return true
-      }
-    })
+    if (filterStatus.value !== 'all') {
+      filtered = filtered.filter(server => {
+        switch (filterStatus.value) {
+          case 'not_installed':
+            return server.status === 'not_installed';
+          default:
+            return true;
+        }
+      });
+    }
+    return filtered;
   }
-
-  return filtered
 })
 
 // 状态相关函数
