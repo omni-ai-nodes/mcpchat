@@ -109,30 +109,83 @@ const selectedServerConfig = ref<ServerItem | null>(null)
 
 // 检查服务是否已安装
 const isServerInstalled = (server: ServerItem): boolean => {
-  const localServer = mcpStore.serverList.find(local => {
-    return local.name === server.name || 
-           local.name.includes(server.name) || 
-           server.name.includes(local.name) ||
-           (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
-  })
-  return !!localServer
+  // 直接使用server.status来判断是否已安装
+  // 这样可以确保按钮显示逻辑与状态显示逻辑一致
+  return server.status !== 'not_installed'
 }
 
 // 同步服务状态的函数
-const syncServerStatuses = () => {
-  servers.value.forEach(server => {
+const syncServerStatuses = async () => {
+  console.log('同步服务状态，当前本地服务列表:', mcpStore.serverList.map(s => ({ name: s.name, type: s.type, isRunning: s.isRunning })))
+  
+  for (const server of servers.value) {
     // 检查该服务是否已安装到本地配置中
-    // 使用与toggleServer相同的匹配逻辑
     const localServer = mcpStore.serverList.find(local => {
-      return local.name === server.name || 
-             local.name.includes(server.name) || 
-             server.name.includes(local.name) ||
-             (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+      // 首先尝试精确匹配
+      if (local.name === server.name) {
+        return true
+      }
+      
+      // 对于 gallery 类型的服务器，使用更宽松的匹配
+      if (server.type === 'gallery') {
+        const localNameLower = local.name.toLowerCase()
+        const serverNameLower = server.name.toLowerCase()
+        
+        // 基本的包含匹配
+        if (localNameLower === serverNameLower || 
+            localNameLower.includes(serverNameLower) || 
+            serverNameLower.includes(localNameLower)) {
+          return true
+        }
+        
+        // 特殊处理：如果服务器有deployJson，尝试从中提取可能的服务器名称进行匹配
+        if (server.deployJson) {
+          try {
+            const deployConfig = JSON.parse(server.deployJson)
+            if (deployConfig.mcpServers) {
+              const serverKeys = Object.keys(deployConfig.mcpServers)
+              return serverKeys.some(key => {
+                const keyLower = key.toLowerCase()
+                return keyLower === localNameLower || 
+                       keyLower.includes(localNameLower) || 
+                       localNameLower.includes(keyLower)
+              })
+            }
+          } catch (error) {
+            console.warn('Failed to parse deployJson for server matching:', error)
+          }
+        }
+      }
+      
+      return false
     })
     
     if (localServer) {
+      console.log(`找到匹配的本地服务: ${server.name} -> ${localServer.name}, 运行状态: ${localServer.isRunning}`)
+      
+      // 检查是否为GitHub类型的服务器且需要检查代码下载状态
+       let isCodeDownloaded = true
+       if (server.github && localServer.github) {
+         try {
+           // 传递服务器名称作为targetName，因为下载时可能使用了服务器名称重命名仓库
+           isCodeDownloaded = await window.api.presenter.call('mcpPresenter', 'isGitHubRepositoryDownloaded', localServer.github, localServer.name)
+         } catch (error) {
+           console.warn('检查GitHub仓库下载状态失败:', error)
+           isCodeDownloaded = false
+         }
+       }
+      
       // 如果找到本地服务，同步其状态
-      server.status = localServer.isRunning ? 'running' : (localServer.isLoading ? 'loading' : 'stopped')
+      if (localServer.isRunning) {
+        server.status = 'running'
+      } else if (localServer.isLoading) {
+        server.status = 'loading'
+      } else if (isCodeDownloaded) {
+        server.status = 'stopped'
+      } else {
+        server.status = 'not_installed'
+      }
+      
       server.isRunning = localServer.isRunning
       server.isDefault = localServer.isDefault
       // 可以从本地服务获取更多信息，如工具数量等
@@ -146,7 +199,7 @@ const syncServerStatuses = () => {
       server.isRunning = false
       server.isDefault = false
     }
-  })
+  }
 }
 
 // 监听mcpStore的服务状态变化
@@ -156,6 +209,11 @@ watch(() => mcpStore.serverStatuses, () => {
 
 // 监听mcpStore的服务列表变化
 watch(() => mcpStore.serverList, () => {
+  syncServerStatuses()
+}, { deep: true })
+
+// 监听mcpStore的配置变化
+watch(() => mcpStore.config, () => {
   syncServerStatuses()
 }, { deep: true })
 
@@ -195,7 +253,7 @@ const fetchServers = async (page: number = 1, size: number = 10, searchName: str
         name: item.name,
         icon: getServerIcon(item.logo), // 处理图标
         description: item.introduction,
-        type: 'stdio' as const, // 显示By内容而不是http/local
+        type: 'gallery' as const, // 从API获取的服务器应该是gallery类型
         status: 'not_installed' as const, // 默认状态为未安装
         isRunning: false,
         isDefault: false,
@@ -376,10 +434,41 @@ const addServer = () => {
 const editServer = (server: ServerItem) => {
   // 检查服务器是否已安装到本地
   const localServer = mcpStore.serverList.find(local => {
-    return local.name === server.name || 
-           local.name.includes(server.name) || 
-           server.name.includes(local.name) ||
-           (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+    // 首先尝试精确匹配
+    if (local.name === server.name) return true
+    
+    // 对于 gallery 类型的服务器，使用更宽松的匹配
+    if (server.type === 'gallery') {
+      const localNameLower = local.name.toLowerCase()
+      const serverNameLower = server.name.toLowerCase()
+      
+      // 基本的包含匹配
+      if (localNameLower === serverNameLower || 
+          localNameLower.includes(serverNameLower) || 
+          serverNameLower.includes(localNameLower)) {
+        return true
+      }
+      
+      // 特殊处理：如果服务器有deployJson，尝试从中提取可能的服务器名称进行匹配
+      if (server.deployJson) {
+        try {
+          const deployConfig = JSON.parse(server.deployJson)
+          if (deployConfig.mcpServers) {
+            const serverKeys = Object.keys(deployConfig.mcpServers)
+            return serverKeys.some(key => {
+              const keyLower = key.toLowerCase()
+              return keyLower === localNameLower || 
+                     keyLower.includes(localNameLower) || 
+                     localNameLower.includes(keyLower)
+            })
+          }
+        } catch (error) {
+          console.warn('Failed to parse deployJson for server matching:', error)
+        }
+      }
+    }
+    
+    return false
   })
   
   if (!localServer) {
@@ -448,10 +537,41 @@ const editServer = (server: ServerItem) => {
 const deleteServer = (server: ServerItem) => {
   // 检查服务器是否已安装到本地
   const localServer = mcpStore.serverList.find(local => {
-    return local.name === server.name || 
-           local.name.includes(server.name) || 
-           server.name.includes(local.name) ||
-           (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+    // 首先尝试精确匹配
+    if (local.name === server.name) return true
+    
+    // 对于 gallery 类型的服务器，使用更宽松的匹配
+    if (server.type === 'gallery') {
+      const localNameLower = local.name.toLowerCase()
+      const serverNameLower = server.name.toLowerCase()
+      
+      // 基本的包含匹配
+      if (localNameLower === serverNameLower || 
+          localNameLower.includes(serverNameLower) || 
+          serverNameLower.includes(localNameLower)) {
+        return true
+      }
+      
+      // 特殊处理：如果服务器有deployJson，尝试从中提取可能的服务器名称进行匹配
+      if (server.deployJson) {
+        try {
+          const deployConfig = JSON.parse(server.deployJson)
+          if (deployConfig.mcpServers) {
+            const serverKeys = Object.keys(deployConfig.mcpServers)
+            return serverKeys.some(key => {
+              const keyLower = key.toLowerCase()
+              return keyLower === localNameLower || 
+                     keyLower.includes(localNameLower) || 
+                     localNameLower.includes(keyLower)
+            })
+          }
+        } catch (error) {
+          console.warn('Failed to parse deployJson for server matching:', error)
+        }
+      }
+    }
+    
+    return false
   })
   
   if (!localServer) {
@@ -523,12 +643,45 @@ const confirmRemoveServer = async () => {
 const toggleServer = async (server: ServerItem) => {
   try {
     // 检查该服务是否已安装到本地配置中
-    // 尝试多种匹配方式：精确匹配、包含匹配、被包含匹配
+    // 使用与syncServerStatuses相同的匹配逻辑
     const localServer = mcpStore.serverList.find(local => {
-      return local.name === server.name || 
-             local.name.includes(server.name) || 
-             server.name.includes(local.name) ||
-             (local.type === 'gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+      // 首先尝试精确匹配
+      if (local.name === server.name) {
+        return true
+      }
+      
+      // 对于 gallery 类型的服务器，使用更宽松的匹配
+      if (server.type === 'gallery') {
+        const localNameLower = local.name.toLowerCase()
+        const serverNameLower = server.name.toLowerCase()
+        
+        // 基本的包含匹配
+        if (localNameLower === serverNameLower || 
+            localNameLower.includes(serverNameLower) || 
+            serverNameLower.includes(localNameLower)) {
+          return true
+        }
+        
+        // 特殊处理：如果服务器有deployJson，尝试从中提取可能的服务器名称进行匹配
+        if (server.deployJson) {
+          try {
+            const deployConfig = JSON.parse(server.deployJson)
+            if (deployConfig.mcpServers) {
+              const serverKeys = Object.keys(deployConfig.mcpServers)
+              return serverKeys.some(key => {
+                const keyLower = key.toLowerCase()
+                return keyLower === localNameLower || 
+                       keyLower.includes(localNameLower) || 
+                       localNameLower.includes(keyLower)
+              })
+            }
+          } catch (error) {
+            console.warn('Failed to parse deployJson for server matching:', error)
+          }
+        }
+      }
+      
+      return false
     })
     
     if (localServer) {
@@ -587,7 +740,7 @@ const installServer = (server: ServerItem) => {
       // 解析原始 JSON 配置
       const deployConfig = JSON.parse(server.deployJson)
       
-      // 自动为每个服务器配置添加 icons 和 type 字段
+      // 自动为每个服务器配置添加 icons、type、github 等字段
       if (deployConfig.mcpServers) {
         Object.keys(deployConfig.mcpServers).forEach(serverKey => {
           const serverConfig = deployConfig.mcpServers[serverKey]
@@ -601,9 +754,15 @@ const installServer = (server: ServerItem) => {
           if (!serverConfig.type) {
             serverConfig.type = 'stdio'
           }
+          
           // 添加 简介
           if (!serverConfig.descriptions) {
             serverConfig.descriptions = server.description
+          }
+          
+          // 添加 GitHub 字段，使用 ServerItem 的 github
+          if (!serverConfig.github && server.github) {
+            serverConfig.github = server.github
           }
         })
       }
@@ -632,18 +791,49 @@ const handleInstallSubmit = async (name: string, config: any) => {
   try {
     // 调用 McpServers 组件的 handleAddServer 方法
     if (mcpServersRef.value) {
-      await mcpServersRef.value.handleAddServer(name, {
+      const result = await mcpServersRef.value.handleAddServer(name, {
         ...config,
         type: 'gallery' // 确保类型为 gallery
       })
-      console.log('服务器添加成功:', name)
       
-
+      if (result && result.success) {
+        console.log('服务器添加成功:', name)
+        
+        // 显示成功通知
+        toast({
+          title: t('mcp.mcpGallery.installSuccess'),
+          description: `服务器 "${name}" 安装成功`,
+          variant: 'default'
+        })
+        
+        // 等待一段时间确保后端配置更新完成，然后手动触发状态同步
+        await new Promise(resolve => setTimeout(resolve, 500))
+        await nextTick()
+        syncServerStatuses()
+        
+      } else {
+        console.error('服务器添加失败:', name)
+        toast({
+          title: t('mcp.mcpGallery.installFailed'),
+          description: `服务器 "${name}" 安装失败`,
+          variant: 'destructive'
+        })
+      }
     } else {
       console.error('McpServers 组件引用不可用')
+      toast({
+        title: t('mcp.mcpGallery.installFailed'),
+        description: 'MCP服务组件不可用',
+        variant: 'destructive'
+      })
     }
   } catch (error) {
     console.error('添加服务器时发生错误:', error)
+    toast({
+      title: t('mcp.mcpGallery.installFailed'),
+      description: `安装过程中发生错误: ${error}`,
+      variant: 'destructive'
+    })
   }
   
   // 关闭弹窗

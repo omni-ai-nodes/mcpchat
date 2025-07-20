@@ -104,6 +104,7 @@ const handleAddServer = async (serverName: string, serverConfig: MCPServerConfig
   if (result.success) {
     isAddServerDialogOpen.value = false
   }
+  return result
 }
 
 const handleEditServer = async (serverName: string, serverConfig: Partial<MCPServerConfig>) => {

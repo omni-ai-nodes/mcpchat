@@ -13,6 +13,7 @@ import fs from 'fs'
 import { getInMemoryServer } from './inMemoryServers/builder'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { LocalPackageManager } from './localPackageManager'
+import { gitDownloadManager } from '../../lib/gitDownloadManager'
 import {
   PromptListEntry,
   ToolCallResult,
@@ -161,10 +162,114 @@ export class McpClient {
       } else if (this.serverConfig.type === 'gallery') {
         // Gallery 类型服务器使用 stdio 传输方式
         let command = this.serverConfig.command as string
+        let args = this.serverConfig.args as string[]
         const HOME_DIR = app.getPath('home')
 
+        // 检查是否有github字段，如果有则先下载代码
+        if (this.serverConfig.github) {
+          const githubUrl = this.serverConfig.github as string
+          // 如果是node命令，传递服务器名称作为目标名称以便重命名
+          const targetName = command === 'node' ? this.serverName : undefined
+          const downloadPath = await gitDownloadManager.downloadRepository(githubUrl, targetName)
+          if (downloadPath) {
+            console.info(`Using downloaded GitHub repo for ${this.serverName}: ${downloadPath}`)
+            // 如果是node命令，需要更新args中的文件路径而不是command
+            if (command === 'node' && args && args.length > 0) {
+              // 更新args中的第一个参数（通常是要执行的js文件路径）
+              const originalFilePath = args[0]
+              const fileName = path.basename(originalFilePath)
+              args[0] = path.join(downloadPath, fileName)
+              console.info(`Updated node script path: ${args[0]}`)
+              
+              // 检查脚本文件是否存在
+              if (!fs.existsSync(args[0])) {
+                throw new Error(`MCP脚本文件不存在: ${args[0]}。请检查GitHub仓库中是否包含该文件。`)
+              }
+              
+              // 检查是否存在package.json，如果存在则执行npm install
+              const packageJsonPath = path.join(downloadPath, 'package.json')
+              if (fs.existsSync(packageJsonPath)) {
+                console.info(`Found package.json in ${downloadPath}, running npm install...`)
+                try {
+                  const { spawn } = await import('child_process')
+                  const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+                  
+                  // 构建环境变量，确保包含正确的PATH
+                  const npmEnv = { ...process.env }
+                  if (this.nodeRuntimePath) {
+                    const nodePath = process.platform === 'win32' ? this.nodeRuntimePath : `${this.nodeRuntimePath}/bin`
+                    const pathKey = process.platform === 'win32' ? 'Path' : 'PATH'
+                    const separator = process.platform === 'win32' ? ';' : ':'
+                    npmEnv[pathKey] = npmEnv[pathKey] ? `${nodePath}${separator}${npmEnv[pathKey]}` : nodePath
+                  }
+                  if (this.npmRegistry) {
+                    npmEnv.npm_config_registry = this.npmRegistry
+                  }
+                  
+                  await new Promise<void>((resolve, reject) => {
+                    const npmProcess = spawn(npmCommand, ['install'], {
+                      cwd: downloadPath,
+                      stdio: 'pipe',
+                      env: npmEnv,
+                      shell: process.platform === 'win32'
+                    })
+                    
+                    let output = ''
+                    let errorOutput = ''
+                    
+                    npmProcess.stdout?.on('data', (data) => {
+                      output += data.toString()
+                    })
+                    
+                    npmProcess.stderr?.on('data', (data) => {
+                      errorOutput += data.toString()
+                    })
+                    
+                    npmProcess.on('close', (code) => {
+                      if (code === 0) {
+                        console.info(`npm install completed successfully for ${this.serverName}`)
+                        resolve()
+                      } else {
+                        console.error(`npm install failed for ${this.serverName}:`, errorOutput)
+                        reject(new Error(`npm install failed with code ${code}: ${errorOutput}`))
+                      }
+                    })
+                    
+                    npmProcess.on('error', (error) => {
+                      console.error(`npm install process error for ${this.serverName}:`, error)
+                      reject(error)
+                    })
+                  })
+                } catch (installError) {
+                  console.error(`Failed to install dependencies for ${this.serverName}:`, installError)
+                  throw new Error(`依赖安装失败: ${installError instanceof Error ? installError.message : String(installError)}`)
+                }
+              }
+            } else {
+              // 对于非node命令，更新command路径
+              const newCommandPath = path.join(downloadPath, command)
+              if (!fs.existsSync(newCommandPath)) {
+                throw new Error(`MCP命令文件不存在: ${newCommandPath}。请检查GitHub仓库中是否包含该文件。`)
+              }
+              command = newCommandPath
+            }
+          }
+        }
+
         // 检查是否为npx命令，如果是则尝试本地化
-        let args = this.serverConfig.args as string[]
+        // 对于本地文件路径，也进行存在性检查
+        if (command === 'node' && args && args.length > 0 && !this.serverConfig.github) {
+          // 检查本地脚本文件是否存在
+          const scriptPath = args[0]
+          if (!path.isAbsolute(scriptPath)) {
+            // 如果是相对路径，转换为绝对路径
+            args[0] = path.resolve(scriptPath)
+          }
+          if (!fs.existsSync(args[0])) {
+            throw new Error(`MCP脚本文件不存在: ${args[0]}。请检查文件路径是否正确。`)
+          }
+        }
+        
         if (command.startsWith('npx ')) {
           const packageName = command.split(' ')[1]
           const localCommand = await this.localPackageManager.getLocalCommand(packageName)
@@ -305,6 +410,97 @@ export class McpClient {
 
         // 检查是否为npx命令，如果是则尝试本地化
         let args = this.serverConfig.args as string[]
+        
+        // 检查是否有github字段，如果有则先下载代码
+        if (this.serverConfig.github) {
+          const githubUrl = this.serverConfig.github as string
+          // 如果是node命令，传递服务器名称作为目标名称以便重命名
+          const targetName = command === 'node' ? this.serverName : undefined
+          const downloadPath = await gitDownloadManager.downloadRepository(githubUrl, targetName)
+          if (downloadPath) {
+            console.info(`Using downloaded GitHub repo for ${this.serverName}: ${downloadPath}`)
+            // 如果是node命令，需要更新args中的文件路径而不是command
+            if (command === 'node' && args && args.length > 0) {
+              // 更新args中的第一个参数（通常是要执行的js文件路径）
+              const originalFilePath = args[0]
+              const fileName = path.basename(originalFilePath)
+              args[0] = path.join(downloadPath, fileName)
+              console.info(`Updated node script path: ${args[0]}`)
+              
+              // 检查脚本文件是否存在
+              if (!fs.existsSync(args[0])) {
+                throw new Error(`MCP脚本文件不存在: ${args[0]}。请检查GitHub仓库中是否包含该文件。`)
+              }
+              
+              // 检查是否存在package.json，如果存在则执行npm install
+              const packageJsonPath = path.join(downloadPath, 'package.json')
+              if (fs.existsSync(packageJsonPath)) {
+                console.info(`Found package.json in ${downloadPath}, running npm install...`)
+                try {
+                  const { spawn } = await import('child_process')
+                  const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+                  
+                  // 构建环境变量，确保包含正确的PATH
+                  const npmEnv = { ...process.env }
+                  if (this.nodeRuntimePath) {
+                    const nodePath = process.platform === 'win32' ? this.nodeRuntimePath : `${this.nodeRuntimePath}/bin`
+                    const pathKey = process.platform === 'win32' ? 'Path' : 'PATH'
+                    const separator = process.platform === 'win32' ? ';' : ':'
+                    npmEnv[pathKey] = npmEnv[pathKey] ? `${nodePath}${separator}${npmEnv[pathKey]}` : nodePath
+                  }
+                  if (this.npmRegistry) {
+                    npmEnv.npm_config_registry = this.npmRegistry
+                  }
+                  
+                  await new Promise<void>((resolve, reject) => {
+                    const npmProcess = spawn(npmCommand, ['install'], {
+                      cwd: downloadPath,
+                      stdio: 'pipe',
+                      env: npmEnv,
+                      shell: process.platform === 'win32'
+                    })
+                    
+                    let output = ''
+                    let errorOutput = ''
+                    
+                    npmProcess.stdout?.on('data', (data) => {
+                      output += data.toString()
+                    })
+                    
+                    npmProcess.stderr?.on('data', (data) => {
+                      errorOutput += data.toString()
+                    })
+                    
+                    npmProcess.on('close', (code) => {
+                      if (code === 0) {
+                        console.info(`npm install completed successfully for ${this.serverName}`)
+                        resolve()
+                      } else {
+                        console.error(`npm install failed for ${this.serverName}:`, errorOutput)
+                        reject(new Error(`npm install failed with code ${code}: ${errorOutput}`))
+                      }
+                    })
+                    
+                    npmProcess.on('error', (error) => {
+                      console.error(`npm install process error for ${this.serverName}:`, error)
+                      reject(error)
+                    })
+                  })
+                } catch (installError) {
+                  console.error(`Failed to install dependencies for ${this.serverName}:`, installError)
+                  throw new Error(`依赖安装失败: ${installError instanceof Error ? installError.message : String(installError)}`)
+                }
+              }
+            } else {
+              // 对于非node命令，更新command路径
+              const newCommandPath = path.join(downloadPath, command)
+              if (!fs.existsSync(newCommandPath)) {
+                throw new Error(`MCP命令文件不存在: ${newCommandPath}。请检查GitHub仓库中是否包含该文件。`)
+              }
+              command = newCommandPath
+            }
+          }
+        }
         if (command.startsWith('npx ')) {
           const packageName = command.split(' ')[1]
           const localCommand = await this.localPackageManager.getLocalCommand(packageName)

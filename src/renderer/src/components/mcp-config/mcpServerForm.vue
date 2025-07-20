@@ -56,6 +56,7 @@ const type = ref<'sse' | 'stdio' | 'inmemory' | 'http'>(props.initialConfig?.typ
 const baseUrl = ref(props.initialConfig?.baseUrl || '')
 const customHeaders = ref('')
 const npmRegistry = ref(props.initialConfig?.customNpmRegistry || '')
+const github = ref(props.initialConfig?.github || '')
 
 // 模型选择相关
 const modelSelectOpen = ref(false)
@@ -191,6 +192,9 @@ const parseJsonConfig = (): void => {
     } else {
       customHeaders.value = '' // 默认空字符串
     }
+
+    // 填充 github 字段
+    github.value = serverConfig.github || ''
 
     // 权限设置
     autoApproveAll.value = serverConfig.autoApprove?.includes('all') || false
@@ -563,18 +567,19 @@ const handleSubmit = (): void => {
     }
   }
 
-  // 填充 customHeaders (如果存在)
-  if (serverConfig.customHeaders) {
-    customHeaders.value = formatJsonHeaders(serverConfig.customHeaders) // 加载时格式化为 Key=Value
-  } else {
-    customHeaders.value = '' // 默认空字符串
-  }
+  // 注释：这段代码是错误的，应该移除
+  // 在提交时不应该重新设置 customHeaders.value
 
   // 添加 customNpmRegistry 字段（仅当显示npm registry输入框且有值时）
   if (showNpmRegistryInput.value && npmRegistry.value.trim()) {
     serverConfig.customNpmRegistry = npmRegistry.value.trim()
   } else {
     serverConfig.customNpmRegistry = ''
+  }
+
+  // 添加 github 字段（如果有值）
+  if (github.value.trim()) {
+    serverConfig.github = github.value.trim()
   }
 
   emit('submit', name.value.trim(), serverConfig)
@@ -650,6 +655,7 @@ watch(
       type.value = newConfig.type || 'stdio'
       baseUrl.value = newConfig.baseUrl || ''
       npmRegistry.value = newConfig.customNpmRegistry || ''
+      github.value = newConfig.github || ''
 
       // Format customHeaders from initialConfig
       if (newConfig.customHeaders) {
@@ -1066,6 +1072,23 @@ defineExpose({
             "
           />
         </div>
+        
+        <!-- GitHub 仓库 URL (仅在命令为 node 时显示) -->
+        <div v-if="command === 'node'" class="space-y-2">
+          <Label class="text-xs text-muted-foreground" for="github-url">
+            {{ t('settings.mcp.serverForm.github') || 'GitHub 仓库 URL' }}
+          </Label>
+          <Input
+            id="github-url"
+            v-model="github"
+            :placeholder="
+              t('settings.mcp.serverForm.githubPlaceholder') ||
+              '输入 GitHub 仓库 URL，例如：https://github.com/user/repo'
+            "
+            :disabled="isFieldReadOnly"
+          />
+        </div>
+
         <!-- 自动授权选项 -->
         <div class="space-y-3">
           <Label class="text-xs text-muted-foreground">{{

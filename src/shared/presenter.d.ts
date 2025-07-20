@@ -834,6 +834,7 @@ export interface MCPServerConfig {
   customHeaders?: Record<string, string>
   customNpmRegistry?: string
   type: 'sse' | 'stdio' | 'inmemory' | 'http' | 'gallery'
+  github?: string // GitHub仓库URL，用于node命令时下载代码
 }
 
 export interface MCPConfig {

@@ -406,10 +406,107 @@ export class McpConfHelper {
 
   // 添加MCP服务器
   async addMcpServer(name: string, config: MCPServerConfig): Promise<boolean> {
-    const mcpServers = await this.getMcpServers()
-    mcpServers[name] = config
-    await this.setMcpServers(mcpServers)
-    return true
+    console.log(`[McpConfHelper] 开始添加MCP服务器: ${name}`, config)
+    
+    // 检查是否包含GitHub信息且为node类型，如果是则需要下载
+    if (config.github && config.command === 'node' && config.args && config.args.length > 0) {
+      console.log(`[McpConfHelper] 检测到GitHub仓库配置，开始下载: ${config.github}`)
+      
+      try {
+        // 导入gitDownloadManager
+        const { gitDownloadManager } = await import('@/lib/gitDownloadManager')
+        
+        // 下载GitHub仓库
+        const downloadedPath = await gitDownloadManager.downloadRepository(
+          config.github,
+          name // 使用服务器名称作为目标名称
+        )
+        
+        console.log(`[McpConfHelper] GitHub仓库下载完成: ${downloadedPath}`)
+        
+        // 更新配置中的路径
+        const updatedConfig = { ...config }
+        if (updatedConfig.args && updatedConfig.args.length > 0) {
+          // 将第一个参数更新为下载后的路径
+          const originalScript = updatedConfig.args[0]
+          const newScriptPath = `${downloadedPath}/${originalScript}`
+          updatedConfig.args[0] = newScriptPath
+          console.log(`[McpConfHelper] 更新脚本路径: ${originalScript} -> ${newScriptPath}`)
+        }
+        
+        // 检查是否需要安装依赖
+        const fs = await import('fs')
+        const path = await import('path')
+        const packageJsonPath = path.join(downloadedPath, 'package.json')
+        
+        if (fs.existsSync(packageJsonPath)) {
+          console.log(`[McpConfHelper] 发现package.json，开始安装依赖: ${packageJsonPath}`)
+          
+          try {
+            const { spawn } = await import('child_process')
+            
+            // 安装依赖
+            await new Promise<void>((resolve, reject) => {
+              const npmProcess = spawn('npm', ['install'], {
+                cwd: downloadedPath,
+                stdio: 'pipe'
+              })
+              
+              npmProcess.stdout?.on('data', (data) => {
+                console.log(`[McpConfHelper] npm install stdout: ${data}`)
+              })
+              
+              npmProcess.stderr?.on('data', (data) => {
+                console.log(`[McpConfHelper] npm install stderr: ${data}`)
+              })
+              
+              npmProcess.on('close', (code) => {
+                if (code === 0) {
+                  console.log(`[McpConfHelper] 依赖安装成功`)
+                  resolve()
+                } else {
+                  console.error(`[McpConfHelper] 依赖安装失败，退出码: ${code}`)
+                  reject(new Error(`npm install failed with code ${code}`))
+                }
+              })
+              
+              npmProcess.on('error', (error) => {
+                console.error(`[McpConfHelper] npm install进程错误:`, error)
+                reject(error)
+              })
+            })
+          } catch (installError) {
+            console.error(`[McpConfHelper] 依赖安装失败:`, installError)
+            // 继续执行，不因为依赖安装失败而中断服务器添加
+          }
+        } else {
+          console.log(`[McpConfHelper] 未找到package.json，跳过依赖安装`)
+        }
+        
+        // 使用更新后的配置
+        const mcpServers = await this.getMcpServers()
+        mcpServers[name] = updatedConfig
+        await this.setMcpServers(mcpServers)
+        
+        console.log(`[McpConfHelper] MCP服务器添加完成: ${name}`)
+        return true
+        
+      } catch (downloadError) {
+        console.error(`[McpConfHelper] GitHub仓库下载失败:`, downloadError)
+        // 下载失败时仍然保存原始配置
+        const mcpServers = await this.getMcpServers()
+        mcpServers[name] = config
+        await this.setMcpServers(mcpServers)
+        return true
+      }
+    } else {
+      console.log(`[McpConfHelper] 普通MCP服务器配置，直接保存`)
+      // 普通配置，直接保存
+      const mcpServers = await this.getMcpServers()
+      mcpServers[name] = config
+      await this.setMcpServers(mcpServers)
+      return true
+    }
   }
 
   // 移除MCP服务器

@@ -121,6 +121,10 @@
     "selectFolder": "Select Folder",
     "selectFolderError": "Failed to select folder",
     "noFoldersSelected": "No folders selected",
+    "github": "GitHub Repository URL",
+    "githubPlaceholder": "Enter GitHub repository URL, e.g.: https://github.com/user/repo",
+    "npmRegistry": "Custom npm Registry",
+    "npmRegistryPlaceholder": "Set custom npm registry, leave empty for automatic selection",
     "type": "Server Type",
     "typeInMemory": "Memory",
     "typePlaceholder": "Select a server type",
@@ -267,7 +271,9 @@
     "installDialog": {
       "title": "Install MCP Server",
       "description": "Configure and install a new MCP server to your system"
-    }
+    },
+    "installSuccess": "Server installed successfully",
+    "installFailed": "Server installation failed"
   },
   "serverDetail": {
     "introduction": "Introduction",
