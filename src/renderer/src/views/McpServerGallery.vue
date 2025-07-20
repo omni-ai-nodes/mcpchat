@@ -76,10 +76,11 @@ interface ServerItem {
   name: string
   icon: string
   description: string
-  type: string // 改为显示By内容
+  type: string // 显示By内容
   status: 'running' | 'stopped' | 'error' | 'loading' | 'not_installed'
   isRunning: boolean
   isDefault: boolean
+  isGallery: boolean
   toolsCount: number
   promptsCount: number
   resourcesCount: number
@@ -114,7 +115,7 @@ const isServerInstalled = (server: ServerItem): boolean => {
     return local.name === server.name || 
            local.name.includes(server.name) || 
            server.name.includes(local.name) ||
-           (local.type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+           (local.mcp_type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
   })
   return !!localServer
 }
@@ -128,7 +129,7 @@ const syncServerStatuses = () => {
       return local.name === server.name || 
              local.name.includes(server.name) || 
              server.name.includes(local.name) ||
-             (local.type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+             (local.mcp_type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
     })
     
     if (localServer) {
@@ -137,9 +138,8 @@ const syncServerStatuses = () => {
       server.isRunning = localServer.isRunning
       server.isDefault = localServer.isDefault
       // 可以从本地服务获取更多信息，如工具数量等
-      if (localServer.type === 'mcp_gallery') {
-        // 对于gallery类型的服务，确保状态正确同步
-        server.type = 'mcp_gallery'
+      if (localServer.mcp_type === 'mcp_gallery') {
+        server.isGallery = true
       }
     } else {
       // 如果未找到本地服务，设置为未安装状态
@@ -197,10 +197,11 @@ const fetchServers = async (page: number = 1, size: number = 10, searchName: str
         name: item.name,
         icon: getServerIcon(item.logo), // 处理图标
         description: item.introduction,
-        type: 'stdio' as const, // 显示By内容而不是http/local
+        type: item.by, // 显示By内容
         status: 'not_installed' as const, // 默认状态为未安装
         isRunning: false,
         isDefault: false,
+        isGallery: false,
         toolsCount: 0, // 可以根据需要解析Tools字段
         promptsCount: 0,
         resourcesCount: 0,
@@ -383,7 +384,7 @@ const editServer = (server: ServerItem) => {
     return local.name === server.name || 
            local.name.includes(server.name) || 
            server.name.includes(local.name) ||
-           (local.type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+           (local.mcp_type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
   })
   
   if (!localServer) {
@@ -455,7 +456,7 @@ const deleteServer = (server: ServerItem) => {
     return local.name === server.name || 
            local.name.includes(server.name) || 
            server.name.includes(local.name) ||
-           (local.type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+           (local.mcp_type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
   })
   
   if (!localServer) {
@@ -638,7 +639,7 @@ const handleInstallSubmit = async (name: string, config: MCPServerConfig) => {
     if (mcpServersRef.value) {
       await mcpServersRef.value.handleAddServer(name, {
         ...config,
-        type: 'mcp_gallery' // 确保类型为 mcp_gallery
+        mcp_type: 'mcp_gallery',
       })
       console.log('服务器添加成功:', name)
       
@@ -833,6 +834,10 @@ const goToMcpSettings = () => {
                 <Badge variant="outline" class="text-xs h-4 px-1.5">
                   {{ server.type }}
                 </Badge>
+                <!-- Gallery 标识 -->
+                <Badge v-if="server.isGallery" variant="secondary" class="text-xs h-4 px-1.5">
+                  Gallery
+                </Badge>
                 <!-- 默认启动标识 -->
                 <Badge v-if="server.isDefault" variant="secondary" class="text-xs h-4 px-1.5">
                   {{ t('mcp.mcpGallery.default') }}
@@ -923,6 +928,9 @@ const goToMcpSettings = () => {
                     <h3 class="font-medium truncate">{{ server.name }}</h3>
                     <Badge variant="outline" class="text-xs">
                       {{ server.type }}
+                    </Badge>
+                    <Badge v-if="server.isGallery" variant="secondary" class="text-xs">
+                      Gallery
                     </Badge>
                     <Badge v-if="server.isDefault" variant="secondary" class="text-xs">
                       {{ t('mcp.mcpGallery.default') }}

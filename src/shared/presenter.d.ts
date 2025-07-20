@@ -847,6 +847,7 @@ export interface MCPServerConfig extends GalleryServerDetail {
   customHeaders?: Record<string, string>
   customNpmRegistry?: string
   type: 'sse' | 'stdio' | 'inmemory' | 'http' | 'gallery' | 'mcp_gallery'
+  mcp_type?: 'mcp_gallery'
 }
 
 export interface MCPConfig {

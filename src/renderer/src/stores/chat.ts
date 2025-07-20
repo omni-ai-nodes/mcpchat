@@ -1015,12 +1015,12 @@ export const useChatStore = defineStore('chat', () => {
 
   const initAudio = () => {
     if (!typewriterAudio) {
-      typewriterAudio = new Audio('/sounds/sfx-typing.mp3')
+      typewriterAudio = new Audio(new URL('/sounds/sfx-typing.mp3', import.meta.url).href)
       typewriterAudio.volume = 0.6
       typewriterAudio.load()
     }
     if (!toolcallAudio) {
-      toolcallAudio = new Audio('/sounds/sfx-fc.mp3')
+      toolcallAudio = new Audio(new URL('/sounds/sfx-fc.mp3', import.meta.url).href)
       toolcallAudio.volume = 1
       toolcallAudio.load()
     }

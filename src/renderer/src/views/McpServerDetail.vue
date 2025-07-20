@@ -335,7 +335,7 @@ const handleInstallSubmit = async (name: string, config: MCPServerConfig) => {
     if (mcpServersRef.value) {
       await mcpServersRef.value.handleAddServer(name, {
         ...config,
-        type: 'mcp_gallery' // 确保类型为 mcp_gallery
+        
       })
       console.log('服务器添加成功:', name)
     } else {

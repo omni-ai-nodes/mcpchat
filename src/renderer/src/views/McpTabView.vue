@@ -93,12 +93,19 @@ const inMemoryServers = computed(() => {
     const config = mcpStore.config.mcpServers[server.name]
     return config?.type === 'inmemory'
   })
+})
 
-
-// const regularServers = computed(() => {
+const regularServers = computed(() => {
   return mcpStore.serverList.filter((server) => {
     const config = mcpStore.config.mcpServers[server.name]
-    return config?.type !== 'inmemory'
+    return config?.type !== 'inmemory' && config?.mcp_type !== 'mcp_gallery'
+  })
+})
+
+const mcpGalleryServers = computed(() => {
+  return mcpStore.serverList.filter((server) => {
+    const config = mcpStore.config.mcpServers[server.name]
+    return config?.mcp_type === 'mcp_gallery'
   })
 })
 
@@ -300,6 +307,68 @@ const handleViewResources = async (serverName: string) => {
               :key="server.name"
               :server="server"
               :is-built-in="true"
+              :is-loading="mcpStore.serverLoadingStates[server.name]"
+              :disabled="mcpStore.configLoading"
+              :tools-count="getServerToolsCount(server.name)"
+              :prompts-count="getServerPromptsCount(server.name)"
+              :resources-count="getServerResourcesCount(server.name)"
+              @toggle="handleToggleServer(server.name)"
+              @toggle-default="handleToggleDefaultServer(server.name)"
+              @edit="openEditServerDialog(server.name)"
+              @view-tools="handleViewTools(server.name)"
+              @view-prompts="handleViewPrompts(server.name)"
+              @view-resources="handleViewResources(server.name)"
+            />
+          </div>
+        </div>
+
+        <!-- MCP 广场服务 -->
+        <div v-if="mcpGalleryServers.length > 0">
+          <div class="flex items-center space-x-2 mb-3">
+            <Icon icon="lucide:store" class="h-4 w-4 text-purple-600" />
+            <h3 class="text-sm font-semibold text-foreground">
+              {{ t('mcp.mcpGallery.title') }}
+            </h3>
+            <div class="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full">
+              {{ mcpGalleryServers.length }}
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <McpSquareCard
+              v-for="server in mcpGalleryServers"
+              :key="server.name"
+              :server="server"
+              :is-loading="mcpStore.serverLoadingStates[server.name]"
+              :disabled="mcpStore.configLoading"
+              :tools-count="getServerToolsCount(server.name)"
+              :prompts-count="getServerPromptsCount(server.name)"
+              :resources-count="getServerResourcesCount(server.name)"
+              @toggle="handleToggleServer(server.name)"
+              @toggle-default="handleToggleDefaultServer(server.name)"
+              @edit="openEditServerDialog(server.name)"
+              @view-tools="handleViewTools(server.name)"
+              @view-prompts="handleViewPrompts(server.name)"
+              @view-resources="handleViewResources(server.name)"
+            />
+          </div>
+        </div>
+
+        <!-- 普通服务 -->
+        <div v-if="regularServers.length > 0">
+          <div class="flex items-center space-x-2 mb-3">
+            <Icon icon="lucide:server" class="h-4 w-4 text-blue-600" />
+            <h3 class="text-sm font-semibold text-foreground">
+              {{ t('settings.mcp.regularServers') }}
+            </h3>
+            <div class="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full">
+              {{ regularServers.length }}
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <McpSquareCard
+              v-for="server in regularServers"
+              :key="server.name"
+              :server="server"
               :is-loading="mcpStore.serverLoadingStates[server.name]"
               :disabled="mcpStore.configLoading"
               :tools-count="getServerToolsCount(server.name)"
