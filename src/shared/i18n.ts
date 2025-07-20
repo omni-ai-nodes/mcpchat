@@ -143,7 +143,11 @@ export const errorMessageTranslations: Record<string, TranslationMap> = {
     needDifyDatasetId: '需要提供Dify Dataset ID',
     needRagflowEndpoint: '需要提供RAGFlow Endpoint',
     needDifyEndpoint: '需要提供Dify Endpoint',
-    needKnowledgeBaseDescription: '需要提供对这个知识库的描述，以方便ai决定是否检索此知识库'
+    needKnowledgeBaseDescription: '需要提供对这个知识库的描述，以方便ai决定是否检索此知识库',
+    mcpInstallErrorTitle: 'MCP 服务安装失败',
+    mcpInstallErrorMessage: '当前 MCP 服务异常，无法安装',
+    mcpStartErrorTitle: 'MCP 服务启动失败',
+    mcpStartErrorMessage: '当前 MCP 服务异常，无法启动'
   },
   'zh-TW': {
     mcpConnectionErrorTitle: 'MCP 連接錯誤',
@@ -164,7 +168,11 @@ export const errorMessageTranslations: Record<string, TranslationMap> = {
     needDifyDatasetId: '需要提供Dify Dataset ID',
     needRagflowEndpoint: '需要提供RAGFlow Endpoint',
     needDifyEndpoint: '需要提供Dify Endpoint',
-    needKnowledgeBaseDescription: '需要提供對這個知識庫的描述，以方便ai決定是否檢索此知識庫'
+    needKnowledgeBaseDescription: '需要提供對這個知識庫的描述，以方便ai決定是否檢索此知識庫',
+    mcpInstallErrorTitle: 'MCP 服務安裝失敗',
+    mcpInstallErrorMessage: '當前 MCP 服務異常，無法安裝',
+    mcpStartErrorTitle: 'MCP 服務啟動失敗',
+    mcpStartErrorMessage: '當前 MCP 服務異常，無法啟動'
   },
   'en-US': {
     mcpConnectionErrorTitle: 'MCP Connection Error',
@@ -189,7 +197,11 @@ export const errorMessageTranslations: Record<string, TranslationMap> = {
     needRagflowEndpoint: 'Need to provide RAGFlow Endpoint',
     needDifyEndpoint: 'Need to provide Dify Endpoint',
     needKnowledgeBaseDescription:
-      'Need to provide a description for this knowledge base to help AI decide whether to retrieve this knowledge base'
+      'Need to provide a description for this knowledge base to help AI decide whether to retrieve this knowledge base',
+    mcpInstallErrorTitle: 'MCP Service Installation Failed',
+    mcpInstallErrorMessage: 'Current MCP service is abnormal, unable to install',
+    mcpStartErrorTitle: 'MCP Service Start Failed',
+    mcpStartErrorMessage: 'Current MCP service is abnormal, unable to start'
   },
   ja: {
     mcpConnectionErrorTitle: 'MCP 接続エラー',
@@ -213,7 +225,11 @@ export const errorMessageTranslations: Record<string, TranslationMap> = {
     needRagflowEndpoint: 'RAGFlowのエンドポイントを提供する必要があります',
     needDifyEndpoint: 'Difyのエンドポイントを提供する必要があります',
     needKnowledgeBaseDescription:
-      'この知識ベースの説明を提供する必要があります。AIがこの知識ベースを取得するかどうかを判断するのに役立ちます'
+      'この知識ベースの説明を提供する必要があります。AIがこの知識ベースを取得するかどうかを判断するのに役立ちます',
+    mcpInstallErrorTitle: 'MCPサービスのインストールに失敗しました',
+    mcpInstallErrorMessage: '現在のMCPサービスに異常があり、インストールできません',
+    mcpStartErrorTitle: 'MCPサービスの開始に失敗しました',
+    mcpStartErrorMessage: '現在のMCPサービスに異常があり、開始できません'
   },
   ko: {
     mcpConnectionErrorTitle: 'MCP 연결 오류',
@@ -237,7 +253,11 @@ export const errorMessageTranslations: Record<string, TranslationMap> = {
     needRagflowEndpoint: 'RAGFlow 엔드포인트를 제공해야 합니다',
     needDifyEndpoint: 'Dify 엔드포인트를 제공해야 합니다',
     needKnowledgeBaseDescription:
-      'AI가 이 지식 베이스를 검색할지 여부를 결정하는 데 도움이 되는 설명을 제공해야 합니다'
+      'AI가 이 지식 베이스를 검색할지 여부를 결정하는 데 도움이 되는 설명을 제공해야 합니다',
+    mcpInstallErrorTitle: 'MCP 서비스 설치 실패',
+    mcpInstallErrorMessage: '현재 MCP 서비스에 이상이 있어 설치할 수 없습니다',
+    mcpStartErrorTitle: 'MCP 서비스 시작 실패',
+    mcpStartErrorMessage: '현재 MCP 서비스에 이상이 있어 시작할 수 없습니다'
   },
   fr: {
     mcpConnectionErrorTitle: 'Erreur de connexion MCP',
@@ -263,7 +283,11 @@ export const errorMessageTranslations: Record<string, TranslationMap> = {
     needRagflowEndpoint: 'Vous devez fournir le point de terminaison RAGFlow',
     needDifyEndpoint: 'Vous devez fournir le point de terminaison Dify',
     needKnowledgeBaseDescription:
-      "Vous devez fournir une description de cette base de connaissances pour aider l'IA à décider si elle doit récupérer cette base de connaissances"
+      "Vous devez fournir une description de cette base de connaissances pour aider l'IA à décider si elle doit récupérer cette base de connaissances",
+    mcpInstallErrorTitle: "Échec de l'installation du service MCP",
+    mcpInstallErrorMessage: 'Le service MCP actuel est anormal, impossible à installer',
+    mcpStartErrorTitle: 'Échec du démarrage du service MCP',
+    mcpStartErrorMessage: 'Le service MCP actuel est anormal, impossible à démarrer'
   },
   de: {
     mcpConnectionErrorTitle: 'MCP-Verbindungsfehler',
@@ -288,7 +312,11 @@ export const errorMessageTranslations: Record<string, TranslationMap> = {
     needRagflowEndpoint: 'Es muss ein RAGFlow-Endpunkt bereitgestellt werden',
     needDifyEndpoint: 'Es muss ein Dify-Endpunkt bereitgestellt werden',
     needKnowledgeBaseDescription:
-      'Es muss eine Beschreibung dieser Wissensdatenbank bereitgestellt werden, um der KI zu helfen, zu entscheiden, ob sie diese Wissensdatenbank abrufen soll'
+      'Es muss eine Beschreibung dieser Wissensdatenbank bereitgestellt werden, um der KI zu helfen, zu entscheiden, ob sie diese Wissensdatenbank abrufen soll',
+    mcpInstallErrorTitle: 'MCP-Service-Installation fehlgeschlagen',
+    mcpInstallErrorMessage: 'Der aktuelle MCP-Service ist abnormal, Installation nicht möglich',
+    mcpStartErrorTitle: 'MCP-Service-Start fehlgeschlagen',
+    mcpStartErrorMessage: 'Der aktuelle MCP-Service ist abnormal, Start nicht möglich'
   },
   es: {
     mcpConnectionErrorTitle: 'Error de conexión MCP',
@@ -313,7 +341,11 @@ export const errorMessageTranslations: Record<string, TranslationMap> = {
     needRagflowEndpoint: 'Se debe proporcionar el punto de acceso de RAGFlow',
     needDifyEndpoint: 'Se debe proporcionar el punto de acceso de Dify',
     needKnowledgeBaseDescription:
-      'Se debe proporcionar una descripción de esta base de conocimientos para ayudar a la IA a decidir si debe recuperar esta base de conocimientos'
+      'Se debe proporcionar una descripción de esta base de conocimientos para ayudar a la IA a decidir si debe recuperar esta base de conocimientos',
+    mcpInstallErrorTitle: 'Error en la instalación del servicio MCP',
+    mcpInstallErrorMessage: 'El servicio MCP actual es anormal, no se puede instalar',
+    mcpStartErrorTitle: 'Error en el inicio del servicio MCP',
+    mcpStartErrorMessage: 'El servicio MCP actual es anormal, no se puede iniciar'
   }
 }
 

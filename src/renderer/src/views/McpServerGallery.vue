@@ -41,8 +41,10 @@ const router = useRouter()
 const mcpStore = useMcpStore()
 const { toast } = useToast()
 
-// McpServers 组件引用
+// 引用 McpServers 组件
 const mcpServersRef = ref<InstanceType<typeof McpServers> | null>(null)
+// 引用安装表单组件
+const installFormRef = ref<any>(null)
 
 // API返回的服务器数据类型
 interface ApiServerItem {
@@ -834,6 +836,11 @@ const handleInstallSubmit = async (name: string, config: any) => {
       description: `安装过程中发生错误: ${error}`,
       variant: 'destructive'
     })
+  } finally {
+    // 重置表单的提交状态
+    if (installFormRef.value) {
+      installFormRef.value.isSubmitting = false
+    }
   }
   
   // 关闭弹窗
@@ -1258,6 +1265,7 @@ const goToMcpSettings = () => {
         </DialogDescription>
       </DialogHeader>
       <McpServerForm
+        ref="installFormRef"
         :default-json-config="prefilledJsonConfig"
         @submit="handleInstallSubmit"
       />

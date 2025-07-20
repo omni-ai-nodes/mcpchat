@@ -79,6 +79,8 @@
     "autoApproveWrite": "写入",
     "autoApproveHelp": "选择需要自动授权的操作类型，无需用户确认即可执行",
     "submit": "提交",
+    "submitting": "安装中...",
+    "submitError": "提交失败",
     "add": "添加",
     "update": "更新",
     "cancel": "取消",

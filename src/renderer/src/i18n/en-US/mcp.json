@@ -116,6 +116,8 @@
     "parseSuccess": "Configuration parsing successfully",
     "skipToManual": "Skip to manual configuration",
     "submit": "submit",
+    "submitting": "Installing...",
+    "submitError": "Submit failed",
     "folders": "Folder List",
     "addFolder": "Add Folder",
     "selectFolder": "Select Folder",

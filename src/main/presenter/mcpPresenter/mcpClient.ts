@@ -4,7 +4,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { type Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import { eventBus } from '@/eventbus'
-import { MCP_EVENTS } from '@/events'
+import { MCP_EVENTS, NOTIFICATION_EVENTS } from '@/events'
 import path from 'path'
 import { presenter } from '@/presenter'
 import { app } from 'electron'
@@ -22,6 +22,7 @@ import {
   ResourceListEntry,
   Resource
 } from '@shared/presenter'
+import { getErrorMessageLabels } from '@shared/i18n'
 // TODO: resources 和 prompts 的类型,Notifactions 的类型 https://github.com/modelcontextprotocol/typescript-sdk/blob/main/src/examples/client/simpleStreamableHttp.ts
 // 简单的 OAuth 提供者，用于处理 Bearer Token
 class SimpleOAuthProvider {
@@ -171,6 +172,16 @@ export class McpClient {
           // 如果是node命令，传递服务器名称作为目标名称以便重命名
           const targetName = command === 'node' ? this.serverName : undefined
           const downloadPath = await gitDownloadManager.downloadRepository(githubUrl, targetName)
+          if (!downloadPath) {
+            // GitHub下载失败，发送错误通知
+            const locale = app.getLocale()
+            const errorMessages = getErrorMessageLabels(locale)
+            eventBus.emit(NOTIFICATION_EVENTS.SHOW_ERROR, {
+              title: errorMessages.mcpInstallErrorTitle,
+              message: errorMessages.mcpInstallErrorMessage
+            })
+            throw new Error(`GitHub仓库下载失败: ${githubUrl}`)
+          }
           if (downloadPath) {
             console.info(`Using downloaded GitHub repo for ${this.serverName}: ${downloadPath}`)
             // 如果是node命令，需要更新args中的文件路径而不是command
@@ -242,6 +253,13 @@ export class McpClient {
                   })
                 } catch (installError) {
                   console.error(`Failed to install dependencies for ${this.serverName}:`, installError)
+                  // npm install失败，发送错误通知
+                  const locale = app.getLocale()
+                  const errorMessages = getErrorMessageLabels(locale)
+                  eventBus.emit(NOTIFICATION_EVENTS.SHOW_ERROR, {
+                    title: errorMessages.mcpInstallErrorTitle,
+                    message: errorMessages.mcpInstallErrorMessage
+                  })
                   throw new Error(`依赖安装失败: ${installError instanceof Error ? installError.message : String(installError)}`)
                 }
               }
@@ -417,6 +435,16 @@ export class McpClient {
           // 如果是node命令，传递服务器名称作为目标名称以便重命名
           const targetName = command === 'node' ? this.serverName : undefined
           const downloadPath = await gitDownloadManager.downloadRepository(githubUrl, targetName)
+          if (!downloadPath) {
+            // GitHub下载失败，发送错误通知
+            const locale = app.getLocale()
+            const errorMessages = getErrorMessageLabels(locale)
+            eventBus.emit(NOTIFICATION_EVENTS.SHOW_ERROR, {
+              title: errorMessages.mcpInstallErrorTitle,
+              message: errorMessages.mcpInstallErrorMessage
+            })
+            throw new Error(`GitHub仓库下载失败: ${githubUrl}`)
+          }
           if (downloadPath) {
             console.info(`Using downloaded GitHub repo for ${this.serverName}: ${downloadPath}`)
             // 如果是node命令，需要更新args中的文件路径而不是command
@@ -488,6 +516,13 @@ export class McpClient {
                   })
                 } catch (installError) {
                   console.error(`Failed to install dependencies for ${this.serverName}:`, installError)
+                  // npm install失败，发送错误通知
+                  const locale = app.getLocale()
+                  const errorMessages = getErrorMessageLabels(locale)
+                  eventBus.emit(NOTIFICATION_EVENTS.SHOW_ERROR, {
+                    title: errorMessages.mcpInstallErrorTitle,
+                    message: errorMessages.mcpInstallErrorMessage
+                  })
                   throw new Error(`依赖安装失败: ${installError instanceof Error ? installError.message : String(installError)}`)
                 }
               }
@@ -715,6 +750,14 @@ export class McpClient {
       this.cleanupResources()
 
       console.error(`Failed to connect to MCP server ${this.serverName}:`, error)
+
+      // MCP服务器启动失败，发送错误通知
+      const locale = app.getLocale()
+      const errorMessages = getErrorMessageLabels(locale)
+      eventBus.emit(NOTIFICATION_EVENTS.SHOW_ERROR, {
+        title: errorMessages.mcpStartErrorTitle,
+        message: errorMessages.mcpStartErrorMessage
+      })
 
       // 触发服务器状态变更事件
       eventBus.emit((MCP_EVENTS as MCPEventsType).SERVER_STATUS_CHANGED, {

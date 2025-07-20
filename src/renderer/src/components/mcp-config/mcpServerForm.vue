@@ -45,6 +45,9 @@ const emit = defineEmits<{
   submit: [serverName: string, config: MCPServerConfig]
 }>()
 
+// 提交状态
+const isSubmitting = ref(false)
+
 // 表单状态
 const name = ref(props.serverName || '')
 const command = ref(props.initialConfig?.command || 'npx')
@@ -491,8 +494,12 @@ const focusArgsInput = (): void => {
 }
 
 // 提交表单
-const handleSubmit = (): void => {
-  if (!isFormValid.value) return
+const handleSubmit = async (): Promise<void> => {
+  if (!isFormValid.value || isSubmitting.value) return
+  
+  isSubmitting.value = true
+  
+  try {
 
   // 处理自动授权设置
   const autoApprove: string[] = []
@@ -583,6 +590,15 @@ const handleSubmit = (): void => {
   }
 
   emit('submit', name.value.trim(), serverConfig)
+  } catch (error) {
+    console.error('提交表单时发生错误:', error)
+    toast({
+      title: t('settings.mcp.serverForm.submitError'),
+      description: String(error),
+      variant: 'destructive'
+    })
+    isSubmitting.value = false
+  }
 }
 
 const placeholder = `mcp配置示例
@@ -722,7 +738,8 @@ HTTP-Referer=mcpchatai.cn`
 defineExpose({
   parseJsonConfig,
   handleSubmit,
-  jsonConfig
+  jsonConfig,
+  isSubmitting
 })
 </script>
 
@@ -1164,8 +1181,10 @@ defineExpose({
       <Button type="button" variant="outline" size="sm" @click="toggleJsonEditMode">
         {{ isJsonEditMode ? t('settings.mcp.serverForm.backToForm') : t('settings.mcp.serverForm.editJson') }}
       </Button>
-      <Button type="submit" size="sm" :disabled="!isFormValid">
-        {{ t('settings.mcp.serverForm.submit') }}
+      <Button type="submit" size="sm" :disabled="!isFormValid || isSubmitting">
+        <Icon v-if="isSubmitting" icon="lucide:loader-2" class="w-4 h-4 mr-2 animate-spin" />
+        <span v-if="isSubmitting">安装中...</span>
+        <span v-if="!isSubmitting">{{ t('settings.mcp.serverForm.submit') }}</span>
       </Button>
     </div>
   </form>
