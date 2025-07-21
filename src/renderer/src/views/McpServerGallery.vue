@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useMcpStore } from '@/stores/mcp'
 import { useToast } from '@/components/ui/toast/use-toast'
+import { usePresenter } from '@/composables/usePresenter'
 import { debounce } from 'lodash-es'
 import McpServerForm from '@/components/mcp-config/mcpServerForm.vue'
 import McpServers from '@/components/mcp-config/components/McpServers.vue'
@@ -41,6 +42,7 @@ const { t } = useI18n()
 const router = useRouter()
 const mcpStore = useMcpStore()
 const { toast } = useToast()
+const mcpPresenter = usePresenter('mcpPresenter')
 
 // 引用 McpServers 组件
 const mcpServersRef = ref<InstanceType<typeof McpServers> | null>(null)
@@ -86,7 +88,7 @@ interface ServerItem {
   toolsCount: number
   promptsCount: number
   resourcesCount: number
-  github?: string // 添加GitHub链接
+  Github?: string // 添加GitHub链接
   deployJson?: string // 添加部署配置信息
   command?: string
   args?: string[]
@@ -114,10 +116,42 @@ const selectedServerConfig = ref<ServerItem | null>(null)
 // 检查服务是否已安装
 const isServerInstalled = (server: ServerItem): boolean => {
   const localServer = mcpStore.serverList.find(local => {
-    return local.name === server.name || 
-           local.name.includes(server.name) || 
-           server.name.includes(local.name) ||
-           (local.mcp_type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+    // 首先尝试精确匹配
+    if (local.name === server.name) {
+      return true
+    }
+    
+    // 对于 gallery 类型的服务器，使用更宽松的匹配
+    if (server.type === 'gallery') {
+      const localNameLower = local.name.toLowerCase()
+      const serverNameLower = server.name.toLowerCase()
+      
+      // 基本的包含匹配
+      if (localNameLower === serverNameLower || 
+          localNameLower.includes(serverNameLower) || 
+          serverNameLower.includes(localNameLower)) {
+        return true
+      }
+      
+      // 特殊处理npx命令：检查命令中是否包含服务器名称
+      if (local.command?.startsWith('npx')) {
+        const npxPackageName = local.command.replace(/^npx\s*/, '').split(' ')[0]
+        const packageNameLower = npxPackageName.toLowerCase()
+        
+        if (packageNameLower === serverNameLower || 
+            packageNameLower.includes(serverNameLower) || 
+            serverNameLower.includes(packageNameLower)) {
+          return true
+        }
+      }
+      
+      // 检查GitHub匹配
+      if (server.Github && local.Github && server.Github === local.Github) {
+        return true
+      }
+    }
+    
+    return false
   })
   return !!localServer
 }
@@ -228,10 +262,10 @@ const syncServerStatuses = async () => {
         let isCodeDownloaded = true
         const isNpxCommand = localServer.command?.startsWith('npx') || false
         
-        if (server.github && localServer.github && !isNpxCommand) {
+        if (server.Github && localServer.Github && !isNpxCommand) {
           try {
             // 传递服务器名称作为targetName，因为下载时可能使用了服务器名称重命名仓库
-            isCodeDownloaded = await window.api.presenter.call('mcpPresenter', 'isGitHubRepositoryDownloaded', localServer.github, localServer.name)
+            isCodeDownloaded = await mcpPresenter.isGitHubRepositoryDownloaded(localServer.Github, localServer.name)
             console.log(`  GitHub仓库下载状态检查: ${server.name}, 已下载: ${isCodeDownloaded}`)
           } catch (error) {
             console.warn('检查GitHub仓库下载状态失败:', error)
@@ -242,7 +276,7 @@ const syncServerStatuses = async () => {
         }
       
       // 如果找到本地服务，同步其状态
-      let newStatus: string
+      let newStatus: 'running' | 'stopped' | 'error' | 'loading' | 'not_installed'
       if (localServer.isRunning) {
         newStatus = 'running'
       } else if (localServer.isLoading) {
@@ -333,8 +367,9 @@ const fetchServers = async (page: number = 1, size: number = 10, searchName: str
         isGallery: false,
         toolsCount: 0, // 可以根据需要解析Tools字段
         promptsCount: 0,
+
         resourcesCount: 0,
-        github: item.github,
+        Github: item.github,
         deployJson: item.deploy_json // 保留部署配置信息
       }))
       
@@ -437,7 +472,7 @@ const filteredServers = computed(() => {
       .filter(s => s.mcp_type === 'mcp_gallery' && 
         ((filterStatus.value === 'running' && s.isRunning) ||
          (filterStatus.value === 'stopped' && !s.isRunning && !s.isLoading) ||
-         (filterStatus.value === 'error' && s.errorMessage)) // 假设有errorMessage表示错误
+         (filterStatus.value === 'error' && false)) // Remove errorMessage check since it doesn't exist
       )
       .map(s => ({
         id: s.name,
@@ -445,14 +480,14 @@ const filteredServers = computed(() => {
         icon: s.icons || '🔧',
         description: s.descriptions || '',
         type: s.type || '',
-        status: s.isRunning ? 'running' : (s.isLoading ? 'loading' : (s.errorMessage ? 'error' : 'stopped')),
+        status: (s.isRunning ? 'running' : (s.isLoading ? 'loading' : 'stopped')) as 'running' | 'stopped' | 'error' | 'loading' | 'not_installed',
         isRunning: s.isRunning,
         isDefault: s.isDefault,
         isGallery: true,
         toolsCount: 0,
         promptsCount: 0,
         resourcesCount: 0,
-        github: s.github,
+        Github: s.Github,
         deployJson: ''
       }));
   } else {
@@ -528,10 +563,7 @@ const getStatusTextClass = (status: string) => {
 const editServer = (server: ServerItem) => {
   // 检查服务器是否已安装到本地
   const localServer = mcpStore.serverList.find(local => {
-    return local.name === server.name || 
-           local.name.includes(server.name) || 
-           server.name.includes(local.name) ||
-           (local.mcp_type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+    return local.mcp_type === 'mcp_gallery'
   })
   
   if (!localServer) {
@@ -600,10 +632,7 @@ const editServer = (server: ServerItem) => {
 const deleteServer = (server: ServerItem) => {
   // 检查服务器是否已安装到本地
   const localServer = mcpStore.serverList.find(local => {
-    return local.name === server.name || 
-           local.name.includes(server.name) || 
-           server.name.includes(local.name) ||
-           (local.mcp_type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+    return local.mcp_type === 'mcp_gallery'
   })
   
   if (!localServer) {
@@ -677,10 +706,7 @@ const toggleServer = async (server: ServerItem) => {
     // 检查该服务是否已安装到本地配置中
     // 使用与syncServerStatuses相同的匹配逻辑
     const localServer = mcpStore.serverList.find(local => {
-      return local.name === server.name || 
-             local.name.includes(server.name) || 
-             server.name.includes(local.name) ||
-             (local.mcp_type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+      return local.mcp_type === 'mcp_gallery'
     })
     
     if (localServer) {
@@ -759,9 +785,9 @@ const installServer = (server: ServerItem) => {
             serverConfig.descriptions = server.description
           }
           
-          // 添加 GitHub 字段，使用 ServerItem 的 github
-          if (!serverConfig.github && server.github) {
-            serverConfig.github = server.github
+          // 添加 GitHub 字段，使用 ServerItem 的 Github
+          if (!serverConfig.Github && server.Github) {
+            serverConfig.Github = server.Github
           }
         })
       }
@@ -978,11 +1004,11 @@ const goToMcpSettings = () => {
                 </div>
                 <!-- GitHub图标 -->
                 <Button
-                  v-if="server.github"
+                  v-if="server.Github"
                   variant="ghost"
                   size="icon"
                   class="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mr-1"
-                  @click.stop="openGithub(server.github)"
+                  @click.stop="openGithub(server.Github)"
                 >
                   <Icon icon="lucide:github" class="h-3 w-3" />
                 </Button>
@@ -1140,11 +1166,11 @@ const goToMcpSettings = () => {
                     </Badge>
                     <!-- GitHub图标 -->
                     <Button
-                      v-if="server.github"
+                      v-if="server.Github"
                       variant="ghost"
                       size="icon"
                       class="h-5 w-5"
-                      @click.stop="openGithub(server.github)"
+                      @click.stop="openGithub(server.Github)"
                     >
                       <Icon icon="lucide:github" class="h-3 w-3" />
                     </Button>

@@ -92,6 +92,11 @@ interface IpcAPI {
     isPackageCached: (packageName: string) => Promise<boolean>
     installPackageToCache: (packageName: string) => Promise<boolean>
   }
+
+  // 通用 Presenter 调用接口
+  presenter: {
+    call: (presenterName: string, method: string, ...args: unknown[]) => Promise<unknown>
+  }
 }
 
 declare global {

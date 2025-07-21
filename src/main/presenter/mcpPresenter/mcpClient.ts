@@ -20,7 +20,8 @@ import {
   Tool,
   Prompt,
   ResourceListEntry,
-  Resource
+  Resource,
+  MCPServerConfig
 } from '@shared/presenter'
 import { getErrorMessageLabels } from '@shared/i18n'
 // TODO: resources 和 prompts 的类型,Notifactions 的类型 https://github.com/modelcontextprotocol/typescript-sdk/blob/main/src/examples/client/simpleStreamableHttp.ts
@@ -238,7 +239,7 @@ export class McpClient {
                     
                     npmProcess.on('close', (code) => {
                       if (code === 0) {
-                        console.info(`npm install completed successfully for ${this.serverName}`)
+                        console.info(`npm install completed successfully for ${this.serverName}`, output)
                         resolve()
                       } else {
                         console.error(`npm install failed for ${this.serverName}:`, errorOutput)
@@ -429,8 +430,9 @@ export class McpClient {
         // 检查是否为npx命令，如果是则尝试本地化
         let args = this.serverConfig.args as string[]
         
-        // 检查是否有github字段，如果有则先下载代码
-        if (this.serverConfig.github) {
+        // 检查是否有github字段，如果有则先下载代码（对于 mcp_gallery 类型或有 github 字段的服务器）
+        const isMcpGalleryType = (this.serverConfig as unknown as MCPServerConfig & { mcp_type?: string }).mcp_type === 'mcp_gallery'
+        if (this.serverConfig.github && (isMcpGalleryType || command !== 'npx')) {
           const githubUrl = this.serverConfig.github as string
           // 如果是node命令，传递服务器名称作为目标名称以便重命名
           const targetName = command === 'node' ? this.serverName : undefined
@@ -501,7 +503,7 @@ export class McpClient {
                     
                     npmProcess.on('close', (code) => {
                       if (code === 0) {
-                        console.info(`npm install completed successfully for ${this.serverName}`)
+                        console.info(`npm install completed successfully for ${this.serverName}`, output)
                         resolve()
                       } else {
                         console.error(`npm install failed for ${this.serverName}:`, errorOutput)

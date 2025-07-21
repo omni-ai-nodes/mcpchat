@@ -309,7 +309,7 @@ const installServer = () => {
           }
           
           // 添加 GitHub 字段，使用 ServerDetail 的 Github
-          if (!serverConfig.github && serverDetail.value.Github) {
+          if (!serverConfig.github && serverDetail.value?.Github) {
             serverConfig.github = serverDetail.value.Github
           }
         })

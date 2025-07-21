@@ -838,7 +838,7 @@ export interface GalleryServerDetail {
 export interface MCPServerConfig extends GalleryServerDetail {
   command: string
   args: string[]
-  env: Record<string, unknow>
+  env: Record<string, unknown>
   descriptions: string
   icons: string
   autoApprove: string[]
@@ -848,6 +848,7 @@ export interface MCPServerConfig extends GalleryServerDetail {
   customNpmRegistry?: string
   type: 'sse' | 'stdio' | 'inmemory' | 'http' | 'gallery' | 'mcp_gallery'
   mcp_type?: 'mcp_gallery'
+  github?: string
 }
 
 export interface MCPConfig {
@@ -966,6 +967,7 @@ export interface IMCPPresenter {
   setMcpEnabled(enabled: boolean): Promise<void>
   getMcpEnabled(): Promise<boolean>
   resetToDefaultServers(): Promise<void>
+  isGitHubRepositoryDownloaded(githubUrl: string, targetName?: string): Promise<boolean>
 }
 
 export interface IDeeplinkPresenter {

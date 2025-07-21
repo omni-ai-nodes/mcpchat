@@ -381,7 +381,7 @@ export class DeeplinkPresenter implements IDeeplinkPresenter {
           // Set command or baseUrl based on type, prioritizing provided values
           command: processedCommand,
           baseUrl: determinedType === 'sse' ? determinedUrl! : defaultConfig.baseUrl!,
-          github: serverConfig.github // 保存github字段
+          Github: serverConfig.github // 保存github字段
         }
 
         // 安装 MCP 服务器
