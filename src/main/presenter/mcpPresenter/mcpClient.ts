@@ -145,29 +145,42 @@ export class McpClient {
   private replaceWithRuntimeCommand(command: string): string {
     // 获取命令的基本名称（去掉路径）
     const basename = path.basename(command)
+    console.log(`[McpClient] 尝试替换命令: ${command} (basename: ${basename})`)
 
     // 根据命令类型选择对应的 runtime 路径
     if (process.platform === 'win32') {
       // Windows平台只替换Node.js相关命令，bun命令让系统自动处理
       if (this.nodeRuntimePath) {
         if (basename === 'node') {
-          return path.join(this.nodeRuntimePath, 'node.exe')
+          const runtimeCommand = path.join(this.nodeRuntimePath, 'node.exe')
+          console.log(`[McpClient] 替换 node 命令: ${command} -> ${runtimeCommand}`)
+          return runtimeCommand
         } else if (basename === 'npm') {
           // Windows 下 npm 通常是 .cmd 文件
           const npmCmd = path.join(this.nodeRuntimePath, 'npm.cmd')
           if (fs.existsSync(npmCmd)) {
+            console.log(`[McpClient] 替换 npm 命令: ${command} -> ${npmCmd}`)
             return npmCmd
           }
-          // 如果不存在，返回默认路径
-          return path.join(this.nodeRuntimePath, 'npm')
+          // 如果不存在，尝试系统 npm
+          console.log(`[McpClient] Runtime npm.cmd 不存在，回退到系统 npm: ${command}`)
+          return 'npm'
         } else if (basename === 'npx') {
           // Windows 下 npx 通常是 .cmd 文件
           const npxCmd = path.join(this.nodeRuntimePath, 'npx.cmd')
           if (fs.existsSync(npxCmd)) {
+            console.log(`[McpClient] 替换 npx 命令: ${command} -> ${npxCmd}`)
             return npxCmd
           }
-          // 如果不存在，返回默认路径
-          return path.join(this.nodeRuntimePath, 'npx')
+          // 如果不存在，尝试系统 npx
+          console.log(`[McpClient] Runtime npx.cmd 不存在，回退到系统 npx: ${command}`)
+          return 'npx'
+        }
+      } else {
+        // 如果没有 nodeRuntimePath，对于 node/npm/npx 命令回退到系统版本
+        if (['node', 'npm', 'npx'].includes(basename)) {
+          console.log(`[McpClient] 没有 nodeRuntimePath，回退到系统命令: ${basename}`)
+          return basename
         }
       }
     } else {
@@ -177,7 +190,9 @@ export class McpClient {
         if (this.bunRuntimePath) {
           // 对于 node/npm/npx，统一替换为 bun
           const targetCommand = 'bun'
-          return path.join(this.bunRuntimePath, targetCommand)
+          const runtimeCommand = path.join(this.bunRuntimePath, targetCommand)
+          console.log(`[McpClient] 使用 Bun 替换命令: ${command} -> ${runtimeCommand}`)
+          return runtimeCommand
         } else if (this.nodeRuntimePath) {
           // 使用 Node.js 运行时
           let targetCommand: string
@@ -192,7 +207,18 @@ export class McpClient {
           } else {
             targetCommand = basename
           }
-          return path.join(this.nodeRuntimePath, 'bin', targetCommand)
+          const runtimeCommand = path.join(this.nodeRuntimePath, 'bin', targetCommand)
+          if (fs.existsSync(runtimeCommand)) {
+            console.log(`[McpClient] 使用 Node.js 替换命令: ${command} -> ${runtimeCommand}`)
+            return runtimeCommand
+          } else {
+            console.log(`[McpClient] Runtime 命令不存在: ${runtimeCommand}，回退到系统命令: ${basename}`)
+            return basename
+          }
+        } else {
+          // 如果没有运行时，回退到系统命令
+          console.log(`[McpClient] 没有可用的运行时，回退到系统命令: ${basename}`)
+          return basename
         }
       }
     }
@@ -200,6 +226,7 @@ export class McpClient {
     // UV命令处理（所有平台）
     if (['uv', 'uvx'].includes(basename)) {
       if (!this.uvRuntimePath) {
+        console.log(`[McpClient] 没有 uvRuntimePath，保持原命令: ${command}`)
         return command
       }
 
@@ -207,12 +234,17 @@ export class McpClient {
       const targetCommand = basename === 'uvx' ? 'uvx' : 'uv'
 
       if (process.platform === 'win32') {
-        return path.join(this.uvRuntimePath, `${targetCommand}.exe`)
+        const runtimeCommand = path.join(this.uvRuntimePath, `${targetCommand}.exe`)
+        console.log(`[McpClient] 替换 UV 命令: ${command} -> ${runtimeCommand}`)
+        return runtimeCommand
       } else {
-        return path.join(this.uvRuntimePath, targetCommand)
+        const runtimeCommand = path.join(this.uvRuntimePath, targetCommand)
+        console.log(`[McpClient] 替换 UV 命令: ${command} -> ${runtimeCommand}`)
+        return runtimeCommand
       }
     }
 
+    console.log(`[McpClient] 保持原命令不变: ${command}`)
     return command
   }
 
@@ -222,34 +254,52 @@ export class McpClient {
     args: string[]
   ): { command: string; args: string[] } {
     const basename = path.basename(command)
+    console.log(`[McpClient] 处理命令和参数: ${command} ${args.join(' ')}`)
 
     // 处理 npx 命令
     if (basename === 'npx' || command.includes('npx')) {
+      console.log(`[McpClient] 检测到 npx 命令，平台: ${process.platform}`)
+      
       if (process.platform === 'win32') {
         // Windows 平台使用 Node.js 的 npx，保持原有参数
+        const replacedCommand = this.replaceWithRuntimeCommand(command)
+        console.log(`[McpClient] Windows 平台 npx 处理: ${command} -> ${replacedCommand}`)
         return {
-          command: this.replaceWithRuntimeCommand(command),
+          command: replacedCommand,
           args: args.map((arg) => this.replaceWithRuntimeCommand(arg))
         }
       } else {
         // 非Windows平台优先使用 Bun，需要在参数前添加 'x'
         if (this.bunRuntimePath) {
+          const bunCommand = this.replaceWithRuntimeCommand('bun')
+          console.log(`[McpClient] 使用 Bun 替换 npx: ${command} -> ${bunCommand} x ${args.join(' ')}`)
           return {
-            command: this.replaceWithRuntimeCommand(command),
+            command: bunCommand,
             args: ['x', ...args]
           }
         } else if (this.nodeRuntimePath) {
           // 如果没有Bun，使用Node.js，保持原有参数
+          const replacedCommand = this.replaceWithRuntimeCommand(command)
+          console.log(`[McpClient] 使用 Node.js 替换 npx: ${command} -> ${replacedCommand}`)
           return {
-            command: this.replaceWithRuntimeCommand(command),
+            command: replacedCommand,
             args: args.map((arg) => this.replaceWithRuntimeCommand(arg))
+          }
+        } else {
+          // 如果没有运行时，回退到系统 npx
+          console.log(`[McpClient] 没有可用运行时，回退到系统 npx`)
+          return {
+            command: 'npx',
+            args: args
           }
         }
       }
     }
 
+    const replacedCommand = this.replaceWithRuntimeCommand(command)
+    console.log(`[McpClient] 常规命令处理: ${command} -> ${replacedCommand}`)
     return {
-      command: this.replaceWithRuntimeCommand(command),
+      command: replacedCommand,
       args: args.map((arg) => this.replaceWithRuntimeCommand(arg))
     }
   }
