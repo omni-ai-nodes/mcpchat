@@ -124,63 +124,154 @@ const isServerInstalled = (server: ServerItem): boolean => {
 
 // 同步服务状态的函数
 const syncServerStatuses = async () => {
-  console.log('同步服务状态，当前本地服务列表:', mcpStore.serverList.map(s => ({ name: s.name, type: s.type, isRunning: s.isRunning })))
+  console.log('同步服务状态，当前本地服务列表:', mcpStore.serverList.map(s => ({ name: s.name, type: s.type, isRunning: s.isRunning, command: s.command })))
+  console.log('当前Gallery服务列表:', servers.value.map(s => ({ name: s.name, status: s.status })))
   
   for (const server of servers.value) {
+    console.log(`\n正在处理服务器: ${server.name}`)
+    
     // 检查该服务是否已安装到本地配置中
     const localServer = mcpStore.serverList.find(local => {
-      return local.name === server.name || 
-             local.name.includes(server.name) || 
-             server.name.includes(local.name) ||
-             (local.mcp_type === 'mcp_gallery' && server.name.toLowerCase().includes(local.name.toLowerCase()))
+      console.log(`  检查本地服务: ${local.name}, 命令: ${local.command}`)
+      
+      // 首先尝试精确匹配
+      if (local.name === server.name) {
+        console.log(`  ✓ 精确匹配: ${local.name} === ${server.name}`)
+        return true
+      }
+      
+      // 对于 gallery 类型的服务器，使用更宽松的匹配
+      if (server.type === 'gallery') {
+        const localNameLower = local.name.toLowerCase()
+        const serverNameLower = server.name.toLowerCase()
+        
+        // 基本的包含匹配
+        if (localNameLower === serverNameLower || 
+            localNameLower.includes(serverNameLower) || 
+            serverNameLower.includes(localNameLower)) {
+          console.log(`  ✓ 名称包含匹配: ${localNameLower} <-> ${serverNameLower}`)
+          return true
+        }
+        
+        // 特殊处理npx命令：检查命令中是否包含服务器名称
+        if (local.command?.startsWith('npx')) {
+          // 处理 'npx' 或 'npx ' 开头的命令
+          const npxPackageName = local.command.replace(/^npx\s*/, '').split(' ')[0]
+          const packageNameLower = npxPackageName.toLowerCase()
+          
+          console.log(`  检查npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`)
+          
+          // 检查npx包名是否与服务器名称匹配
+          if (packageNameLower === serverNameLower || 
+              packageNameLower.includes(serverNameLower) || 
+              serverNameLower.includes(packageNameLower)) {
+            console.log(`  ✓ npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`)
+            return true
+          }
+        }
+        
+        // 特殊处理：如果服务器有deployJson，尝试从中提取可能的服务器名称进行匹配
+        if (server.deployJson) {
+          try {
+            const deployConfig = JSON.parse(server.deployJson)
+            if (deployConfig.mcpServers) {
+              const serverKeys = Object.keys(deployConfig.mcpServers)
+              const matched = serverKeys.some(key => {
+                const keyLower = key.toLowerCase()
+                const serverConfig = deployConfig.mcpServers[key]
+                
+                console.log(`    检查deployJson键: ${key}, 命令: ${serverConfig.command}`)
+                
+                // 检查服务器名称匹配
+                if (keyLower === localNameLower || 
+                    keyLower.includes(localNameLower) || 
+                    localNameLower.includes(keyLower)) {
+                  console.log(`    ✓ deployJson键名匹配: ${keyLower} <-> ${localNameLower}`)
+                  return true
+                }
+                
+                // 检查deployJson中的npx命令是否与本地服务的npx命令匹配
+                if (local.command?.startsWith('npx') && serverConfig.command?.startsWith('npx')) {
+                  const localNpxPackage = local.command.replace(/^npx\s*/, '').split(' ')[0]
+                  const deployNpxPackage = serverConfig.command.replace(/^npx\s*/, '').split(' ')[0]
+                  
+                  console.log(`    检查deployJson npx包匹配: ${localNpxPackage} <-> ${deployNpxPackage}`)
+                  
+                  if (localNpxPackage.toLowerCase() === deployNpxPackage.toLowerCase()) {
+                    console.log(`    ✓ deployJson npx包匹配: ${localNpxPackage} === ${deployNpxPackage}`)
+                    return true
+                  }
+                }
+                
+                return false
+              })
+              
+              if (matched) {
+                console.log(`  ✓ deployJson匹配成功`)
+                return true
+              }
+            }
+          } catch (error) {
+            console.warn('Failed to parse deployJson for server matching:', error)
+          }
+        }
+      }
+      
+      return false
     })
     
     if (localServer) {
-      console.log(`找到匹配的本地服务: ${server.name} -> ${localServer.name}, 运行状态: ${localServer.isRunning}`)
+      console.log(`✓ 找到匹配的本地服务: ${server.name} -> ${localServer.name}, 运行状态: ${localServer.isRunning}, 命令: ${localServer.command}`)
       
       // 检查是否为GitHub类型的服务器且需要检查代码下载状态
-      // npx类型的服务器不需要检查目录，因为它们通过包管理器运行
-      const isNpxCommand = localServer.command?.startsWith('npx')
-      console.log(`服务器 ${server.name} 命令: ${localServer.command}, 是否为npx命令: ${isNpxCommand}`)
-      
-      let isCodeDownloaded = true
-      if (server.github && localServer.github && !isNpxCommand) {
-        try {
-          // 传递服务器名称作为targetName，因为下载时可能使用了服务器名称重命名仓库
-          isCodeDownloaded = await window.api.presenter.call('mcpPresenter', 'isGitHubRepositoryDownloaded', localServer.github, localServer.name)
-          console.log(`GitHub仓库下载状态检查: ${server.name} -> ${isCodeDownloaded}`)
-        } catch (error) {
-          console.warn('检查GitHub仓库下载状态失败:', error)
-          isCodeDownloaded = false
+       // npx类型的服务器不需要检查目录，因为它们通过包管理器运行
+        let isCodeDownloaded = true
+        const isNpxCommand = localServer.command?.startsWith('npx') || false
+        
+        if (server.github && localServer.github && !isNpxCommand) {
+          try {
+            // 传递服务器名称作为targetName，因为下载时可能使用了服务器名称重命名仓库
+            isCodeDownloaded = await window.api.presenter.call('mcpPresenter', 'isGitHubRepositoryDownloaded', localServer.github, localServer.name)
+            console.log(`  GitHub仓库下载状态检查: ${server.name}, 已下载: ${isCodeDownloaded}`)
+          } catch (error) {
+            console.warn('检查GitHub仓库下载状态失败:', error)
+            isCodeDownloaded = false
+          }
+        } else if (isNpxCommand) {
+          console.log(`  npx服务器 ${server.name} 跳过GitHub目录检查，命令: ${localServer.command}`)
         }
-      } else if (isNpxCommand) {
-        console.log(`跳过GitHub目录检查，因为 ${server.name} 是npx服务器`)
-      }
       
       // 如果找到本地服务，同步其状态
+      let newStatus: string
       if (localServer.isRunning) {
-        server.status = 'running'
+        newStatus = 'running'
       } else if (localServer.isLoading) {
-        server.status = 'loading'
+        newStatus = 'loading'
       } else if (isCodeDownloaded) {
-        server.status = 'stopped'
+        newStatus = 'stopped'
       } else {
-        server.status = 'not_installed'
+        newStatus = 'not_installed'
       }
       
+      console.log(`  服务器 ${server.name} 状态更新: ${server.status} -> ${newStatus}`)
+      server.status = newStatus
       server.isRunning = localServer.isRunning
       server.isDefault = localServer.isDefault
+      
       // 可以从本地服务获取更多信息，如工具数量等
       if (localServer.mcp_type === 'mcp_gallery') {
         server.isGallery = true
       }
     } else {
+      console.log(`✗ 未找到匹配的本地服务: ${server.name}, 设置为未安装状态`)
       // 如果未找到本地服务，设置为未安装状态
       server.status = 'not_installed'
       server.isRunning = false
       server.isDefault = false
     }
   }
+  
+  console.log('\n同步完成，最终状态:', servers.value.map(s => ({ name: s.name, status: s.status })))
 }
 
 // 监听mcpStore的服务状态变化
@@ -715,9 +806,23 @@ const handleInstallSubmit = async (name: string, config: MCPServerConfig) => {
         })
         
         // 等待一段时间确保后端配置更新完成，然后手动触发状态同步
+        console.log('安装成功，开始状态同步流程...')
+        await new Promise(resolve => setTimeout(resolve, 1000)) // 增加延迟到1秒
+        await nextTick()
+        
+        // 强制重新加载配置
+        console.log('重新加载MCP配置...')
+        await mcpStore.loadConfig()
+        
+        // 再次等待确保配置加载完成
         await new Promise(resolve => setTimeout(resolve, 500))
         await nextTick()
-        syncServerStatuses()
+        
+        // 执行状态同步
+        console.log('执行状态同步...')
+        await syncServerStatuses()
+        
+        console.log('状态同步完成')
         
       } else {
         console.error('服务器添加失败:', name)

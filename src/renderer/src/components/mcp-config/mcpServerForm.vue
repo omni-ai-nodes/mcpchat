@@ -1196,7 +1196,7 @@ defineExpose({
       </Button>
       <Button type="submit" size="sm" :disabled="!isFormValid || isSubmitting">
         <Icon v-if="isSubmitting" icon="lucide:loader-2" class="w-4 h-4 mr-2 animate-spin" />
-        <span v-if="isSubmitting">安装中...</span>
+        <span v-if="isSubmitting">{{ t('settings.mcp.serverForm.submitting') }}</span>
         <span v-if="!isSubmitting">{{ t('settings.mcp.serverForm.submit') }}</span>
       </Button>
     </div>
