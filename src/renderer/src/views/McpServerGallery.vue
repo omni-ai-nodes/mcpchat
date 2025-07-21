@@ -140,16 +140,22 @@ const syncServerStatuses = async () => {
       
       // 检查是否为GitHub类型的服务器且需要检查代码下载状态
       // npx类型的服务器不需要检查目录，因为它们通过包管理器运行
-       let isCodeDownloaded = true
-       if (server.github && localServer.github && !localServer.command?.startsWith('npx ')) {
-         try {
-           // 传递服务器名称作为targetName，因为下载时可能使用了服务器名称重命名仓库
-           isCodeDownloaded = await window.api.presenter.call('mcpPresenter', 'isGitHubRepositoryDownloaded', localServer.github, localServer.name)
-         } catch (error) {
-           console.warn('检查GitHub仓库下载状态失败:', error)
-           isCodeDownloaded = false
-         }
-       }
+      const isNpxCommand = localServer.command?.startsWith('npx')
+      console.log(`服务器 ${server.name} 命令: ${localServer.command}, 是否为npx命令: ${isNpxCommand}`)
+      
+      let isCodeDownloaded = true
+      if (server.github && localServer.github && !isNpxCommand) {
+        try {
+          // 传递服务器名称作为targetName，因为下载时可能使用了服务器名称重命名仓库
+          isCodeDownloaded = await window.api.presenter.call('mcpPresenter', 'isGitHubRepositoryDownloaded', localServer.github, localServer.name)
+          console.log(`GitHub仓库下载状态检查: ${server.name} -> ${isCodeDownloaded}`)
+        } catch (error) {
+          console.warn('检查GitHub仓库下载状态失败:', error)
+          isCodeDownloaded = false
+        }
+      } else if (isNpxCommand) {
+        console.log(`跳过GitHub目录检查，因为 ${server.name} 是npx服务器`)
+      }
       
       // 如果找到本地服务，同步其状态
       if (localServer.isRunning) {
