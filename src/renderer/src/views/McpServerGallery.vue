@@ -164,118 +164,29 @@ const syncServerStatuses = async () => {
   for (const server of servers.value) {
     console.log(`\n正在处理服务器: ${server.name}`)
     
-    // 检查该服务是否已安装到本地配置中
-    const localServer = mcpStore.serverList.find(local => {
-      console.log(`  检查本地服务: ${local.name}, 命令: ${local.command}`)
-      
-      // 首先尝试精确匹配
-      if (local.name === server.name) {
-        console.log(`  ✓ 精确匹配: ${local.name} === ${server.name}`)
-        return true
-      }
-      
-      // 对于 gallery 类型的服务器，使用更宽松的匹配
-      if (server.type === 'gallery') {
-        const localNameLower = local.name.toLowerCase()
-        const serverNameLower = server.name.toLowerCase()
-        
-        // 基本的包含匹配
-        if (localNameLower === serverNameLower || 
-            localNameLower.includes(serverNameLower) || 
-            serverNameLower.includes(localNameLower)) {
-          console.log(`  ✓ 名称包含匹配: ${localNameLower} <-> ${serverNameLower}`)
-          return true
-        }
-        
-        // 特殊处理npx命令：检查命令中是否包含服务器名称
-        if (local.command?.startsWith('npx')) {
-          // 处理 'npx' 或 'npx ' 开头的命令
-          const npxPackageName = local.command.replace(/^npx\s*/, '').split(' ')[0]
-          const packageNameLower = npxPackageName.toLowerCase()
-          
-          console.log(`  检查npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`)
-          
-          // 检查npx包名是否与服务器名称匹配
-          if (packageNameLower === serverNameLower || 
-              packageNameLower.includes(serverNameLower) || 
-              serverNameLower.includes(packageNameLower)) {
-            console.log(`  ✓ npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`)
-            return true
-          }
-        }
-        
-        // 特殊处理：如果服务器有deployJson，尝试从中提取可能的服务器名称进行匹配
-        if (server.deployJson) {
-          try {
-            const deployConfig = JSON.parse(server.deployJson)
-            if (deployConfig.mcpServers) {
-              const serverKeys = Object.keys(deployConfig.mcpServers)
-              const matched = serverKeys.some(key => {
-                const keyLower = key.toLowerCase()
-                const serverConfig = deployConfig.mcpServers[key]
-                
-                console.log(`    检查deployJson键: ${key}, 命令: ${serverConfig.command}`)
-                
-                // 检查服务器名称匹配
-                if (keyLower === localNameLower || 
-                    keyLower.includes(localNameLower) || 
-                    localNameLower.includes(keyLower)) {
-                  console.log(`    ✓ deployJson键名匹配: ${keyLower} <-> ${localNameLower}`)
-                  return true
-                }
-                
-                // 检查deployJson中的npx命令是否与本地服务的npx命令匹配
-                if (local.command?.startsWith('npx') && serverConfig.command?.startsWith('npx')) {
-                  const localNpxPackage = local.command.replace(/^npx\s*/, '').split(' ')[0]
-                  const deployNpxPackage = serverConfig.command.replace(/^npx\s*/, '').split(' ')[0]
-                  
-                  console.log(`    检查deployJson npx包匹配: ${localNpxPackage} <-> ${deployNpxPackage}`)
-                  
-                  if (localNpxPackage.toLowerCase() === deployNpxPackage.toLowerCase()) {
-                    console.log(`    ✓ deployJson npx包匹配: ${localNpxPackage} === ${deployNpxPackage}`)
-                    return true
-                  }
-                }
-                
-                return false
-              })
-              
-              if (matched) {
-                console.log(`  ✓ deployJson匹配成功`)
-                return true
-              }
-            }
-          } catch (error) {
-            console.warn('Failed to parse deployJson for server matching:', error)
-          }
-        }
-      }
-      
-      return false
-    })
+    // 只使用精确名称匹配
+    const localServer = mcpStore.serverList.find(local => local.name === server.name)
     
     if (localServer) {
       console.log(`✓ 找到匹配的本地服务: ${server.name} -> ${localServer.name}, 运行状态: ${localServer.isRunning}, 命令: ${localServer.command}`)
       
       // 检查是否为GitHub类型的服务器且需要检查代码下载状态
-       // npx类型的服务器不需要检查目录，因为它们通过包管理器运行
-        let isCodeDownloaded = true
-        const isNpxCommand = localServer.command?.startsWith('npx') || false
-        
-        if (server.Github && localServer.Github && !isNpxCommand) {
-          try {
-            // 传递服务器名称作为targetName，因为下载时可能使用了服务器名称重命名仓库
-            isCodeDownloaded = await mcpPresenter.isGitHubRepositoryDownloaded(localServer.Github, localServer.name)
-            console.log(`  GitHub仓库下载状态检查: ${server.name}, 已下载: ${isCodeDownloaded}`)
-          } catch (error) {
-            console.warn('检查GitHub仓库下载状态失败:', error)
-            isCodeDownloaded = false
-          }
-        } else if (isNpxCommand) {
-          console.log(`  npx服务器 ${server.name} 跳过GitHub目录检查，命令: ${localServer.command}`)
-        }
+      let isCodeDownloaded = true
+      const isNpxCommand = localServer.command?.startsWith('npx') || false
       
-      // 如果找到本地服务，同步其状态
+      if (server.Github && localServer.Github && !isNpxCommand) {
+        try {
+          isCodeDownloaded = await mcpPresenter.isGitHubRepositoryDownloaded(localServer.Github, localServer.name)
+          console.log(`  GitHub仓库下载状态检查: ${server.name}, 已下载: ${isCodeDownloaded}`)
+        } catch (error) {
+          console.warn('检查GitHub仓库下载状态失败:', error)
+          isCodeDownloaded = false
+        }
+      } else if (isNpxCommand) {
+        console.log(`  npx服务器 ${server.name} 跳过GitHub目录检查，命令: ${localServer.command}`)
+      }
+      
+      // 同步状态
       let newStatus: 'running' | 'stopped' | 'error' | 'loading' | 'not_installed'
       if (localServer.isRunning) {
         newStatus = 'running'
@@ -292,13 +203,11 @@ const syncServerStatuses = async () => {
       server.isRunning = localServer.isRunning
       server.isDefault = localServer.isDefault
       
-      // 可以从本地服务获取更多信息，如工具数量等
       if (localServer.mcp_type === 'mcp_gallery') {
         server.isGallery = true
       }
     } else {
       console.log(`✗ 未找到匹配的本地服务: ${server.name}, 设置为未安装状态`)
-      // 如果未找到本地服务，设置为未安装状态
       server.status = 'not_installed'
       server.isRunning = false
       server.isDefault = false
@@ -323,63 +232,76 @@ watch(() => mcpStore.config, () => {
   syncServerStatuses()
 }, { deep: true })
 
-// API调用函数
-const fetchServers = async (page: number = 1, size: number = 10, searchName: string = '') => {
+// 所有API服务器数据
+let allApiServers = ref<ServerItem[]>([])
+
+// API调用函数 - 修改为获取所有页面数据
+const fetchServers = async (searchName: string = '') => {
   loading.value = true
+  allApiServers.value = []
   try {
     const apiUrl = import.meta.env.VITE_MCP_SERVER_API_URL || 'https://api.omni-ainode.com'
-    interface RequestBody { page_size: number; current_page: number; name?: string; }
-    const requestBody: RequestBody = {
-      page_size: size,
-      current_page: page
-    }
-    
-    // 如果有搜索内容，添加到请求体中
-    if (searchName.trim()) {
-      requestBody.name = searchName.trim()
-    }
-    
-    const response = await fetch(`${apiUrl}/api/get_mcp_server_list`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    })
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    
-    const data: ApiResponse = await response.json()
-    
-    if (data.code === 200) {
-      // 将API数据映射为组件需要的格式
-      servers.value = data.data.infos.map(item => reactive({
-        id: item.id.toString(),
-        name: item.name,
-        icon: getServerIcon(item.logo), // 处理图标
-        description: item.introduction,
-        type: item.by, // 显示By内容
-        status: 'not_installed' as const, // 默认状态为未安装
-        isRunning: false,
-        isDefault: false,
-        isGallery: false,
-        toolsCount: 0, // 可以根据需要解析Tools字段
-        promptsCount: 0,
-        resourcesCount: 0,
-        Github: item.github,
-        deployJson: item.deploy_json // 保留部署配置信息
-      }))
+    let currentPage = 1
+    let totalPages = 1
+
+    do {
+      interface RequestBody { page_size: number; current_page: number; name?: string; }
+      const requestBody: RequestBody = {
+        page_size: 100, // 使用较大的页面大小
+        current_page: currentPage
+      }
       
-      totalPages.value = data.data.total_pages
-      currentPage.value = page
+      if (searchName.trim()) {
+        requestBody.name = searchName.trim()
+      }
       
-      // 获取数据后立即同步服务状态
-      syncServerStatuses()
-    } else {
-      console.error('API返回错误:', data.msg)
-    }
+      const response = await fetch(`${apiUrl}/api/get_mcp_server_list`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data: ApiResponse = await response.json()
+      
+      if (data.code === 200) {
+        // 映射并添加到所有服务器列表
+        const pageServers = data.data.infos.map(item => reactive({
+          id: item.id.toString(),
+          name: item.name,
+          icon: getServerIcon(item.logo),
+          description: item.introduction,
+          type: item.by,
+          status: 'not_installed' as const,
+          isRunning: false,
+          isDefault: false,
+          isGallery: false,
+          toolsCount: 0,
+          promptsCount: 0,
+          resourcesCount: 0,
+          Github: item.github,
+          deployJson: item.deploy_json
+        }))
+        
+        allApiServers.value = [...allApiServers.value, ...pageServers]
+        totalPages = data.data.total_pages
+        currentPage++
+      } else {
+        console.error('API返回错误:', data.msg)
+        break
+      }
+    } while (currentPage <= totalPages)
+    
+    // 获取所有数据后同步状态
+    await syncServerStatuses()
+    
+    // 设置总页数基于所有服务器
+totalPages.value = Math.ceil(allApiServers.value.length / pageSize.value)
   } catch (error) {
     console.error('获取服务器列表失败:', error)
   } finally {
@@ -422,66 +344,100 @@ const goToServerDetail = (server: ServerItem) => {
 // 组件挂载时获取数据
 onMounted(() => {
   fetchServers()
-  // 确保mcpStore已初始化后同步状态
   nextTick(() => {
     syncServerStatuses()
   })
-
-  // 添加定时轮询以确保状态实时同步
+  
   const syncInterval = setInterval(() => {
     syncServerStatuses()
   }, 5000)
-
-  // 在组件卸载时清除定时器
+  
   onUnmounted(() => {
     clearInterval(syncInterval)
   })
 })
 
+// 监听过滤变化，更新分页
+watch(filterStatus, () => {
+  currentPage.value = 1
+})
+
+// 监听分页大小变化，更新分页
+watch(pageSize, () => {
+  currentPage.value = 1
+})
+
+// 监听当前页变化，确保有效
+watch(currentPage, (newPage) => {
+  if (newPage > totalPages.value) {
+    currentPage.value = totalPages.value || 1
+  }
+})
+
 // 监听搜索查询变化，实现实时搜索
 const debouncedFetchServers = debounce((query: string) => {
-  fetchServers(1, pageSize.value, query)
+  fetchServers(query)
 }, 300)
 
 watch(searchQuery, (newQuery) => {
   debouncedFetchServers(newQuery)
 })
 
-// 修改翻页函数以支持搜索
-const goToPageWithSearch = (page: number) => {
-  if (page >= 1 && page <= totalPages.value && page !== currentPage.value) {
-    fetchServers(page, pageSize.value, searchQuery.value)
-  }
+// 客户端分页函数
+const getPaginatedServers = (servers: ServerItem[]) => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return servers.slice(start, end)
 }
 
 // 更新翻页函数
 const goToPage = (page: number) => {
-  goToPageWithSearch(page)
+  if (page >= 1 && page <= totalPages.value && page !== currentPage.value) {
+    currentPage.value = page
+  }
 }
 
 // 上一页
 const prevPage = () => {
   if (currentPage.value > 1) {
-    goToPageWithSearch(currentPage.value - 1)
+    goToPage(currentPage.value - 1)
   }
 }
 
 // 下一页
 const nextPage = () => {
   if (currentPage.value < totalPages.value) {
-    goToPageWithSearch(currentPage.value + 1)
+    goToPage(currentPage.value + 1)
   }
 }
 
-// 计算属性：过滤后的服务器列表（仅保留状态过滤，搜索已移至服务端）
-const filteredServers = computed(() => {
-  // 合并API服务器和本地独有gallery服务器
-  const allServers = [...servers.value];
-
+// 计算属性：过滤后的服务器列表
+const allServers = computed(() => {
+  // 过滤API服务器
+  let filtered = allApiServers.value
+  
+  if (filterStatus.value !== 'all') {
+    filtered = filtered.filter(server => {
+      switch (filterStatus.value) {
+        case 'running':
+          return server.status === 'running'
+        case 'stopped':
+          return server.status === 'stopped'
+        case 'error':
+          return server.status === 'error'
+        case 'not_installed':
+          return server.status === 'not_installed'
+        default:
+          return true
+      }
+    })
+  }
+  
   // 添加本地独有gallery服务器
+  const serversList = [...filtered]
   mcpStore.serverList.forEach(local => {
-    if (local.mcp_type === 'mcp_gallery' && !servers.value.some(s => s.name === local.name)) {
-      allServers.push({
+    if (local.mcp_type === 'mcp_gallery' && !allApiServers.value.some(s => s.name === local.name)) {
+      const localServer: ServerItem = {
         id: local.name,
         name: local.name,
         icon: local.icons || '🔧',
@@ -499,30 +455,25 @@ const filteredServers = computed(() => {
         command: local.command,
         args: local.args,
         baseUrl: local.baseUrl
-      });
+      }
+      
+      if (filterStatus.value === 'all' || localServer.status === filterStatus.value) {
+        serversList.push(localServer)
+      }
     }
-  });
-
-  // 根据filterStatus过滤
-  if (filterStatus.value === 'all') {
-    return allServers;
-  }
-
-  return allServers.filter(server => {
-    switch (filterStatus.value) {
-      case 'running':
-        return server.status === 'running';
-      case 'stopped':
-        return server.status === 'stopped';
-      case 'error':
-        return server.status === 'error';
-      case 'not_installed':
-        return server.status === 'not_installed';
-      default:
-        return false;
-    }
-  });
+  })
+  
+  return serversList
 })
+
+const filteredServers = computed(() => {
+  return getPaginatedServers(allServers.value)
+})
+
+// 监视allServers变化更新总页数
+watch(allServers, (newServers) => {
+  totalPages.value = Math.ceil(newServers.length / pageSize.value)
+}, { deep: true })
 
 // 状态相关函数
 const getStatusText = (status: string) => {
