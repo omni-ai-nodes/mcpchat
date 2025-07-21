@@ -3,8 +3,8 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { type Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
-import { eventBus } from '@/eventbus'
-import { MCP_EVENTS, NOTIFICATION_EVENTS } from '@/events'
+import { eventBus, SendTarget } from '@/eventbus'
+import { MCP_EVENTS } from '@/events'
 import path from 'path'
 import { presenter } from '@/presenter'
 import { app } from 'electron'
@@ -12,18 +12,14 @@ import fs from 'fs'
 // import { NO_PROXY, proxyConfig } from '@/presenter/proxyConfig'
 import { getInMemoryServer } from './inMemoryServers/builder'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { LocalPackageManager } from './localPackageManager'
-import { gitDownloadManager } from '../../lib/gitDownloadManager'
 import {
   PromptListEntry,
   ToolCallResult,
   Tool,
   Prompt,
   ResourceListEntry,
-  Resource,
-  MCPServerConfig
+  Resource
 } from '@shared/presenter'
-import { getErrorMessageLabels } from '@shared/i18n'
 // TODO: resources 和 prompts 的类型,Notifactions 的类型 https://github.com/modelcontextprotocol/typescript-sdk/blob/main/src/examples/client/simpleStreamableHttp.ts
 // 简单的 OAuth 提供者，用于处理 Bearer Token
 class SimpleOAuthProvider {
@@ -48,6 +44,45 @@ type MCPEventsType = typeof MCP_EVENTS & {
   SERVER_STATUS_CHANGED: string
 }
 
+// Session management related types
+interface SessionError extends Error {
+  httpStatus?: number
+  isSessionExpired?: boolean
+}
+
+// Helper function to check if error is session-related
+function isSessionError(error: unknown): error is SessionError {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase()
+
+    // Check for specific MCP Streamable HTTP session error patterns
+    const sessionErrorPatterns = [
+      'no valid session',
+      'session expired',
+      'session not found',
+      'invalid session',
+      'session id',
+      'mcp-session-id'
+    ]
+
+    const httpErrorPatterns = ['http 400', 'http 404', 'bad request', 'not found']
+
+    // Check for session-specific errors first (high confidence)
+    const hasSessionPattern = sessionErrorPatterns.some((pattern) => message.includes(pattern))
+    if (hasSessionPattern) {
+      return true
+    }
+
+    // Check for HTTP errors that might be session-related (lower confidence)
+    // Only treat as session error if it's an HTTP transport
+    const hasHttpPattern = httpErrorPatterns.some((pattern) => message.includes(pattern))
+    if (hasHttpPattern && (message.includes('posting') || message.includes('endpoint'))) {
+      return true
+    }
+  }
+  return false
+}
+
 // MCP 客户端类
 export class McpClient {
   private client: Client | null = null
@@ -56,9 +91,15 @@ export class McpClient {
   public serverConfig: Record<string, unknown>
   private isConnected: boolean = false
   private connectionTimeout: NodeJS.Timeout | null = null
+  private bunRuntimePath: string | null = null
   private nodeRuntimePath: string | null = null
+  private uvRuntimePath: string | null = null
   private npmRegistry: string | null = null
-  private localPackageManager: LocalPackageManager
+  private uvRegistry: string | null = null
+
+  // Session management
+  private isRecovering: boolean = false
+  private hasRestarted: boolean = false
 
   // 缓存
   private cachedTools: Tool[] | null = null
@@ -75,6 +116,142 @@ export class McpClient {
     const pathValue = paths.filter(Boolean).join(separator)
 
     return { key: pathKey, value: pathValue }
+  }
+
+  // 展开路径中的各种符号和变量
+  private expandPath(inputPath: string): string {
+    let expandedPath = inputPath
+
+    // 处理 ~ 符号 (用户主目录)
+    if (expandedPath.startsWith('~/') || expandedPath === '~') {
+      const homeDir = app.getPath('home')
+      expandedPath = expandedPath.replace('~', homeDir)
+    }
+
+    // 处理环境变量展开
+    expandedPath = expandedPath.replace(/\$\{([^}]+)\}/g, (match, varName) => {
+      return process.env[varName] || match
+    })
+
+    // 处理简单的 $VAR 格式 (不含花括号)
+    expandedPath = expandedPath.replace(/\$([A-Z_][A-Z0-9_]*)/g, (match, varName) => {
+      return process.env[varName] || match
+    })
+
+    return expandedPath
+  }
+
+  // 替换命令为 runtime 版本
+  private replaceWithRuntimeCommand(command: string): string {
+    // 获取命令的基本名称（去掉路径）
+    const basename = path.basename(command)
+
+    // 根据命令类型选择对应的 runtime 路径
+    if (process.platform === 'win32') {
+      // Windows平台只替换Node.js相关命令，bun命令让系统自动处理
+      if (this.nodeRuntimePath) {
+        if (basename === 'node') {
+          return path.join(this.nodeRuntimePath, 'node.exe')
+        } else if (basename === 'npm') {
+          // Windows 下 npm 通常是 .cmd 文件
+          const npmCmd = path.join(this.nodeRuntimePath, 'npm.cmd')
+          if (fs.existsSync(npmCmd)) {
+            return npmCmd
+          }
+          // 如果不存在，返回默认路径
+          return path.join(this.nodeRuntimePath, 'npm')
+        } else if (basename === 'npx') {
+          // Windows 下 npx 通常是 .cmd 文件
+          const npxCmd = path.join(this.nodeRuntimePath, 'npx.cmd')
+          if (fs.existsSync(npxCmd)) {
+            return npxCmd
+          }
+          // 如果不存在，返回默认路径
+          return path.join(this.nodeRuntimePath, 'npx')
+        }
+      }
+    } else {
+      // 非Windows平台处理所有命令
+      if (['node', 'npm', 'npx', 'bun'].includes(basename)) {
+        // 优先使用 Bun，如果不可用则使用 Node.js
+        if (this.bunRuntimePath) {
+          // 对于 node/npm/npx，统一替换为 bun
+          const targetCommand = 'bun'
+          return path.join(this.bunRuntimePath, targetCommand)
+        } else if (this.nodeRuntimePath) {
+          // 使用 Node.js 运行时
+          let targetCommand: string
+          if (basename === 'node') {
+            targetCommand = 'node'
+          } else if (basename === 'npm') {
+            targetCommand = 'npm'
+          } else if (basename === 'npx') {
+            targetCommand = 'npx'
+          } else if (basename === 'bun') {
+            targetCommand = 'node' // 将 bun 命令映射到 node
+          } else {
+            targetCommand = basename
+          }
+          return path.join(this.nodeRuntimePath, 'bin', targetCommand)
+        }
+      }
+    }
+
+    // UV命令处理（所有平台）
+    if (['uv', 'uvx'].includes(basename)) {
+      if (!this.uvRuntimePath) {
+        return command
+      }
+
+      // uv 和 uvx 都使用对应的命令
+      const targetCommand = basename === 'uvx' ? 'uvx' : 'uv'
+
+      if (process.platform === 'win32') {
+        return path.join(this.uvRuntimePath, `${targetCommand}.exe`)
+      } else {
+        return path.join(this.uvRuntimePath, targetCommand)
+      }
+    }
+
+    return command
+  }
+
+  // 处理特殊参数替换（如 npx -> bun x）
+  private processCommandWithArgs(
+    command: string,
+    args: string[]
+  ): { command: string; args: string[] } {
+    const basename = path.basename(command)
+
+    // 处理 npx 命令
+    if (basename === 'npx' || command.includes('npx')) {
+      if (process.platform === 'win32') {
+        // Windows 平台使用 Node.js 的 npx，保持原有参数
+        return {
+          command: this.replaceWithRuntimeCommand(command),
+          args: args.map((arg) => this.replaceWithRuntimeCommand(arg))
+        }
+      } else {
+        // 非Windows平台优先使用 Bun，需要在参数前添加 'x'
+        if (this.bunRuntimePath) {
+          return {
+            command: this.replaceWithRuntimeCommand(command),
+            args: ['x', ...args]
+          }
+        } else if (this.nodeRuntimePath) {
+          // 如果没有Bun，使用Node.js，保持原有参数
+          return {
+            command: this.replaceWithRuntimeCommand(command),
+            args: args.map((arg) => this.replaceWithRuntimeCommand(arg))
+          }
+        }
+      }
+    }
+
+    return {
+      command: this.replaceWithRuntimeCommand(command),
+      args: args.map((arg) => this.replaceWithRuntimeCommand(arg))
+    }
   }
 
   // 获取系统特定的默认路径
@@ -102,33 +279,72 @@ export class McpClient {
   constructor(
     serverName: string,
     serverConfig: Record<string, unknown>,
-    npmRegistry: string | null = null
+    npmRegistry: string | null = null,
+    uvRegistry: string | null = null
   ) {
     this.serverName = serverName
     this.serverConfig = serverConfig
     this.npmRegistry = npmRegistry
-    this.localPackageManager = new LocalPackageManager()
+    this.uvRegistry = uvRegistry
 
-    const runtimePath = path
-      .join(app.getAppPath(), 'runtime', 'node')
+    const runtimeBasePath = path
+      .join(app.getAppPath(), 'runtime')
       .replace('app.asar', 'app.asar.unpacked')
-    console.info('runtimePath', runtimePath)
-    // 检查运行时文件是否存在
+    console.info('runtimeBasePath', runtimeBasePath)
+
+    // 检查 bun 运行时文件是否存在
+    const bunRuntimePath = path.join(runtimeBasePath, 'bun')
     if (process.platform === 'win32') {
-      const nodeExe = path.join(runtimePath, 'node.exe')
-      const npxCmd = path.join(runtimePath, 'npx.cmd')
-      if (fs.existsSync(nodeExe) && fs.existsSync(npxCmd)) {
-        this.nodeRuntimePath = runtimePath
+      const bunExe = path.join(bunRuntimePath, 'bun.exe')
+      if (fs.existsSync(bunExe)) {
+        this.bunRuntimePath = bunRuntimePath
+      } else {
+        this.bunRuntimePath = null
+      }
+    } else {
+      const bunBin = path.join(bunRuntimePath, 'bun')
+      if (fs.existsSync(bunBin)) {
+        this.bunRuntimePath = bunRuntimePath
+      } else {
+        this.bunRuntimePath = null
+      }
+    }
+
+    // 检查 node 运行时文件是否存在
+    const nodeRuntimePath = path.join(runtimeBasePath, 'node')
+    if (process.platform === 'win32') {
+      const nodeExe = path.join(nodeRuntimePath, 'node.exe')
+      if (fs.existsSync(nodeExe)) {
+        this.nodeRuntimePath = nodeRuntimePath
       } else {
         this.nodeRuntimePath = null
       }
     } else {
-      const nodeBin = path.join(runtimePath, 'bin', 'node')
-      const npxBin = path.join(runtimePath, 'bin', 'npx')
-      if (fs.existsSync(nodeBin) && fs.existsSync(npxBin)) {
-        this.nodeRuntimePath = runtimePath
+      const nodeBin = path.join(nodeRuntimePath, 'bin', 'node')
+      if (fs.existsSync(nodeBin)) {
+        this.nodeRuntimePath = nodeRuntimePath
       } else {
         this.nodeRuntimePath = null
+      }
+    }
+
+    // 检查 uv 运行时文件是否存在
+    const uvRuntimePath = path.join(runtimeBasePath, 'uv')
+    if (process.platform === 'win32') {
+      const uvExe = path.join(uvRuntimePath, 'uv.exe')
+      const uvxExe = path.join(uvRuntimePath, 'uvx.exe')
+      if (fs.existsSync(uvExe) && fs.existsSync(uvxExe)) {
+        this.uvRuntimePath = uvRuntimePath
+      } else {
+        this.uvRuntimePath = null
+      }
+    } else {
+      const uvBin = path.join(uvRuntimePath, 'uv')
+      const uvxBin = path.join(uvRuntimePath, 'uvx')
+      if (fs.existsSync(uvBin) && fs.existsSync(uvxBin)) {
+        this.uvRuntimePath = uvRuntimePath
+      } else {
+        this.uvRuntimePath = null
       }
     }
   }
@@ -161,396 +377,16 @@ export class McpClient {
         const _server = getInMemoryServer(this.serverName, _args, _env)
         _server.startServer(serverTransport)
         this.transport = clientTransport
-      } else if (this.serverConfig.type === 'mcp_gallery') {
-        // Gallery 类型服务器使用 stdio 传输方式
-        let command = this.serverConfig.command as string
-        let args = this.serverConfig.args as string[]
-        const HOME_DIR = app.getPath('home')
-
-        // 检查是否有github字段，如果有则先下载代码（npx命令除外）
-        if (this.serverConfig.github && command !== 'npx') {
-          const githubUrl = this.serverConfig.github as string
-          // 如果是node命令，传递服务器名称作为目标名称以便重命名
-          const targetName = command === 'node' ? this.serverName : undefined
-          const downloadPath = await gitDownloadManager.downloadRepository(githubUrl, targetName)
-          if (!downloadPath) {
-            // GitHub下载失败，发送错误通知
-            const locale = app.getLocale()
-            const errorMessages = getErrorMessageLabels(locale)
-            eventBus.emit(NOTIFICATION_EVENTS.SHOW_ERROR, {
-              title: errorMessages.mcpInstallErrorTitle,
-              message: errorMessages.mcpInstallErrorMessage
-            })
-            throw new Error(`GitHub仓库下载失败: ${githubUrl}`)
-          }
-          if (downloadPath) {
-            console.info(`Using downloaded GitHub repo for ${this.serverName}: ${downloadPath}`)
-            // 如果是node命令，需要更新args中的文件路径而不是command
-            if (command === 'node' && args && args.length > 0) {
-              // 更新args中的第一个参数（通常是要执行的js文件路径）
-              const originalFilePath = args[0]
-              const fileName = path.basename(originalFilePath)
-              args[0] = path.join(downloadPath, fileName)
-              console.info(`Updated node script path: ${args[0]}`)
-              
-              // 检查脚本文件是否存在
-              if (!fs.existsSync(args[0])) {
-                throw new Error(`MCP脚本文件不存在: ${args[0]}。请检查GitHub仓库中是否包含该文件。`)
-              }
-              
-              // 检查是否存在package.json，如果存在则执行npm install
-              const packageJsonPath = path.join(downloadPath, 'package.json')
-              if (fs.existsSync(packageJsonPath)) {
-                console.info(`Found package.json in ${downloadPath}, running npm install...`)
-                try {
-                  const { spawn } = await import('child_process')
-                  const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-                  
-                  // 构建环境变量，确保包含正确的PATH
-                  const npmEnv = { ...process.env }
-                  if (this.nodeRuntimePath) {
-                    const nodePath = process.platform === 'win32' ? this.nodeRuntimePath : `${this.nodeRuntimePath}/bin`
-                    const pathKey = process.platform === 'win32' ? 'Path' : 'PATH'
-                    const separator = process.platform === 'win32' ? ';' : ':'
-                    npmEnv[pathKey] = npmEnv[pathKey] ? `${nodePath}${separator}${npmEnv[pathKey]}` : nodePath
-                  }
-                  if (this.npmRegistry) {
-                    npmEnv.npm_config_registry = this.npmRegistry
-                  }
-                  
-                  await new Promise<void>((resolve, reject) => {
-                    const npmProcess = spawn(npmCommand, ['install'], {
-                      cwd: downloadPath,
-                      stdio: 'pipe',
-                      env: npmEnv,
-                      shell: process.platform === 'win32'
-                    })
-                    
-                    let output = ''
-                    let errorOutput = ''
-                    
-                    npmProcess.stdout?.on('data', (data) => {
-                      output += data.toString()
-                    })
-                    
-                    npmProcess.stderr?.on('data', (data) => {
-                      errorOutput += data.toString()
-                    })
-                    
-                    npmProcess.on('close', (code) => {
-                      if (code === 0) {
-                        console.info(`npm install completed successfully for ${this.serverName}`, output)
-                        resolve()
-                      } else {
-                        console.error(`npm install failed for ${this.serverName}:`, errorOutput)
-                        reject(new Error(`npm install failed with code ${code}: ${errorOutput}`))
-                      }
-                    })
-                    
-                    npmProcess.on('error', (error) => {
-                      console.error(`npm install process error for ${this.serverName}:`, error)
-                      reject(error)
-                    })
-                  })
-                } catch (installError) {
-                  console.error(`Failed to install dependencies for ${this.serverName}:`, installError)
-                  // npm install失败，发送错误通知
-                  const locale = app.getLocale()
-                  const errorMessages = getErrorMessageLabels(locale)
-                  eventBus.emit(NOTIFICATION_EVENTS.SHOW_ERROR, {
-                    title: errorMessages.mcpInstallErrorTitle,
-                    message: errorMessages.mcpInstallErrorMessage
-                  })
-                  throw new Error(`依赖安装失败: ${installError instanceof Error ? installError.message : String(installError)}`)
-                }
-              }
-            } else {
-              // 对于非node命令，更新command路径
-              const newCommandPath = path.join(downloadPath, command)
-              if (!fs.existsSync(newCommandPath)) {
-                throw new Error(`MCP命令文件不存在: ${newCommandPath}。请检查GitHub仓库中是否包含该文件。`)
-              }
-              command = newCommandPath
-            }
-          }
-        }
-
-        // 检查是否为npx命令，如果是则尝试本地化
-        // 对于本地文件路径，也进行存在性检查
-        if (command === 'node' && args && args.length > 0 && !this.serverConfig.github) {
-          // 检查本地脚本文件是否存在
-          const scriptPath = args[0]
-          if (!path.isAbsolute(scriptPath)) {
-            // 如果是相对路径，转换为绝对路径
-            args[0] = path.resolve(scriptPath)
-          }
-          if (!fs.existsSync(args[0])) {
-            throw new Error(`MCP脚本文件不存在: ${args[0]}。请检查文件路径是否正确。`)
-          }
-        }
-        
-        if (command.startsWith('npx ')) {
-          const packageName = command.split(' ')[1]
-          const localCommand = await this.localPackageManager.getLocalCommand(packageName)
-          if (localCommand) {
-            // 解析本地化命令，分离command和args
-            const commandParts = localCommand.split(' ')
-            command = commandParts[0]
-            const localArgs = commandParts.slice(1)
-            // 合并本地args和原始args
-            args = [...localArgs, ...(args || [])]
-            console.info(`Using local package for ${packageName}: ${localCommand}`)
-          }
-        }
-
-        // 定义允许的环境变量白名单
-        const allowedEnvVars = [
-          'PATH',
-          'path',
-          'Path',
-          'npm_config_registry',
-          'npm_config_cache',
-          'npm_config_prefix',
-          'npm_config_tmp',
-          'NPM_CONFIG_REGISTRY',
-          'NPM_CONFIG_CACHE',
-          'NPM_CONFIG_PREFIX',
-          'NPM_CONFIG_TMP'
-        ]
-
-        // 修复env类型问题
-        const env: Record<string, string> = {}
-
-        // 判断是否是 Node.js 相关命令
-        const isNodeCommand = ['node', 'npm', 'npx'].some((cmd) => command.includes(cmd))
-
-        if (isNodeCommand) {
-          // Node.js 命令使用白名单处理
-          if (process.env) {
-            const existingPaths: string[] = []
-
-            // 收集所有PATH相关的值
-            Object.entries(process.env).forEach(([key, value]) => {
-              if (value !== undefined) {
-                if (['PATH', 'Path', 'path'].includes(key)) {
-                  existingPaths.push(value)
-                } else if (
-                  allowedEnvVars.includes(key) &&
-                  !['PATH', 'Path', 'path'].includes(key)
-                ) {
-                  env[key] = value
-                }
-              }
-            })
-
-            // 获取默认路径
-            const defaultPaths = this.getDefaultPaths(HOME_DIR)
-
-            // 合并所有路径
-            const allPaths = [...existingPaths, ...defaultPaths]
-            if (this.nodeRuntimePath) {
-              allPaths.unshift(
-                process.platform === 'win32' ? this.nodeRuntimePath : `${this.nodeRuntimePath}/bin`
-              )
-            }
-
-            // 规范化并设置PATH
-            const { key, value } = this.normalizePathEnv(allPaths)
-            env[key] = value
-          }
-        } else {
-          // 非 Node.js 命令，保留所有系统环境变量，只补充 PATH
-          Object.entries(process.env).forEach(([key, value]) => {
-            if (value !== undefined) {
-              env[key] = value
-            }
-          })
-
-          // 补充 PATH
-          const existingPaths: string[] = []
-          if (env.PATH) {
-            existingPaths.push(env.PATH)
-          }
-          if (env.Path) {
-            existingPaths.push(env.Path)
-          }
-
-          // 获取默认路径
-          const defaultPaths = this.getDefaultPaths(HOME_DIR)
-
-          // 合并所有路径
-          const allPaths = [...existingPaths, ...defaultPaths]
-          if (this.nodeRuntimePath) {
-            allPaths.unshift(
-              process.platform === 'win32' ? this.nodeRuntimePath : `${this.nodeRuntimePath}/bin`
-            )
-          }
-
-          // 规范化并设置PATH
-          const { key, value } = this.normalizePathEnv(allPaths)
-          env[key] = value
-        }
-
-        // 添加自定义环境变量
-        if (this.serverConfig.env) {
-          Object.entries(this.serverConfig.env as Record<string, string>).forEach(
-            ([key, value]) => {
-              if (value !== undefined) {
-                // 如果是PATH相关变量，合并到主PATH中
-                if (['PATH', 'Path', 'path'].includes(key)) {
-                  const currentPathKey = process.platform === 'win32' ? 'Path' : 'PATH'
-                  const separator = process.platform === 'win32' ? ';' : ':'
-                  env[currentPathKey] = env[currentPathKey]
-                    ? `${value}${separator}${env[currentPathKey]}`
-                    : value
-                } else {
-                  env[key] = value
-                }
-              }
-            }
-          )
-        }
-
-        if (this.npmRegistry) {
-          env.npm_config_registry = this.npmRegistry
-        }
-
-        console.log('mcp_gallery mcp env', env)
-        this.transport = new StdioClientTransport({
-          command,
-          args,
-          env,
-          stderr: 'pipe'
-        })
       } else if (this.serverConfig.type === 'stdio') {
         // 创建合适的transport
         let command = this.serverConfig.command as string
-        const HOME_DIR = app.getPath('home')
-
-        // 检查是否为npx命令，如果是则尝试本地化
         let args = this.serverConfig.args as string[]
-        
-        // 检查是否有github字段，如果有则先下载代码（对于 mcp_gallery 类型或有 github 字段的服务器）
-        const isMcpGalleryType = (this.serverConfig as unknown as MCPServerConfig & { mcp_type?: string }).mcp_type === 'mcp_gallery'
-        if (this.serverConfig.github && (isMcpGalleryType || command !== 'npx')) {
-          const githubUrl = this.serverConfig.github as string
-          // 如果是node命令，传递服务器名称作为目标名称以便重命名
-          const targetName = command === 'node' ? this.serverName : undefined
-          const downloadPath = await gitDownloadManager.downloadRepository(githubUrl, targetName)
-          if (!downloadPath) {
-            // GitHub下载失败，发送错误通知
-            const locale = app.getLocale()
-            const errorMessages = getErrorMessageLabels(locale)
-            eventBus.emit(NOTIFICATION_EVENTS.SHOW_ERROR, {
-              title: errorMessages.mcpInstallErrorTitle,
-              message: errorMessages.mcpInstallErrorMessage
-            })
-            throw new Error(`GitHub仓库下载失败: ${githubUrl}`)
-          }
-          if (downloadPath) {
-            console.info(`Using downloaded GitHub repo for ${this.serverName}: ${downloadPath}`)
-            // 如果是node命令，需要更新args中的文件路径而不是command
-            if (command === 'node' && args && args.length > 0) {
-              // 更新args中的第一个参数（通常是要执行的js文件路径）
-              const originalFilePath = args[0]
-              const fileName = path.basename(originalFilePath)
-              args[0] = path.join(downloadPath, fileName)
-              console.info(`Updated node script path: ${args[0]}`)
-              
-              // 检查脚本文件是否存在
-              if (!fs.existsSync(args[0])) {
-                throw new Error(`MCP脚本文件不存在: ${args[0]}。请检查GitHub仓库中是否包含该文件。`)
-              }
-              
-              // 检查是否存在package.json，如果存在则执行npm install
-              const packageJsonPath = path.join(downloadPath, 'package.json')
-              if (fs.existsSync(packageJsonPath)) {
-                console.info(`Found package.json in ${downloadPath}, running npm install...`)
-                try {
-                  const { spawn } = await import('child_process')
-                  const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-                  
-                  // 构建环境变量，确保包含正确的PATH
-                  const npmEnv = { ...process.env }
-                  if (this.nodeRuntimePath) {
-                    const nodePath = process.platform === 'win32' ? this.nodeRuntimePath : `${this.nodeRuntimePath}/bin`
-                    const pathKey = process.platform === 'win32' ? 'Path' : 'PATH'
-                    const separator = process.platform === 'win32' ? ';' : ':'
-                    npmEnv[pathKey] = npmEnv[pathKey] ? `${nodePath}${separator}${npmEnv[pathKey]}` : nodePath
-                  }
-                  if (this.npmRegistry) {
-                    npmEnv.npm_config_registry = this.npmRegistry
-                  }
-                  
-                  await new Promise<void>((resolve, reject) => {
-                    const npmProcess = spawn(npmCommand, ['install'], {
-                      cwd: downloadPath,
-                      stdio: 'pipe',
-                      env: npmEnv,
-                      shell: process.platform === 'win32'
-                    })
-                    
-                    let output = ''
-                    let errorOutput = ''
-                    
-                    npmProcess.stdout?.on('data', (data) => {
-                      output += data.toString()
-                    })
-                    
-                    npmProcess.stderr?.on('data', (data) => {
-                      errorOutput += data.toString()
-                    })
-                    
-                    npmProcess.on('close', (code) => {
-                      if (code === 0) {
-                        console.info(`npm install completed successfully for ${this.serverName}`, output)
-                        resolve()
-                      } else {
-                        console.error(`npm install failed for ${this.serverName}:`, errorOutput)
-                        reject(new Error(`npm install failed with code ${code}: ${errorOutput}`))
-                      }
-                    })
-                    
-                    npmProcess.on('error', (error) => {
-                      console.error(`npm install process error for ${this.serverName}:`, error)
-                      reject(error)
-                    })
-                  })
-                } catch (installError) {
-                  console.error(`Failed to install dependencies for ${this.serverName}:`, installError)
-                  // npm install失败，发送错误通知
-                  const locale = app.getLocale()
-                  const errorMessages = getErrorMessageLabels(locale)
-                  eventBus.emit(NOTIFICATION_EVENTS.SHOW_ERROR, {
-                    title: errorMessages.mcpInstallErrorTitle,
-                    message: errorMessages.mcpInstallErrorMessage
-                  })
-                  throw new Error(`依赖安装失败: ${installError instanceof Error ? installError.message : String(installError)}`)
-                }
-              }
-            } else {
-              // 对于非node命令，更新command路径
-              const newCommandPath = path.join(downloadPath, command)
-              if (!fs.existsSync(newCommandPath)) {
-                throw new Error(`MCP命令文件不存在: ${newCommandPath}。请检查GitHub仓库中是否包含该文件。`)
-              }
-              command = newCommandPath
-            }
-          }
-        }
-        if (command.startsWith('npx ')) {
-          const packageName = command.split(' ')[1]
-          const localCommand = await this.localPackageManager.getLocalCommand(packageName)
-          if (localCommand) {
-            // 解析本地化命令，分离command和args
-            const commandParts = localCommand.split(' ')
-            command = commandParts[0]
-            const localArgs = commandParts.slice(1)
-            // 合并本地args和原始args
-            args = [...localArgs, ...(args || [])]
-            console.info(`Using local package for ${packageName}: ${localCommand}`)
-          }
-        }
+
+        // 处理路径展开 (包括 ~ 和环境变量)
+        command = this.expandPath(command)
+        args = args.map((arg) => this.expandPath(arg))
+
+        const HOME_DIR = app.getPath('home')
 
         // 定义允许的环境变量白名单
         const allowedEnvVars = [
@@ -572,11 +408,18 @@ export class McpClient {
         // 修复env类型问题
         const env: Record<string, string> = {}
 
-        // 判断是否是 Node.js 相关命令
-        const isNodeCommand = ['node', 'npm', 'npx'].some((cmd) => command.includes(cmd))
+        // 处理命令和参数替换
+        const processedCommand = this.processCommandWithArgs(command, args)
+        command = processedCommand.command
+        args = processedCommand.args
+
+        // 判断是否是 Node.js/Bun/UV 相关命令
+        const isNodeCommand = ['node', 'npm', 'npx', 'bun', 'uv', 'uvx'].some(
+          (cmd) => command.includes(cmd) || args.some((arg) => arg.includes(cmd))
+        )
 
         if (isNodeCommand) {
-          // Node.js 命令使用白名单处理
+          // Node.js/Bun/UV 命令使用白名单处理
           if (process.env) {
             const existingPaths: string[] = []
 
@@ -599,10 +442,26 @@ export class McpClient {
 
             // 合并所有路径
             const allPaths = [...existingPaths, ...defaultPaths]
-            if (this.nodeRuntimePath) {
-              allPaths.unshift(
-                process.platform === 'win32' ? this.nodeRuntimePath : `${this.nodeRuntimePath}/bin`
-              )
+            // 添加运行时路径
+            if (process.platform === 'win32') {
+              // Windows平台只添加 node 和 uv 路径
+              if (this.uvRuntimePath) {
+                allPaths.unshift(this.uvRuntimePath)
+              }
+              if (this.nodeRuntimePath) {
+                allPaths.unshift(this.nodeRuntimePath)
+              }
+            } else {
+              // 其他平台优先级：bun > node > uv
+              if (this.uvRuntimePath) {
+                allPaths.unshift(this.uvRuntimePath)
+              }
+              if (this.nodeRuntimePath) {
+                allPaths.unshift(path.join(this.nodeRuntimePath, 'bin'))
+              }
+              if (this.bunRuntimePath) {
+                allPaths.unshift(this.bunRuntimePath)
+              }
             }
 
             // 规范化并设置PATH
@@ -610,7 +469,7 @@ export class McpClient {
             env[key] = value
           }
         } else {
-          // 非 Node.js 命令，保留所有系统环境变量，只补充 PATH
+          // 非 Node.js/Bun/UV 命令，保留所有系统环境变量，只补充 PATH
           Object.entries(process.env).forEach(([key, value]) => {
             if (value !== undefined) {
               env[key] = value
@@ -631,10 +490,26 @@ export class McpClient {
 
           // 合并所有路径
           const allPaths = [...existingPaths, ...defaultPaths]
-          if (this.nodeRuntimePath) {
-            allPaths.unshift(
-              process.platform === 'win32' ? this.nodeRuntimePath : `${this.nodeRuntimePath}/bin`
-            )
+          // 添加运行时路径
+          if (process.platform === 'win32') {
+            // Windows平台只添加 node 和 uv 路径
+            if (this.uvRuntimePath) {
+              allPaths.unshift(this.uvRuntimePath)
+            }
+            if (this.nodeRuntimePath) {
+              allPaths.unshift(this.nodeRuntimePath)
+            }
+          } else {
+            // 其他平台优先级：bun > node > uv
+            if (this.uvRuntimePath) {
+              allPaths.unshift(this.uvRuntimePath)
+            }
+            if (this.nodeRuntimePath) {
+              allPaths.unshift(path.join(this.nodeRuntimePath, 'bin'))
+            }
+            if (this.bunRuntimePath) {
+              allPaths.unshift(this.bunRuntimePath)
+            }
           }
 
           // 规范化并设置PATH
@@ -666,12 +541,20 @@ export class McpClient {
           env.npm_config_registry = this.npmRegistry
         }
 
-        console.log('mcp env', env)
+        if (this.uvRegistry) {
+          env.UV_DEFAULT_INDEX = this.uvRegistry
+          env.PIP_INDEX_URL = this.uvRegistry
+        }
+
+        // console.log('mcp env', command, env, args)
         this.transport = new StdioClientTransport({
           command,
           args,
           env,
           stderr: 'pipe'
+        })
+        ;(this.transport as StdioClientTransport).stderr?.on('data', (data) => {
+          console.info('mcp StdioClientTransport error', this.serverName, data.toString())
         })
       } else if (this.serverConfig.baseUrl && this.serverConfig.type === 'sse') {
         this.transport = new SSEClientTransport(new URL(this.serverConfig.baseUrl as string), {
@@ -694,7 +577,7 @@ export class McpClient {
 
       // 创建 MCP 客户端
       this.client = new Client(
-        { name: 'McpChat', version: app.getVersion() },
+        { name: 'DeepChat', version: app.getVersion() },
         {
           capabilities: {
             resources: {},
@@ -729,10 +612,14 @@ export class McpClient {
           console.info(`MCP server ${this.serverName} connected successfully`)
 
           // 触发服务器状态变更事件
-          eventBus.emit((MCP_EVENTS as MCPEventsType).SERVER_STATUS_CHANGED, {
-            name: this.serverName,
-            status: 'running'
-          })
+          eventBus.send(
+            (MCP_EVENTS as MCPEventsType).SERVER_STATUS_CHANGED,
+            SendTarget.ALL_WINDOWS,
+            {
+              name: this.serverName,
+              status: 'running'
+            }
+          )
         })
         .catch((error) => {
           console.error(`Failed to connect to MCP server ${this.serverName}:`, error)
@@ -753,16 +640,8 @@ export class McpClient {
 
       console.error(`Failed to connect to MCP server ${this.serverName}:`, error)
 
-      // MCP服务器启动失败，发送错误通知
-      const locale = app.getLocale()
-      const errorMessages = getErrorMessageLabels(locale)
-      eventBus.emit(NOTIFICATION_EVENTS.SHOW_ERROR, {
-        title: errorMessages.mcpStartErrorTitle,
-        message: errorMessages.mcpStartErrorMessage
-      })
-
       // 触发服务器状态变更事件
-      eventBus.emit((MCP_EVENTS as MCPEventsType).SERVER_STATUS_CHANGED, {
+      eventBus.send((MCP_EVENTS as MCPEventsType).SERVER_STATUS_CHANGED, SendTarget.ALL_WINDOWS, {
         name: this.serverName,
         status: 'stopped'
       })
@@ -778,16 +657,8 @@ export class McpClient {
     }
 
     try {
-      // 清理资源
-      this.cleanupResources()
-
-      console.log(`Disconnected from MCP server: ${this.serverName}`)
-
-      // 触发服务器状态变更事件
-      eventBus.emit((MCP_EVENTS as MCPEventsType).SERVER_STATUS_CHANGED, {
-        name: this.serverName,
-        status: 'stopped'
-      })
+      // Use internal disconnect method for normal disconnection
+      await this.internalDisconnect()
     } catch (error) {
       console.error(`Failed to disconnect from MCP server ${this.serverName}:`, error)
       throw error
@@ -827,73 +698,114 @@ export class McpClient {
     return this.isConnected && !!this.client
   }
 
+  // Check and handle session errors by restarting the service
+  private async checkAndHandleSessionError(error: unknown): Promise<void> {
+    if (isSessionError(error) && !this.isRecovering) {
+      // If already restarted once and still getting session errors, stop the service
+      if (this.hasRestarted) {
+        console.error(
+          `Session error persists after restart for server ${this.serverName}, stopping service...`,
+          error
+        )
+        await this.stopService()
+        throw new Error(`MCP服务 ${this.serverName} 重启后仍然出现session错误，已停止服务`)
+      }
+
+      console.warn(
+        `Session error detected for server ${this.serverName}, restarting service...`,
+        error
+      )
+
+      this.isRecovering = true
+
+      try {
+        // Clean up current connection
+        this.cleanupResources()
+
+        // Clear all caches to ensure fresh data after reconnection
+        this.cachedTools = null
+        this.cachedPrompts = null
+        this.cachedResources = null
+
+        // Mark as restarted
+        this.hasRestarted = true
+
+        console.info(`Service ${this.serverName} restarted due to session error`)
+      } catch (restartError) {
+        console.error(`Failed to restart service ${this.serverName}:`, restartError)
+      } finally {
+        this.isRecovering = false
+      }
+    }
+  }
+
+  // Stop the service completely due to persistent session errors
+  private async stopService(): Promise<void> {
+    try {
+      // Use the same disconnect logic but with different reason
+      await this.internalDisconnect('persistent session errors')
+    } catch (error) {
+      console.error(`Failed to stop service ${this.serverName}:`, error)
+    }
+  }
+
+  // Internal disconnect with custom reason
+  private async internalDisconnect(reason?: string): Promise<void> {
+    // Clean up all resources
+    this.cleanupResources()
+
+    const logMessage = reason
+      ? `MCP service ${this.serverName} has been stopped due to ${reason}`
+      : `Disconnected from MCP server: ${this.serverName}`
+
+    console.log(logMessage)
+
+    // Trigger server status changed event to notify the system
+    eventBus.send((MCP_EVENTS as MCPEventsType).SERVER_STATUS_CHANGED, SendTarget.ALL_WINDOWS, {
+      name: this.serverName,
+      status: 'stopped'
+    })
+  }
+
   // 调用 MCP 工具
   async callTool(toolName: string, args: Record<string, unknown>): Promise<ToolCallResult> {
-    if (!this.isConnected) {
-      await this.connect()
-    }
-
-    if (!this.client) {
-      throw new Error(`MCP客户端 ${this.serverName} 未初始化`)
-    }
-
     try {
+      if (!this.isConnected) {
+        await this.connect()
+      }
+
+      if (!this.client) {
+        throw new Error(`MCP客户端 ${this.serverName} 未初始化`)
+      }
+
       // 调用工具
-      const result = await this.client.callTool({
+      const result = (await this.client.callTool({
         name: toolName,
         arguments: args
-      })
+      })) as ToolCallResult
 
-      // 将SDK返回的结果转换为ToolCallResult格式
-      if (result && typeof result === 'object') {
-        // 检查是否有错误
-        if ('isError' in result && result.isError) {
-          return {
-            isError: true,
-            content: [{ type: 'error', text: String(result.content || '未知错误') }]
-          }
-        }
+      // 成功调用后重置重启标志
+      this.hasRestarted = false
 
-        // 处理正常结果
-        if ('content' in result) {
-          const content = result.content
-          
-          // 如果content是数组格式，直接使用
-          if (Array.isArray(content)) {
-            return {
-              isError: false,
-              content: content.map(item => ({
-                type: item.type || 'text',
-                text: item.text || String(item)
-              }))
-            }
-          }
-          
-          // 如果content是字符串，包装成数组格式
-          if (typeof content === 'string') {
-            return {
-              isError: false,
-              content: [{ type: 'text', text: content }]
-            }
-          }
+      // 检查结果
+      if (result.isError) {
+        const errorText = result.content && result.content[0] ? result.content[0].text : '未知错误'
+        // 如果调用失败，清空工具缓存，以便下次重新获取
+        this.cachedTools = null
+        return {
+          isError: true,
+          content: [{ type: 'error', text: errorText }]
         }
       }
-
-      // 如果结果格式不符合预期，将整个结果作为文本返回
-      return {
-        isError: false,
-        content: [{ type: 'text', text: JSON.stringify(result) }]
-      }
+      return result
     } catch (error) {
+      // 检查并处理session错误
+      await this.checkAndHandleSessionError(error)
+
       console.error(`Failed to call MCP tool ${toolName}:`, error)
       // 调用失败，清空工具缓存
       this.cachedTools = null
-      
-      // 返回错误结果而不是抛出异常
-      return {
-        isError: true,
-        content: [{ type: 'error', text: error instanceof Error ? error.message : String(error) }]
-      }
+      throw error
     }
   }
 
@@ -904,16 +816,20 @@ export class McpClient {
       return this.cachedTools
     }
 
-    if (!this.isConnected) {
-      await this.connect()
-    }
-
-    if (!this.client) {
-      throw new Error(`MCP客户端 ${this.serverName} 未初始化`)
-    }
-
     try {
+      if (!this.isConnected) {
+        await this.connect()
+      }
+
+      if (!this.client) {
+        throw new Error(`MCP客户端 ${this.serverName} 未初始化`)
+      }
+
       const response = await this.client.listTools()
+
+      // 成功调用后重置重启标志
+      this.hasRestarted = false
+
       // 检查响应格式
       if (response && typeof response === 'object' && 'tools' in response) {
         const toolsArray = response.tools
@@ -925,6 +841,9 @@ export class McpClient {
       }
       throw new Error('无效的工具响应格式')
     } catch (error) {
+      // 检查并处理session错误
+      await this.checkAndHandleSessionError(error)
+
       // 尝试从错误对象中提取更多信息
       const errorMessage = error instanceof Error ? error.message : String(error)
       // 如果错误表明不支持，则缓存空数组
@@ -947,17 +866,20 @@ export class McpClient {
       return this.cachedPrompts
     }
 
-    if (!this.isConnected) {
-      await this.connect()
-    }
-
-    if (!this.client) {
-      throw new Error(`MCP客户端 ${this.serverName} 未初始化`)
-    }
-
     try {
+      if (!this.isConnected) {
+        await this.connect()
+      }
+
+      if (!this.client) {
+        throw new Error(`MCP客户端 ${this.serverName} 未初始化`)
+      }
+
       // SDK可能没有 listPrompts 方法，需要使用通用的 request
       const response = await this.client.listPrompts()
+
+      // 成功调用后重置重启标志
+      this.hasRestarted = false
 
       // 检查响应格式
       if (response && typeof response === 'object' && 'prompts' in response) {
@@ -973,8 +895,7 @@ export class McpClient {
                 : undefined,
             arguments:
               typeof p === 'object' && p !== null && 'arguments' in p ? p.arguments : undefined,
-            files:
-              typeof p === 'object' && p !== null && 'files' in p ? p.files : undefined
+            files: typeof p === 'object' && p !== null && 'files' in p ? p.files : undefined
           })) as PromptListEntry[]
           // 缓存结果
           this.cachedPrompts = validPrompts
@@ -983,6 +904,9 @@ export class McpClient {
       }
       throw new Error('无效的提示响应格式')
     } catch (error) {
+      // 检查并处理session错误
+      await this.checkAndHandleSessionError(error)
+
       // 尝试从错误对象中提取更多信息
       const errorMessage = error instanceof Error ? error.message : String(error)
       // 如果错误表明不支持，则缓存空数组
@@ -1000,19 +924,23 @@ export class McpClient {
 
   // 获取指定提示
   async getPrompt(name: string, args?: Record<string, unknown>): Promise<Prompt> {
-    if (!this.isConnected) {
-      await this.connect()
-    }
-
-    if (!this.client) {
-      throw new Error(`MCP客户端 ${this.serverName} 未初始化`)
-    }
-
     try {
+      if (!this.isConnected) {
+        await this.connect()
+      }
+
+      if (!this.client) {
+        throw new Error(`MCP客户端 ${this.serverName} 未初始化`)
+      }
+
       const response = await this.client.getPrompt({
         name,
         arguments: (args as Record<string, string>) || {}
       })
+
+      // 成功调用后重置重启标志
+      this.hasRestarted = false
+
       // 检查响应格式并转换为 Prompt 类型
       if (
         response &&
@@ -1029,6 +957,9 @@ export class McpClient {
       }
       throw new Error('无效的获取提示响应格式')
     } catch (error) {
+      // 检查并处理session错误
+      await this.checkAndHandleSessionError(error)
+
       console.error(`Failed to get MCP prompt ${name}:`, error)
       // 获取失败，清空提示缓存
       this.cachedPrompts = null
@@ -1043,17 +974,20 @@ export class McpClient {
       return this.cachedResources
     }
 
-    if (!this.isConnected) {
-      await this.connect()
-    }
-
-    if (!this.client) {
-      throw new Error(`MCP客户端 ${this.serverName} 未初始化`)
-    }
-
     try {
+      if (!this.isConnected) {
+        await this.connect()
+      }
+
+      if (!this.client) {
+        throw new Error(`MCP客户端 ${this.serverName} 未初始化`)
+      }
+
       // SDK可能没有 listResources 方法，需要使用通用的 request
       const response = await this.client.listResources()
+
+      // 成功调用后重置重启标志
+      this.hasRestarted = false
 
       // 检查响应格式
       if (response && typeof response === 'object' && 'resources' in response) {
@@ -1071,6 +1005,9 @@ export class McpClient {
       }
       throw new Error('无效的资源列表响应格式')
     } catch (error) {
+      // 检查并处理session错误
+      await this.checkAndHandleSessionError(error)
+
       // 尝试从错误对象中提取更多信息
       const errorMessage = error instanceof Error ? error.message : String(error)
       // 如果错误表明不支持，则缓存空数组
@@ -1088,17 +1025,20 @@ export class McpClient {
 
   // 读取资源
   async readResource(resourceUri: string): Promise<Resource> {
-    if (!this.isConnected) {
-      await this.connect()
-    }
-
-    if (!this.client) {
-      throw new Error(`MCP客户端 ${this.serverName} 未初始化`)
-    }
-
     try {
+      if (!this.isConnected) {
+        await this.connect()
+      }
+
+      if (!this.client) {
+        throw new Error(`MCP客户端 ${this.serverName} 未初始化`)
+      }
+
       // 使用 unknown 作为中间类型进行转换
       const rawResource = await this.client.readResource({ uri: resourceUri })
+
+      // 成功调用后重置重启标志
+      this.hasRestarted = false
 
       // 手动构造 Resource 对象
       const resource: Resource = {
@@ -1111,6 +1051,9 @@ export class McpClient {
 
       return resource
     } catch (error) {
+      // 检查并处理session错误
+      await this.checkAndHandleSessionError(error)
+
       console.error(`Failed to read MCP resource ${resourceUri}:`, error)
       // 读取失败，清空资源缓存
       this.cachedResources = null

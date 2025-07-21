@@ -220,38 +220,41 @@ export class ServerManager {
    */
   private preInstallPackageIfNeeded(serverConfig: any, npmRegistry?: string | null): void {
     const command = serverConfig.command as string
-    if (!command || !command.startsWith('npx ')) {
-      return
+    let packageName: string | undefined
+  
+    if (command === 'npx') {
+      // 对于 command === 'npx'，从 args 中提取包名（假设 args[0] 是 -y，args[1] 是包名）
+      if (serverConfig.args && serverConfig.args.length >= 2 && serverConfig.args[0] === '-y') {
+        packageName = serverConfig.args[1]
+      }
+    } else if (command.startsWith('npx ')) {
+      packageName = command.split(' ')[1]
     }
-
-    const packageName = command.split(' ')[1]
+  
     if (!packageName) {
       return
     }
-
+  
     // 异步执行预安装，不阻塞服务器启动
     (async () => {
       try {
-        console.info(`预检查包 ${packageName}...`)
+        console.info(`预检查包 ${packageName}...`);
         
         // 检查包是否已缓存
         if (this.localPackageManager.isPackageCached(packageName)) {
-          console.info(`包 ${packageName} 已在本地缓存中`)
-          return
+          console.info(`包 ${packageName} 已在本地缓存中`);
+          return;
         }
-
-        // 跳过网络检查，直接尝试安装（避免阻塞）
-        // 如果网络不可用，安装会自然失败，不影响服务器启动
-
+  
         // 尝试安装到本地缓存
-        console.info(`正在预安装包 ${packageName} 到本地缓存...`)
-        await this.localPackageManager.installPackageToCache(packageName, npmRegistry || undefined)
-        console.info(`包 ${packageName} 预安装完成`)
+        console.info(`正在预安装包 ${packageName} 到本地缓存...`);
+        await this.localPackageManager.installPackageToCache(packageName, npmRegistry || undefined);
+        console.info(`包 ${packageName} 预安装完成`);
       } catch (error) {
-        console.warn(`预安装包 ${packageName} 失败，将在运行时尝试:`, error)
+        console.warn(`预安装包 ${packageName} 失败，将在运行时尝试:`, error);
         // 不抛出错误，允许继续启动服务器
       }
-    })()
+    })();
   }
 
   // 处理并发送MCP连接错误通知
