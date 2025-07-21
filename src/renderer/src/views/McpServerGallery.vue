@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, watch, nextTick, onUnmounted, reactive } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -47,7 +47,7 @@ const mcpPresenter = usePresenter('mcpPresenter')
 // 引用 McpServers 组件
 const mcpServersRef = ref<InstanceType<typeof McpServers> | null>(null)
 // 引用安装表单组件
-const installFormRef = ref<any>(null)
+const installFormRef = ref<InstanceType<typeof McpServerForm> | null>(null)
 
 // API返回的服务器数据类型
 interface ApiServerItem {
@@ -355,7 +355,7 @@ const fetchServers = async (page: number = 1, size: number = 10, searchName: str
     
     if (data.code === 200) {
       // 将API数据映射为组件需要的格式
-      servers.value = data.data.infos.map(item => ({
+      servers.value = data.data.infos.map(item => reactive({
         id: item.id.toString(),
         name: item.name,
         icon: getServerIcon(item.logo), // 处理图标
@@ -367,7 +367,6 @@ const fetchServers = async (page: number = 1, size: number = 10, searchName: str
         isGallery: false,
         toolsCount: 0, // 可以根据需要解析Tools字段
         promptsCount: 0,
-
         resourcesCount: 0,
         Github: item.github,
         deployJson: item.deploy_json // 保留部署配置信息
@@ -427,6 +426,16 @@ onMounted(() => {
   nextTick(() => {
     syncServerStatuses()
   })
+
+  // 添加定时轮询以确保状态实时同步
+  const syncInterval = setInterval(() => {
+    syncServerStatuses()
+  }, 5000)
+
+  // 在组件卸载时清除定时器
+  onUnmounted(() => {
+    clearInterval(syncInterval)
+  })
 })
 
 // 监听搜索查询变化，实现实时搜索
@@ -466,45 +475,53 @@ const nextPage = () => {
 
 // 计算属性：过滤后的服务器列表（仅保留状态过滤，搜索已移至服务端）
 const filteredServers = computed(() => {
-  if (filterStatus.value === 'running' || filterStatus.value === 'stopped' || filterStatus.value === 'error') {
-    // 对于已安装状态，从本地服务器列表获取
-    return mcpStore.serverList
-      .filter(s => s.mcp_type === 'mcp_gallery' && 
-        ((filterStatus.value === 'running' && s.isRunning) ||
-         (filterStatus.value === 'stopped' && !s.isRunning && !s.isLoading) ||
-         (filterStatus.value === 'error' && false)) // Remove errorMessage check since it doesn't exist
-      )
-      .map(s => ({
-        id: s.name,
-        name: s.name,
-        icon: s.icons || '🔧',
-        description: s.descriptions || '',
-        type: s.type || '',
-        status: (s.isRunning ? 'running' : (s.isLoading ? 'loading' : 'stopped')) as 'running' | 'stopped' | 'error' | 'loading' | 'not_installed',
-        isRunning: s.isRunning,
-        isDefault: s.isDefault,
+  // 合并API服务器和本地独有gallery服务器
+  const allServers = [...servers.value];
+
+  // 添加本地独有gallery服务器
+  mcpStore.serverList.forEach(local => {
+    if (local.mcp_type === 'mcp_gallery' && !servers.value.some(s => s.name === local.name)) {
+      allServers.push({
+        id: local.name,
+        name: local.name,
+        icon: local.icons || '🔧',
+        description: local.descriptions || '',
+        type: local.type || 'gallery',
+        status: local.isRunning ? 'running' : (local.isLoading ? 'loading' : 'stopped'),
+        isRunning: local.isRunning,
+        isDefault: local.isDefault,
         isGallery: true,
         toolsCount: 0,
         promptsCount: 0,
         resourcesCount: 0,
-        Github: s.Github,
-        deployJson: ''
-      }));
-  } else {
-    let filtered = servers.value;
-
-    if (filterStatus.value !== 'all') {
-      filtered = filtered.filter(server => {
-        switch (filterStatus.value) {
-          case 'not_installed':
-            return server.status === 'not_installed';
-          default:
-            return true;
-        }
+        Github: local.Github,
+        deployJson: '',
+        command: local.command,
+        args: local.args,
+        baseUrl: local.baseUrl
       });
     }
-    return filtered;
+  });
+
+  // 根据filterStatus过滤
+  if (filterStatus.value === 'all') {
+    return allServers;
   }
+
+  return allServers.filter(server => {
+    switch (filterStatus.value) {
+      case 'running':
+        return server.status === 'running';
+      case 'stopped':
+        return server.status === 'stopped';
+      case 'error':
+        return server.status === 'error';
+      case 'not_installed':
+        return server.status === 'not_installed';
+      default:
+        return false;
+    }
+  });
 })
 
 // 状态相关函数
@@ -563,8 +580,63 @@ const getStatusTextClass = (status: string) => {
 const editServer = (server: ServerItem) => {
   // 检查服务器是否已安装到本地
   const localServer = mcpStore.serverList.find(local => {
-    return local.mcp_type === 'mcp_gallery'
-  })
+      console.log(`  检查本地服务: ${local.name}, 命令: ${local.command}`);
+      if (local.name === server.name) {
+        console.log(`  ✓ 精确匹配: ${local.name} === ${server.name}`);
+        return true;
+      }
+      if (server.type === 'gallery') {
+        const localNameLower = local.name.toLowerCase();
+        const serverNameLower = server.name.toLowerCase();
+        if (localNameLower === serverNameLower || localNameLower.includes(serverNameLower) || serverNameLower.includes(localNameLower)) {
+          console.log(`  ✓ 名称包含匹配: ${localNameLower} <-> ${serverNameLower}`);
+          return true;
+        }
+        if (local.command?.startsWith('npx')) {
+          const npxPackageName = local.command.replace(/^npx\s*/, '').split(' ')[0];
+          const packageNameLower = npxPackageName.toLowerCase();
+          console.log(`  检查npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`);
+          if (packageNameLower === serverNameLower || packageNameLower.includes(serverNameLower) || serverNameLower.includes(packageNameLower)) {
+            console.log(`  ✓ npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`);
+            return true;
+          }
+        }
+        if (server.deployJson) {
+          try {
+            const deployConfig = JSON.parse(server.deployJson);
+            if (deployConfig.mcpServers) {
+              const serverKeys = Object.keys(deployConfig.mcpServers);
+              const matched = serverKeys.some(key => {
+                const keyLower = key.toLowerCase();
+                const serverConfig = deployConfig.mcpServers[key];
+                console.log(`    检查deployJson键: ${key}, 命令: ${serverConfig.command}`);
+                if (keyLower === localNameLower || keyLower.includes(localNameLower) || localNameLower.includes(keyLower)) {
+                  console.log(`    ✓ deployJson键名匹配: ${keyLower} <-> ${localNameLower}`);
+                  return true;
+                }
+                if (local.command?.startsWith('npx') && serverConfig.command?.startsWith('npx')) {
+                  const localNpxPackage = local.command.replace(/^npx\s*/, '').split(' ')[0];
+                  const deployNpxPackage = serverConfig.command.replace(/^npx\s*/, '').split(' ')[0];
+                  console.log(`    检查deployJson npx包匹配: ${localNpxPackage} <-> ${deployNpxPackage}`);
+                  if (localNpxPackage.toLowerCase() === deployNpxPackage.toLowerCase()) {
+                    console.log(`    ✓ deployJson npx包匹配: ${localNpxPackage} === ${deployNpxPackage}`);
+                    return true;
+                  }
+                }
+                return false;
+              });
+              if (matched) {
+                console.log(`  ✓ deployJson匹配成功`);
+                return true;
+              }
+            }
+          } catch (error) {
+            console.warn('Failed to parse deployJson for server matching:', error);
+          }
+        }
+      }
+      return false;
+    })
   
   if (!localServer) {
     // 如果服务器未安装，提示用户先安装
@@ -632,8 +704,63 @@ const editServer = (server: ServerItem) => {
 const deleteServer = (server: ServerItem) => {
   // 检查服务器是否已安装到本地
   const localServer = mcpStore.serverList.find(local => {
-    return local.mcp_type === 'mcp_gallery'
-  })
+      console.log(`  检查本地服务: ${local.name}, 命令: ${local.command}`);
+      if (local.name === server.name) {
+        console.log(`  ✓ 精确匹配: ${local.name} === ${server.name}`);
+        return true;
+      }
+      if (server.type === 'gallery') {
+        const localNameLower = local.name.toLowerCase();
+        const serverNameLower = server.name.toLowerCase();
+        if (localNameLower === serverNameLower || localNameLower.includes(serverNameLower) || serverNameLower.includes(localNameLower)) {
+          console.log(`  ✓ 名称包含匹配: ${localNameLower} <-> ${serverNameLower}`);
+          return true;
+        }
+        if (local.command?.startsWith('npx')) {
+          const npxPackageName = local.command.replace(/^npx\s*/, '').split(' ')[0];
+          const packageNameLower = npxPackageName.toLowerCase();
+          console.log(`  检查npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`);
+          if (packageNameLower === serverNameLower || packageNameLower.includes(serverNameLower) || serverNameLower.includes(packageNameLower)) {
+            console.log(`  ✓ npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`);
+            return true;
+          }
+        }
+        if (server.deployJson) {
+          try {
+            const deployConfig = JSON.parse(server.deployJson);
+            if (deployConfig.mcpServers) {
+              const serverKeys = Object.keys(deployConfig.mcpServers);
+              const matched = serverKeys.some(key => {
+                const keyLower = key.toLowerCase();
+                const serverConfig = deployConfig.mcpServers[key];
+                console.log(`    检查deployJson键: ${key}, 命令: ${serverConfig.command}`);
+                if (keyLower === localNameLower || keyLower.includes(localNameLower) || localNameLower.includes(keyLower)) {
+                  console.log(`    ✓ deployJson键名匹配: ${keyLower} <-> ${localNameLower}`);
+                  return true;
+                }
+                if (local.command?.startsWith('npx') && serverConfig.command?.startsWith('npx')) {
+                  const localNpxPackage = local.command.replace(/^npx\s*/, '').split(' ')[0];
+                  const deployNpxPackage = serverConfig.command.replace(/^npx\s*/, '').split(' ')[0];
+                  console.log(`    检查deployJson npx包匹配: ${localNpxPackage} <-> ${deployNpxPackage}`);
+                  if (localNpxPackage.toLowerCase() === deployNpxPackage.toLowerCase()) {
+                    console.log(`    ✓ deployJson npx包匹配: ${localNpxPackage} === ${deployNpxPackage}`);
+                    return true;
+                  }
+                }
+                return false;
+              });
+              if (matched) {
+                console.log(`  ✓ deployJson匹配成功`);
+                return true;
+              }
+            }
+          } catch (error) {
+            console.warn('Failed to parse deployJson for server matching:', error);
+          }
+        }
+      }
+      return false;
+    })
   
   if (!localServer) {
     // 如果服务器未安装，提示用户
@@ -706,7 +833,62 @@ const toggleServer = async (server: ServerItem) => {
     // 检查该服务是否已安装到本地配置中
     // 使用与syncServerStatuses相同的匹配逻辑
     const localServer = mcpStore.serverList.find(local => {
-      return local.mcp_type === 'mcp_gallery'
+      console.log(`  检查本地服务: ${local.name}, 命令: ${local.command}`);
+      if (local.name === server.name) {
+        console.log(`  ✓ 精确匹配: ${local.name} === ${server.name}`);
+        return true;
+      }
+      if (server.type === 'gallery') {
+        const localNameLower = local.name.toLowerCase();
+        const serverNameLower = server.name.toLowerCase();
+        if (localNameLower === serverNameLower || localNameLower.includes(serverNameLower) || serverNameLower.includes(localNameLower)) {
+          console.log(`  ✓ 名称包含匹配: ${localNameLower} <-> ${serverNameLower}`);
+          return true;
+        }
+        if (local.command?.startsWith('npx')) {
+          const npxPackageName = local.command.replace(/^npx\s*/, '').split(' ')[0];
+          const packageNameLower = npxPackageName.toLowerCase();
+          console.log(`  检查npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`);
+          if (packageNameLower === serverNameLower || packageNameLower.includes(serverNameLower) || serverNameLower.includes(packageNameLower)) {
+            console.log(`  ✓ npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`);
+            return true;
+          }
+        }
+        if (server.deployJson) {
+          try {
+            const deployConfig = JSON.parse(server.deployJson);
+            if (deployConfig.mcpServers) {
+              const serverKeys = Object.keys(deployConfig.mcpServers);
+              const matched = serverKeys.some(key => {
+                const keyLower = key.toLowerCase();
+                const serverConfig = deployConfig.mcpServers[key];
+                console.log(`    检查deployJson键: ${key}, 命令: ${serverConfig.command}`);
+                if (keyLower === localNameLower || keyLower.includes(localNameLower) || localNameLower.includes(keyLower)) {
+                  console.log(`    ✓ deployJson键名匹配: ${keyLower} <-> ${localNameLower}`);
+                  return true;
+                }
+                if (local.command?.startsWith('npx') && serverConfig.command?.startsWith('npx')) {
+                  const localNpxPackage = local.command.replace(/^npx\s*/, '').split(' ')[0];
+                  const deployNpxPackage = serverConfig.command.replace(/^npx\s*/, '').split(' ')[0];
+                  console.log(`    检查deployJson npx包匹配: ${localNpxPackage} <-> ${deployNpxPackage}`);
+                  if (localNpxPackage.toLowerCase() === deployNpxPackage.toLowerCase()) {
+                    console.log(`    ✓ deployJson npx包匹配: ${localNpxPackage} === ${deployNpxPackage}`);
+                    return true;
+                  }
+                }
+                return false;
+              });
+              if (matched) {
+                console.log(`  ✓ deployJson匹配成功`);
+                return true;
+              }
+            }
+          } catch (error) {
+            console.warn('Failed to parse deployJson for server matching:', error);
+          }
+        }
+      }
+      return false;
     })
     
     if (localServer) {
@@ -716,6 +898,7 @@ const toggleServer = async (server: ServerItem) => {
       if (success) {
         // 状态会通过watch自动同步，这里不需要手动更新
         console.log(`服务器 ${localServer.name} 状态切换成功`)
+        await syncServerStatuses() // 立即同步状态以确保UI更新
       } else {
         // 如果切换失败，恢复原状态
         server.status = server.isRunning ? 'running' : 'stopped'
@@ -1090,10 +1273,10 @@ const goToMcpSettings = () => {
                     {{ getStatusText(server.status) }}
                   </span>
                 </div>
-                <!-- 根据安装状态显示不同控件 -->
+                <!-- 根据服务器状态显示不同控件 -->
                 <!-- 未安装时显示安装按钮 -->
                 <Button
-                  v-if="!isServerInstalled(server)"
+                  v-if="server.status === 'not_installed'"
                   variant="default"
                   size="sm"
                   class="px-3 py-1 text-xs"
@@ -1104,7 +1287,7 @@ const goToMcpSettings = () => {
                 </Button>
                 <!-- 已安装时显示启动按钮 -->
                 <Button
-                  v-if="isServerInstalled(server)"
+                  v-if="server.status !== 'not_installed'"
                   variant="default"
                   size="sm"
                   class="px-3 py-1 text-xs"
@@ -1195,10 +1378,10 @@ const goToMcpSettings = () => {
                     {{ getStatusText(server.status) }}
                     </span>
                   </div>
-                  <!-- 根据安装状态显示不同按钮 -->
+                  <!-- 根据服务器状态显示不同按钮 -->
                   <!-- 未安装时显示安装按钮 -->
                   <Button
-                    v-if="!isServerInstalled(server)"
+                    v-if="server.status === 'not_installed'"
                     variant="default"
                     size="sm"
                     class="px-4"
@@ -1209,7 +1392,7 @@ const goToMcpSettings = () => {
                   </Button>
                   <!-- 已安装时显示启动按钮 -->
                   <Button
-                    v-if="isServerInstalled(server)"
+                    v-if="server.status !== 'not_installed'"
                     variant="default"
                     size="sm"
                     class="px-4"
