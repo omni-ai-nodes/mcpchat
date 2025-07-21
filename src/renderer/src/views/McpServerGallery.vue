@@ -242,7 +242,7 @@ const fetchServers = async (searchName: string = '') => {
   try {
     const apiUrl = import.meta.env.VITE_MCP_SERVER_API_URL || 'https://api.omni-ainode.com'
     let currentPage = 1
-    let totalPages = 1
+    let apiTotalPages = 1
 
     do {
       interface RequestBody { page_size: number; current_page: number; name?: string; }
@@ -289,19 +289,19 @@ const fetchServers = async (searchName: string = '') => {
         }))
         
         allApiServers.value = [...allApiServers.value, ...pageServers]
-        totalPages = data.data.total_pages
+        apiTotalPages = data.data.total_pages
         currentPage++
       } else {
         console.error('API返回错误:', data.msg)
         break
       }
-    } while (currentPage <= totalPages)
+    } while (currentPage <= apiTotalPages)
     
     // 获取所有数据后同步状态
     await syncServerStatuses()
     
     // 设置总页数基于所有服务器
-totalPages.value = Math.ceil(allApiServers.value.length / pageSize.value)
+    totalPages.value = Math.ceil(allApiServers.value.length / pageSize.value)
   } catch (error) {
     console.error('获取服务器列表失败:', error)
   } finally {
