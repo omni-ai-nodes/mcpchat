@@ -259,6 +259,7 @@ export class McpClient {
     // 处理 npx 命令
     if (basename === 'npx' || command.includes('npx')) {
       console.log(`[McpClient] 检测到 npx 命令，平台: ${process.platform}`)
+      console.log(`[McpClient] 可用 runtime: bunRuntimePath=${this.bunRuntimePath}, nodeRuntimePath=${this.nodeRuntimePath}`)
       
       if (process.platform === 'win32') {
         // Windows 平台使用 Node.js 的 npx，保持原有参数
@@ -286,8 +287,8 @@ export class McpClient {
             args: args.map((arg) => this.replaceWithRuntimeCommand(arg))
           }
         } else {
-          // 如果没有运行时，回退到系统 npx
-          console.log(`[McpClient] 没有可用运行时，回退到系统 npx`)
+          // 如果没有内置运行时，直接使用系统 npx
+          console.log(`[McpClient] 没有内置运行时，使用系统 npx: ${command}`)
           return {
             command: 'npx',
             args: args
@@ -340,12 +341,13 @@ export class McpClient {
     const runtimeBasePath = path
       .join(app.getAppPath(), 'runtime')
       .replace('app.asar', 'app.asar.unpacked')
-    console.info('runtimeBasePath', runtimeBasePath)
+    console.info('[McpClient] runtimeBasePath:', runtimeBasePath)
 
     // 检查 bun 运行时文件是否存在
     const bunRuntimePath = path.join(runtimeBasePath, 'bun')
     if (process.platform === 'win32') {
       const bunExe = path.join(bunRuntimePath, 'bun.exe')
+      console.log(`[McpClient] 检查 Bun (Windows): ${bunExe}, 存在: ${fs.existsSync(bunExe)}`)
       if (fs.existsSync(bunExe)) {
         this.bunRuntimePath = bunRuntimePath
       } else {
@@ -353,6 +355,7 @@ export class McpClient {
       }
     } else {
       const bunBin = path.join(bunRuntimePath, 'bun')
+      console.log(`[McpClient] 检查 Bun (非Windows): ${bunBin}, 存在: ${fs.existsSync(bunBin)}`)
       if (fs.existsSync(bunBin)) {
         this.bunRuntimePath = bunRuntimePath
       } else {
@@ -364,6 +367,7 @@ export class McpClient {
     const nodeRuntimePath = path.join(runtimeBasePath, 'node')
     if (process.platform === 'win32') {
       const nodeExe = path.join(nodeRuntimePath, 'node.exe')
+      console.log(`[McpClient] 检查 Node.js (Windows): ${nodeExe}, 存在: ${fs.existsSync(nodeExe)}`)
       if (fs.existsSync(nodeExe)) {
         this.nodeRuntimePath = nodeRuntimePath
       } else {
@@ -371,6 +375,7 @@ export class McpClient {
       }
     } else {
       const nodeBin = path.join(nodeRuntimePath, 'bin', 'node')
+      console.log(`[McpClient] 检查 Node.js (非Windows): ${nodeBin}, 存在: ${fs.existsSync(nodeBin)}`)
       if (fs.existsSync(nodeBin)) {
         this.nodeRuntimePath = nodeRuntimePath
       } else {
@@ -383,6 +388,7 @@ export class McpClient {
     if (process.platform === 'win32') {
       const uvExe = path.join(uvRuntimePath, 'uv.exe')
       const uvxExe = path.join(uvRuntimePath, 'uvx.exe')
+      console.log(`[McpClient] 检查 UV (Windows): ${uvExe}, ${uvxExe}, 存在: ${fs.existsSync(uvExe) && fs.existsSync(uvxExe)}`)
       if (fs.existsSync(uvExe) && fs.existsSync(uvxExe)) {
         this.uvRuntimePath = uvRuntimePath
       } else {
@@ -391,11 +397,22 @@ export class McpClient {
     } else {
       const uvBin = path.join(uvRuntimePath, 'uv')
       const uvxBin = path.join(uvRuntimePath, 'uvx')
+      console.log(`[McpClient] 检查 UV (非Windows): ${uvBin}, ${uvxBin}, 存在: ${fs.existsSync(uvBin) && fs.existsSync(uvxBin)}`)
       if (fs.existsSync(uvBin) && fs.existsSync(uvxBin)) {
         this.uvRuntimePath = uvRuntimePath
       } else {
         this.uvRuntimePath = null
       }
+    }
+
+    console.log(`[McpClient] Runtime 路径检测结果:`)
+    console.log(`[McpClient] - bunRuntimePath: ${this.bunRuntimePath}`)
+    console.log(`[McpClient] - nodeRuntimePath: ${this.nodeRuntimePath}`)
+    console.log(`[McpClient] - uvRuntimePath: ${this.uvRuntimePath}`)
+
+    // 如果没有内置的 runtime，检查系统是否有可用的命令
+    if (!this.nodeRuntimePath && !this.bunRuntimePath) {
+      console.log(`[McpClient] 没有检测到内置 runtime，将依赖系统命令`)
     }
   }
 
@@ -455,13 +472,22 @@ export class McpClient {
           // 'grpc_proxy'
         ]
 
-        // 修复env类型问题
+        // 修复env类型问题 - 过滤掉 undefined 值，同时继承系统环境变量
         const env: Record<string, string> = {}
+        Object.entries(process.env).forEach(([key, value]) => {
+          if (value !== undefined) {
+            env[key] = value
+          }
+        })
 
         // 处理命令和参数替换
         const processedCommand = this.processCommandWithArgs(command, args)
         command = processedCommand.command
         args = processedCommand.args
+
+        console.log(`[McpClient] 最终 spawn 命令: ${command} ${args.join(' ')}`)
+        console.log(`[McpClient] 环境变量 PATH: ${env.PATH || env.Path}`)
+
 
         // 判断是否是 Node.js/Bun/UV 相关命令
         const isNodeCommand = ['node', 'npm', 'npx', 'bun', 'uv', 'uvx'].some(
