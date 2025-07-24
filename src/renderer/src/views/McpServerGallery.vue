@@ -615,11 +615,13 @@ const editServer = (server: ServerItem) => {
     return
   }
   
-  // 处理配置信息，参考 installServer 的实现
-  if (server.deployJson) {
+  // 处理配置信息，从 localServer 获取 DeployJson 数据
+  const deployJsonSource = localServer.DeployJson || server.deployJson
+  
+  if (deployJsonSource) {
     try {
       // 解析原始 JSON 配置
-      const deployConfig = JSON.parse(server.deployJson)
+      const deployConfig = JSON.parse(deployJsonSource)
       
       // 自动为每个服务器配置添加 icons、type 和 descriptions 字段
       if (deployConfig.mcpServers) {
@@ -653,6 +655,7 @@ const editServer = (server: ServerItem) => {
       isEditServerDialogOpen.value = true
       
       console.log(`准备编辑服务器 "${server.name}"，已增强配置`)
+      console.log('使用的 DeployJson 来源:', localServer.DeployJson ? 'localServer.DeployJson' : 'server.deployJson')
       console.log('selectedServer:', selectedServer.value)
       console.log('prefilledEditJsonConfig 长度:', prefilledEditJsonConfig.value.length)
       console.log('prefilledEditJsonConfig 内容:', prefilledEditJsonConfig.value.substring(0, 200) + '...')
@@ -661,23 +664,39 @@ const editServer = (server: ServerItem) => {
       // 如果解析失败，使用原始配置
       selectedServer.value = localServer.name
       selectedServerConfig.value = server
-      prefilledEditJsonConfig.value = server.deployJson || ''
+      prefilledEditJsonConfig.value = deployJsonSource || ''
       isEditServerDialogOpen.value = true
       
       console.log('解析失败，使用原始配置')
+      console.log('使用的 DeployJson 来源:', localServer.DeployJson ? 'localServer.DeployJson' : 'server.deployJson')
       console.log('selectedServer:', selectedServer.value)
       console.log('prefilledEditJsonConfig 长度:', prefilledEditJsonConfig.value.length)
     }
   } else {
-    // 如果没有 deployJson，直接使用原始配置
+    // 如果没有 deployJson，尝试从当前服务器配置生成基本配置
+    const basicConfig = {
+      mcpServers: {
+        [localServer.name]: {
+          command: localServer.command || '',
+          args: localServer.args || [],
+          env: localServer.env || {},
+          descriptions: localServer.descriptions || server.description || '',
+          icons: localServer.icons || server.icon || '🔧',
+          type: localServer.type || 'stdio',
+          autoApprove: localServer.autoApprove || []
+        }
+      }
+    }
+    
     selectedServer.value = localServer.name
     selectedServerConfig.value = server
-    prefilledEditJsonConfig.value = ''
+    prefilledEditJsonConfig.value = JSON.stringify(basicConfig, null, 2)
     isEditServerDialogOpen.value = true
     
-    console.log('没有 deployJson，使用空配置')
+    console.log('没有 deployJson，生成基本配置')
     console.log('selectedServer:', selectedServer.value)
     console.log('prefilledEditJsonConfig 长度:', prefilledEditJsonConfig.value.length)
+    console.log('生成的基本配置:', prefilledEditJsonConfig.value)
   }
 }
 
