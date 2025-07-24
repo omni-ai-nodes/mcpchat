@@ -513,26 +513,62 @@ const handleSubmit = async (): Promise<void> => {
   isSubmitting.value = true
   
   try {
+    // 如果是 JSON 编辑模式，直接解析 JSON 配置
+    if (isJsonEditMode.value) {
+      try {
+        const parsedConfig = JSON.parse(jsonConfig.value)
+        if (!parsedConfig.mcpServers || typeof parsedConfig.mcpServers !== 'object') {
+          throw new Error('Invalid MCP server configuration format')
+        }
 
-  // 处理自动授权设置
-  const autoApprove: string[] = []
-  if (autoApproveAll.value) {
-    autoApprove.push('all')
-  } else {
-    if (autoApproveRead.value) autoApprove.push('read')
-    if (autoApproveWrite.value) autoApprove.push('write')
-  }
+        // 获取第一个服务器的配置
+        const serverEntries = Object.entries(parsedConfig.mcpServers)
+        if (serverEntries.length === 0) {
+          throw new Error('No MCP servers found in configuration')
+        }
 
-  // 创建基本配置（必需的字段）
-  const baseConfig = {
-    descriptions: descriptions.value.trim(),
-    icons: icons.value.trim(),
-    autoApprove,
-    type: type.value
-  }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const [serverName, serverConfig] = serverEntries[0] as [string, any]
 
-  // 创建符合MCPServerConfig接口的配置对象
-  let serverConfig: MCPServerConfig
+        console.log('=== McpServerForm handleSubmit JSON 模式调试信息 ===')
+        console.log('服务器名称:', serverName)
+        console.log('JSON 配置:', JSON.stringify(serverConfig, null, 2))
+        console.log('编辑模式:', props.editMode)
+
+        emit('submit', serverName, serverConfig)
+        isSubmitting.value = false
+        return
+      } catch (error) {
+        console.error('解析JSON配置失败:', error)
+        toast({
+          title: t('settings.mcp.serverForm.parseError'),
+          description: error instanceof Error ? error.message : String(error),
+          variant: 'destructive'
+        })
+        isSubmitting.value = false
+        return
+      }
+    }
+
+    // 表单模式：处理自动授权设置
+    const autoApprove: string[] = []
+    if (autoApproveAll.value) {
+      autoApprove.push('all')
+    } else {
+      if (autoApproveRead.value) autoApprove.push('read')
+      if (autoApproveWrite.value) autoApprove.push('write')
+    }
+
+    // 创建基本配置（必需的字段）
+    const baseConfig = {
+      descriptions: descriptions.value.trim(),
+      icons: icons.value.trim(),
+      autoApprove,
+      type: type.value
+    }
+
+    // 创建符合MCPServerConfig接口的配置对象
+    let serverConfig: MCPServerConfig
 
   // 解析 env
   let parsedEnv = {}
@@ -602,12 +638,13 @@ const handleSubmit = async (): Promise<void> => {
     serverConfig.github = github.value.trim()
   }
 
-  console.log('=== McpServerForm handleSubmit 调试信息 ===')
+  console.log('=== McpServerForm handleSubmit 表单模式调试信息 ===')
   console.log('服务器名称:', name.value.trim())
   console.log('最终配置:', JSON.stringify(serverConfig, null, 2))
   console.log('编辑模式:', props.editMode)
 
   emit('submit', name.value.trim(), serverConfig)
+  isSubmitting.value = false
   } catch (error) {
     console.error('提交表单时发生错误:', error)
     toast({
