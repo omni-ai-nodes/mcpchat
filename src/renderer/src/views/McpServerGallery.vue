@@ -791,8 +791,16 @@ const deleteServer = (server: ServerItem) => {
 
 // 处理编辑服务器
 const handleEditServer = async (serverName: string, serverConfig: Partial<MCPServerConfig>) => {
+  console.log('=== handleEditServer 调试信息 ===')
+  console.log('服务器名称:', serverName)
+  console.log('提交的配置:', JSON.stringify(serverConfig, null, 2))
+  console.log('当前本地服务器配置:', JSON.stringify(mcpStore.config.mcpServers[serverName], null, 2))
+  
   const success = await mcpStore.updateServer(serverName, serverConfig)
+  console.log('更新结果:', success)
+  
   if (success) {
+    console.log('更新后的服务器配置:', JSON.stringify(mcpStore.config.mcpServers[serverName], null, 2))
     isEditServerDialogOpen.value = false
     selectedServer.value = ''
     selectedServerConfig.value = null
@@ -802,6 +810,13 @@ const handleEditServer = async (serverName: string, serverConfig: Partial<MCPSer
     toast({
       title: t('mcp.editServer'),
       description: t('mcp.serverUpdatedSuccessfully', { name: serverName })
+    })
+  } else {
+    console.error('服务器更新失败')
+    toast({
+      title: t('mcp.editServer'),
+      description: '服务器更新失败',
+      variant: 'destructive'
     })
   }
 }

@@ -602,6 +602,11 @@ const handleSubmit = async (): Promise<void> => {
     serverConfig.github = github.value.trim()
   }
 
+  console.log('=== McpServerForm handleSubmit 调试信息 ===')
+  console.log('服务器名称:', name.value.trim())
+  console.log('最终配置:', JSON.stringify(serverConfig, null, 2))
+  console.log('编辑模式:', props.editMode)
+
   emit('submit', name.value.trim(), serverConfig)
   } catch (error) {
     console.error('提交表单时发生错误:', error)
