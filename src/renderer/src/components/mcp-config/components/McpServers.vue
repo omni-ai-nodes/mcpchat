@@ -62,10 +62,16 @@ watch(isAddServerDialogOpen, (newIsAddServerDialogOpen) => {
   }
 })
 
+// 添加防护变量，避免无限循环
+let isCheckingGalleryDirectories = false
+
 // 监听配置变化，重新加载
 watch(
   () => mcpStore.config,
   () => {
+    // 防止在检查过程中重复触发
+    if (isCheckingGalleryDirectories) return
+    
     // 清理缓存
     settingsStore.clearMcpInstallCache()
     // 重新检查gallery服务器目录
@@ -77,6 +83,9 @@ watch(
 watch(
   () => mcpStore.serverList,
   () => {
+    // 防止在检查过程中重复触发
+    if (isCheckingGalleryDirectories) return
+    
     checkGalleryServerDirectories()
   },
   { deep: true }
@@ -105,9 +114,21 @@ const galleryServers = computed(() => {
 
 // 移除不必要的过滤逻辑，简化为空函数以保持兼容性
 const checkGalleryServerDirectories = async () => {
-  // 不再进行目录检查和过滤，让MCP广场显示所有已配置的gallery服务
-  // 这样与McpServerGallery.vue的行为保持一致
-  console.log('MCP广场服务器列表已更新')
+  // 防止重复调用
+  if (isCheckingGalleryDirectories) return
+  
+  isCheckingGalleryDirectories = true
+  try {
+    // 不再进行目录检查和过滤，让MCP广场显示所有已配置的gallery服务
+    // 这样与McpServerGallery.vue的行为保持一致
+    // 减少日志输出频率，避免控制台刷屏
+    // console.log('MCP广场服务器列表已更新')
+  } finally {
+    // 使用 setTimeout 确保在下一个事件循环中重置标志
+    setTimeout(() => {
+      isCheckingGalleryDirectories = false
+    }, 0)
+  }
 }
 
 const regularServers = computed(() => {
