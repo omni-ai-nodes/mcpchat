@@ -107,6 +107,10 @@ const filterStatus = ref('all')
 const viewMode = ref<'grid' | 'list'>('grid')
 const showAddDialog = ref(false)
 
+// 页码输入相关
+const pageInput = ref('')
+const showPageInput = ref(false)
+
 // 编辑和删除服务器相关状态
 const isEditServerDialogOpen = ref(false)
 const isRemoveConfirmDialogOpen = ref(false)
@@ -472,6 +476,36 @@ const nextPage = () => {
   if (currentPage.value < totalPages.value) {
     goToPage(currentPage.value + 1)
   }
+}
+
+// 页码输入处理函数
+const handlePageInput = () => {
+  const page = parseInt(pageInput.value)
+  if (!isNaN(page) && page >= 1 && page <= totalPages.value) {
+    goToPage(page)
+    showPageInput.value = false
+    pageInput.value = ''
+  }
+}
+
+// 显示页码输入框
+const showPageInputBox = () => {
+  showPageInput.value = true
+  pageInput.value = currentPage.value.toString()
+  // 下一帧聚焦输入框
+  nextTick(() => {
+    const input = document.querySelector('.page-input') as HTMLInputElement
+    if (input) {
+      input.focus()
+      input.select()
+    }
+  })
+}
+
+// 隐藏页码输入框
+const hidePageInput = () => {
+  showPageInput.value = false
+  pageInput.value = ''
 }
 
 // 计算属性：显示当前页的服务器列表
@@ -1625,9 +1659,39 @@ const goToMcpSettings = () => {
         <Icon icon="lucide:chevron-right" class="w-4 h-4" />
       </Button>
       
-      <span class="text-sm text-muted-foreground ml-4">
-        第 {{ currentPage }} 页，共 {{ totalPages }} 页
-      </span>
+      <!-- 页码输入区域 -->
+      <div class="flex items-center gap-2 ml-4">
+        <span class="text-sm text-muted-foreground">
+          第 {{ currentPage }} 页，共 {{ totalPages }} 页
+        </span>
+        
+        <!-- 页码输入框 -->
+        <div class="flex items-center gap-1">
+          <span class="text-sm text-muted-foreground">跳转到</span>
+          <div class="relative">
+            <input
+              v-if="showPageInput"
+              v-model="pageInput"
+              type="number"
+              :min="1"
+              :max="totalPages"
+              class="page-input w-16 h-8 px-2 text-sm border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+              @keyup.enter="handlePageInput"
+              @blur="hidePageInput"
+              @keyup.escape="hidePageInput"
+            />
+            <Button
+              v-else
+              variant="outline"
+              size="sm"
+              class="h-8 px-2 text-xs"
+              @click="showPageInputBox"
+            >
+              页码
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   
