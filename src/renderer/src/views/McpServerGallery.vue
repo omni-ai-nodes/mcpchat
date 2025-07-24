@@ -529,64 +529,9 @@ const hidePageInput = () => {
 
 // 计算属性：显示当前页的服务器列表
 const allServers = computed(() => {
-  // 直接返回 API 数据，因为现在使用服务器端分页
-  let filtered = allApiServers.value
-  
-  // 只在第一页时添加本地独有的 gallery 服务器
-  if (currentPage.value === 1) {
-    const serversList = [...filtered]
-    mcpStore.serverList.forEach(local => {
-      if (local.mcp_type === 'mcp_gallery' && !allApiServers.value.some(s => {
-        // 优先通过deploy_json中的mcpServers键名进行精确匹配
-        if (s.deployJson) {
-          try {
-            const deploy = JSON.parse(s.deployJson);
-            if (deploy.mcpServers) {
-              const deployServerNames = Object.keys(deploy.mcpServers)
-              if (deployServerNames.includes(local.name)) {
-                return true
-              }
-            }
-          } catch (e) {
-            console.error('Error parsing deployJson:', e);
-          }
-        }
-        
-        // 其次尝试精确名称匹配
-        if (s.name === local.name) return true;
-        
-        // GitHub匹配
-        if (s.Github && local.Github === s.Github) return true;
-        
-        return false;
-      })) {
-        const localServer: ServerItem = {
-          id: local.name,
-          name: local.name,
-          icon: local.icons || '🔧',
-          description: local.descriptions || '',
-          type: local.type || 'gallery',
-          status: local.isRunning ? 'running' : (local.isLoading ? 'loading' : 'stopped'),
-          isRunning: local.isRunning,
-          isDefault: local.isDefault,
-          isGallery: true,
-          toolsCount: 0,
-          promptsCount: 0,
-          resourcesCount: 0,
-          Github: local.Github,
-          deployJson: '',
-          command: local.command,
-          args: local.args,
-          baseUrl: local.baseUrl
-        }
-        
-        serversList.push(localServer)
-      }
-    })
-    return serversList
-  }
-  
-  return filtered
+  // 直接返回 API 数据，不添加本地服务器
+  // 这样 "All Server" 页面只显示来自 API 的服务器，不会显示已安装的本地服务器
+  return allApiServers.value
 })
 
 // 应用状态过滤
