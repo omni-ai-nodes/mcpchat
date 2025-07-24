@@ -97,7 +97,6 @@ interface ServerItem {
 }
 
 // 响应式数据
-const servers = ref<ServerItem[]>([])
 const loading = ref(false)
 const currentPage = ref(1)
 const totalPages = ref(1)
@@ -120,39 +119,29 @@ const selectedServerConfig = ref<ServerItem | null>(null)
 // 检查服务是否已安装
 const isServerInstalled = (server: ServerItem): boolean => {
   const localServer = mcpStore.serverList.find(local => {
-    // 首先尝试精确匹配
+    // 优先通过deploy_json中的mcpServers键名进行精确匹配
+    if (server.deployJson) {
+      try {
+        const deployConfig = JSON.parse(server.deployJson)
+        if (deployConfig.mcpServers) {
+          const deployServerNames = Object.keys(deployConfig.mcpServers)
+          if (deployServerNames.includes(local.name)) {
+            return true
+          }
+        }
+      } catch (error) {
+        console.warn('解析deployJson失败:', error)
+      }
+    }
+    
+    // 其次尝试精确名称匹配
     if (local.name === server.name) {
       return true
     }
     
-    // 对于 gallery 类型的服务器，使用更宽松的匹配
-    if (server.type === 'gallery') {
-      const localNameLower = local.name.toLowerCase()
-      const serverNameLower = server.name.toLowerCase()
-      
-      // 基本的包含匹配
-      if (localNameLower === serverNameLower || 
-          localNameLower.includes(serverNameLower) || 
-          serverNameLower.includes(localNameLower)) {
-        return true
-      }
-      
-      // 特殊处理npx命令：检查命令中是否包含服务器名称
-      if (local.command?.startsWith('npx')) {
-        const npxPackageName = local.command.replace(/^npx\s*/, '').split(' ')[0]
-        const packageNameLower = npxPackageName.toLowerCase()
-        
-        if (packageNameLower === serverNameLower || 
-            packageNameLower.includes(serverNameLower) || 
-            serverNameLower.includes(packageNameLower)) {
-          return true
-        }
-      }
-      
-      // 检查GitHub匹配
-      if (server.Github && local.Github && server.Github === local.Github) {
-        return true
-      }
+    // GitHub匹配
+    if (server.Github && local.Github && server.Github === local.Github) {
+      return true
     }
     
     return false
@@ -163,16 +152,46 @@ const isServerInstalled = (server: ServerItem): boolean => {
 // 同步服务状态的函数
 const syncServerStatuses = async () => {
   console.log('同步服务状态，当前本地服务列表:', mcpStore.serverList.map(s => ({ name: s.name, type: s.type, isRunning: s.isRunning, command: s.command })))
-  console.log('当前Gallery服务列表:', servers.value.map(s => ({ name: s.name, status: s.status })))
+  console.log('当前Gallery服务列表:', allApiServers.value.map(s => ({ name: s.name, status: s.status })))
   
-  for (const server of servers.value) {
+  for (const server of allApiServers.value) {
     console.log(`\n正在处理服务器: ${server.name}`)
     
-    // 只使用精确名称匹配
-    const localServer = mcpStore.serverList.find(local => local.name === server.name)
+    // 使用与isServerInstalled相同的精确匹配逻辑
+    let localServer = mcpStore.serverList.find(local => {
+      // 优先通过deploy_json中的mcpServers键名进行精确匹配
+      if (server.deployJson) {
+        try {
+          const deployConfig = JSON.parse(server.deployJson)
+          if (deployConfig.mcpServers) {
+            const deployServerNames = Object.keys(deployConfig.mcpServers)
+            if (deployServerNames.includes(local.name)) {
+              console.log(`  ✓ deployJson键名匹配: ${local.name} 在 [${deployServerNames.join(', ')}] 中`)
+              return true
+            }
+          }
+        } catch (error) {
+          console.warn('解析deployJson失败:', error)
+        }
+      }
+      
+      // 其次尝试精确名称匹配
+      if (local.name === server.name) {
+        console.log(`  ✓ 精确匹配: ${local.name} === ${server.name}`)
+        return true
+      }
+      
+      // GitHub匹配
+      if (server.Github && local.Github && server.Github === local.Github) {
+        console.log(`  ✓ GitHub匹配: ${server.Github}`)
+        return true
+      }
+      
+      return false
+    })
     
     if (localServer) {
-      console.log(`✓ 找到匹配的本地服务: ${server.name} -> ${localServer.name}, 运行状态: ${localServer.isRunning}, 命令: ${localServer.command}`)
+      console.log(`✓ 找到匹配的本地服务: Gallery服务"${server.name}" -> 本地服务"${localServer.name}", 运行状态: ${localServer.isRunning}, 命令: ${localServer.command}`)
       
       // 检查是否为GitHub类型的服务器且需要检查代码下载状态
       let isCodeDownloaded = true
@@ -224,7 +243,7 @@ const syncServerStatuses = async () => {
     }
   }
   
-  console.log('\n同步完成，最终状态:', servers.value.map(s => ({ name: s.name, status: s.status })))
+  console.log('\n同步完成，最终状态:', allApiServers.value.map(s => ({ name: s.name, status: s.status })))
 }
 
 // 防抖的同步函数，避免频繁调用
@@ -517,7 +536,30 @@ const allServers = computed(() => {
   if (currentPage.value === 1) {
     const serversList = [...filtered]
     mcpStore.serverList.forEach(local => {
-      if (local.mcp_type === 'mcp_gallery' && !allApiServers.value.some(s => s.name === local.name)) {
+      if (local.mcp_type === 'mcp_gallery' && !allApiServers.value.some(s => {
+        // 优先通过deploy_json中的mcpServers键名进行精确匹配
+        if (s.deployJson) {
+          try {
+            const deploy = JSON.parse(s.deployJson);
+            if (deploy.mcpServers) {
+              const deployServerNames = Object.keys(deploy.mcpServers)
+              if (deployServerNames.includes(local.name)) {
+                return true
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing deployJson:', e);
+          }
+        }
+        
+        // 其次尝试精确名称匹配
+        if (s.name === local.name) return true;
+        
+        // GitHub匹配
+        if (s.Github && local.Github === s.Github) return true;
+        
+        return false;
+      })) {
         const localServer: ServerItem = {
           id: local.name,
           name: local.name,
@@ -694,60 +736,35 @@ const editServer = (server: ServerItem) => {
   // 检查服务器是否已安装到本地
   const localServer = mcpStore.serverList.find(local => {
       console.log(`  检查本地服务: ${local.name}, 命令: ${local.command}`);
+      
+      // 优先通过deploy_json中的mcpServers键名进行精确匹配
+      if (server.deployJson) {
+        try {
+          const deployConfig = JSON.parse(server.deployJson);
+          if (deployConfig.mcpServers) {
+            const deployServerNames = Object.keys(deployConfig.mcpServers)
+            if (deployServerNames.includes(local.name)) {
+              console.log(`  ✓ deployJson键名匹配: ${local.name} 在 [${deployServerNames.join(', ')}] 中`)
+              return true
+            }
+          }
+        } catch (error) {
+          console.warn('解析deployJson失败:', error)
+        }
+      }
+      
+      // 其次尝试精确名称匹配
       if (local.name === server.name) {
         console.log(`  ✓ 精确匹配: ${local.name} === ${server.name}`);
         return true;
       }
-      if (server.type === 'gallery') {
-        const localNameLower = local.name.toLowerCase();
-        const serverNameLower = server.name.toLowerCase();
-        if (localNameLower === serverNameLower || localNameLower.includes(serverNameLower) || serverNameLower.includes(localNameLower)) {
-          console.log(`  ✓ 名称包含匹配: ${localNameLower} <-> ${serverNameLower}`);
-          return true;
-        }
-        if (local.command?.startsWith('npx')) {
-          const npxPackageName = local.command.replace(/^npx\s*/, '').split(' ')[0];
-          const packageNameLower = npxPackageName.toLowerCase();
-          console.log(`  检查npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`);
-          if (packageNameLower === serverNameLower || packageNameLower.includes(serverNameLower) || serverNameLower.includes(packageNameLower)) {
-            console.log(`  ✓ npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`);
-            return true;
-          }
-        }
-        if (server.deployJson) {
-          try {
-            const deployConfig = JSON.parse(server.deployJson);
-            if (deployConfig.mcpServers) {
-              const serverKeys = Object.keys(deployConfig.mcpServers);
-              const matched = serverKeys.some(key => {
-                const keyLower = key.toLowerCase();
-                const serverConfig = deployConfig.mcpServers[key];
-                console.log(`    检查deployJson键: ${key}, 命令: ${serverConfig.command}`);
-                if (keyLower === localNameLower || keyLower.includes(localNameLower) || localNameLower.includes(keyLower)) {
-                  console.log(`    ✓ deployJson键名匹配: ${keyLower} <-> ${localNameLower}`);
-                  return true;
-                }
-                if (local.command?.startsWith('npx') && serverConfig.command?.startsWith('npx')) {
-                  const localNpxPackage = local.command.replace(/^npx\s*/, '').split(' ')[0];
-                  const deployNpxPackage = serverConfig.command.replace(/^npx\s*/, '').split(' ')[0];
-                  console.log(`    检查deployJson npx包匹配: ${localNpxPackage} <-> ${deployNpxPackage}`);
-                  if (localNpxPackage.toLowerCase() === deployNpxPackage.toLowerCase()) {
-                    console.log(`    ✓ deployJson npx包匹配: ${localNpxPackage} === ${deployNpxPackage}`);
-                    return true;
-                  }
-                }
-                return false;
-              });
-              if (matched) {
-                console.log(`  ✓ deployJson匹配成功`);
-                return true;
-              }
-            }
-          } catch (error) {
-            console.warn('Failed to parse deployJson for server matching:', error);
-          }
-        }
+      
+      // GitHub匹配
+      if (server.Github && local.Github && server.Github === local.Github) {
+        console.log(`  ✓ GitHub匹配: ${server.Github}`)
+        return true
       }
+      
       return false;
     })
   
@@ -851,60 +868,35 @@ const deleteServer = (server: ServerItem) => {
   // 检查服务器是否已安装到本地
   const localServer = mcpStore.serverList.find(local => {
       console.log(`  检查本地服务: ${local.name}, 命令: ${local.command}`);
+      
+      // 优先通过deploy_json中的mcpServers键名进行精确匹配
+      if (server.deployJson) {
+        try {
+          const deployConfig = JSON.parse(server.deployJson);
+          if (deployConfig.mcpServers) {
+            const deployServerNames = Object.keys(deployConfig.mcpServers)
+            if (deployServerNames.includes(local.name)) {
+              console.log(`  ✓ deployJson键名匹配: ${local.name} 在 [${deployServerNames.join(', ')}] 中`)
+              return true
+            }
+          }
+        } catch (error) {
+          console.warn('解析deployJson失败:', error)
+        }
+      }
+      
+      // 其次尝试精确名称匹配
       if (local.name === server.name) {
         console.log(`  ✓ 精确匹配: ${local.name} === ${server.name}`);
         return true;
       }
-      if (server.type === 'gallery') {
-        const localNameLower = local.name.toLowerCase();
-        const serverNameLower = server.name.toLowerCase();
-        if (localNameLower === serverNameLower || localNameLower.includes(serverNameLower) || serverNameLower.includes(localNameLower)) {
-          console.log(`  ✓ 名称包含匹配: ${localNameLower} <-> ${serverNameLower}`);
-          return true;
-        }
-        if (local.command?.startsWith('npx')) {
-          const npxPackageName = local.command.replace(/^npx\s*/, '').split(' ')[0];
-          const packageNameLower = npxPackageName.toLowerCase();
-          console.log(`  检查npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`);
-          if (packageNameLower === serverNameLower || packageNameLower.includes(serverNameLower) || serverNameLower.includes(packageNameLower)) {
-            console.log(`  ✓ npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`);
-            return true;
-          }
-        }
-        if (server.deployJson) {
-          try {
-            const deployConfig = JSON.parse(server.deployJson);
-            if (deployConfig.mcpServers) {
-              const serverKeys = Object.keys(deployConfig.mcpServers);
-              const matched = serverKeys.some(key => {
-                const keyLower = key.toLowerCase();
-                const serverConfig = deployConfig.mcpServers[key];
-                console.log(`    检查deployJson键: ${key}, 命令: ${serverConfig.command}`);
-                if (keyLower === localNameLower || keyLower.includes(localNameLower) || localNameLower.includes(keyLower)) {
-                  console.log(`    ✓ deployJson键名匹配: ${keyLower} <-> ${localNameLower}`);
-                  return true;
-                }
-                if (local.command?.startsWith('npx') && serverConfig.command?.startsWith('npx')) {
-                  const localNpxPackage = local.command.replace(/^npx\s*/, '').split(' ')[0];
-                  const deployNpxPackage = serverConfig.command.replace(/^npx\s*/, '').split(' ')[0];
-                  console.log(`    检查deployJson npx包匹配: ${localNpxPackage} <-> ${deployNpxPackage}`);
-                  if (localNpxPackage.toLowerCase() === deployNpxPackage.toLowerCase()) {
-                    console.log(`    ✓ deployJson npx包匹配: ${localNpxPackage} === ${deployNpxPackage}`);
-                    return true;
-                  }
-                }
-                return false;
-              });
-              if (matched) {
-                console.log(`  ✓ deployJson匹配成功`);
-                return true;
-              }
-            }
-          } catch (error) {
-            console.warn('Failed to parse deployJson for server matching:', error);
-          }
-        }
+      
+      // GitHub匹配
+      if (server.Github && local.Github && server.Github === local.Github) {
+        console.log(`  ✓ GitHub匹配: ${server.Github}`)
+        return true
       }
+      
       return false;
     })
   
@@ -1003,63 +995,38 @@ const confirmRemoveServer = async () => {
 const toggleServer = async (server: ServerItem) => {
   try {
     // 检查该服务是否已安装到本地配置中
-    // 使用与syncServerStatuses相同的匹配逻辑
+    // 使用与syncServerStatuses相同的精确匹配逻辑
     const localServer = mcpStore.serverList.find(local => {
       console.log(`  检查本地服务: ${local.name}, 命令: ${local.command}`);
+      
+      // 优先通过deploy_json中的mcpServers键名进行精确匹配
+      if (server.deployJson) {
+        try {
+          const deployConfig = JSON.parse(server.deployJson);
+          if (deployConfig.mcpServers) {
+            const deployServerNames = Object.keys(deployConfig.mcpServers)
+            if (deployServerNames.includes(local.name)) {
+              console.log(`  ✓ deployJson键名匹配: ${local.name} 在 [${deployServerNames.join(', ')}] 中`)
+              return true
+            }
+          }
+        } catch (error) {
+          console.warn('解析deployJson失败:', error)
+        }
+      }
+      
+      // 其次尝试精确名称匹配
       if (local.name === server.name) {
         console.log(`  ✓ 精确匹配: ${local.name} === ${server.name}`);
         return true;
       }
-      if (server.type === 'gallery') {
-        const localNameLower = local.name.toLowerCase();
-        const serverNameLower = server.name.toLowerCase();
-        if (localNameLower === serverNameLower || localNameLower.includes(serverNameLower) || serverNameLower.includes(localNameLower)) {
-          console.log(`  ✓ 名称包含匹配: ${localNameLower} <-> ${serverNameLower}`);
-          return true;
-        }
-        if (local.command?.startsWith('npx')) {
-          const npxPackageName = local.command.replace(/^npx\s*/, '').split(' ')[0];
-          const packageNameLower = npxPackageName.toLowerCase();
-          console.log(`  检查npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`);
-          if (packageNameLower === serverNameLower || packageNameLower.includes(serverNameLower) || serverNameLower.includes(packageNameLower)) {
-            console.log(`  ✓ npx包名匹配: ${packageNameLower} <-> ${serverNameLower}`);
-            return true;
-          }
-        }
-        if (server.deployJson) {
-          try {
-            const deployConfig = JSON.parse(server.deployJson);
-            if (deployConfig.mcpServers) {
-              const serverKeys = Object.keys(deployConfig.mcpServers);
-              const matched = serverKeys.some(key => {
-                const keyLower = key.toLowerCase();
-                const serverConfig = deployConfig.mcpServers[key];
-                console.log(`    检查deployJson键: ${key}, 命令: ${serverConfig.command}`);
-                if (keyLower === localNameLower || keyLower.includes(localNameLower) || localNameLower.includes(keyLower)) {
-                  console.log(`    ✓ deployJson键名匹配: ${keyLower} <-> ${localNameLower}`);
-                  return true;
-                }
-                if (local.command?.startsWith('npx') && serverConfig.command?.startsWith('npx')) {
-                  const localNpxPackage = local.command.replace(/^npx\s*/, '').split(' ')[0];
-                  const deployNpxPackage = serverConfig.command.replace(/^npx\s*/, '').split(' ')[0];
-                  console.log(`    检查deployJson npx包匹配: ${localNpxPackage} <-> ${deployNpxPackage}`);
-                  if (localNpxPackage.toLowerCase() === deployNpxPackage.toLowerCase()) {
-                    console.log(`    ✓ deployJson npx包匹配: ${localNpxPackage} === ${deployNpxPackage}`);
-                    return true;
-                  }
-                }
-                return false;
-              });
-              if (matched) {
-                console.log(`  ✓ deployJson匹配成功`);
-                return true;
-              }
-            }
-          } catch (error) {
-            console.warn('Failed to parse deployJson for server matching:', error);
-          }
-        }
+      
+      // GitHub匹配
+      if (server.Github && local.Github && server.Github === local.Github) {
+        console.log(`  ✓ GitHub匹配: ${server.Github}`)
+        return true
       }
+      
       return false;
     })
     
