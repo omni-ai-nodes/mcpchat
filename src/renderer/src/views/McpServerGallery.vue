@@ -529,6 +529,21 @@ const getStatusTextClass = (status: string) => {
   showAddDialog.value = true
 
 const editServer = (server: ServerItem) => {
+  // 特殊服务器跳转到对应设置页面
+  const specialServers = {
+    difyKnowledge: 'dify',
+    ragflowKnowledge: 'ragflow',
+    fastGptKnowledge: 'fastgpt'
+  }
+
+  if (specialServers[server.name]) {
+    router.push({
+      name: 'settings-knowledge-base',
+      query: { subtab: specialServers[server.name] }
+    })
+    return
+  }
+
   // 检查服务器是否已安装到本地
   const localServer = mcpStore.serverList.find(local => {
       console.log(`  检查本地服务: ${local.name}, 命令: ${local.command}`);
@@ -592,10 +607,15 @@ const editServer = (server: ServerItem) => {
   if (!localServer) {
     // 如果服务器未安装，提示用户先安装
     console.log('服务器未安装，无法编辑')
+    toast({
+      title: t('mcp.mcpGallery.cannotEdit'),
+      description: t('mcp.mcpGallery.serverNotInstalled'),
+      variant: 'destructive'
+    })
     return
   }
   
-  // 处理配置信息，参考 McpServerDetail 的实现
+  // 处理配置信息，参考 installServer 的实现
   if (server.deployJson) {
     try {
       // 解析原始 JSON 配置
@@ -626,29 +646,38 @@ const editServer = (server: ServerItem) => {
       // 将修改后的配置转换回 JSON 字符串
       const enhancedDeployJson = JSON.stringify(deployConfig, null, 2)
       
-      // 创建增强的服务器配置
-      const enhancedServerConfig = {
-        ...server,
-        deployJson: enhancedDeployJson
-      }
-      
+      // 设置预填充配置
       selectedServer.value = localServer.name
-      selectedServerConfig.value = enhancedServerConfig
+      selectedServerConfig.value = server
+      prefilledEditJsonConfig.value = enhancedDeployJson
       isEditServerDialogOpen.value = true
       
       console.log(`准备编辑服务器 "${server.name}"，已增强配置`)
+      console.log('selectedServer:', selectedServer.value)
+      console.log('prefilledEditJsonConfig 长度:', prefilledEditJsonConfig.value.length)
+      console.log('prefilledEditJsonConfig 内容:', prefilledEditJsonConfig.value.substring(0, 200) + '...')
     } catch (error) {
       console.error('DeployJson 格式错误:', error)
       // 如果解析失败，使用原始配置
       selectedServer.value = localServer.name
       selectedServerConfig.value = server
+      prefilledEditJsonConfig.value = server.deployJson || ''
       isEditServerDialogOpen.value = true
+      
+      console.log('解析失败，使用原始配置')
+      console.log('selectedServer:', selectedServer.value)
+      console.log('prefilledEditJsonConfig 长度:', prefilledEditJsonConfig.value.length)
     }
   } else {
     // 如果没有 deployJson，直接使用原始配置
     selectedServer.value = localServer.name
     selectedServerConfig.value = server
+    prefilledEditJsonConfig.value = ''
     isEditServerDialogOpen.value = true
+    
+    console.log('没有 deployJson，使用空配置')
+    console.log('selectedServer:', selectedServer.value)
+    console.log('prefilledEditJsonConfig 长度:', prefilledEditJsonConfig.value.length)
   }
 }
 
@@ -716,6 +745,11 @@ const deleteServer = (server: ServerItem) => {
   if (!localServer) {
     // 如果服务器未安装，提示用户
     console.log('服务器未安装，无法删除')
+    toast({
+      title: t('mcp.mcpGallery.cannotDelete'),
+      description: t('mcp.mcpGallery.serverNotInstalled'),
+      variant: 'destructive'
+    })
     return
   }
   
@@ -723,6 +757,11 @@ const deleteServer = (server: ServerItem) => {
   const config = mcpStore.config.mcpServers[localServer.name]
   if (config?.type === 'inmemory') {
     console.log('内置服务器无法删除')
+    toast({
+      title: t('settings.mcp.cannotRemoveBuiltIn'),
+      description: t('settings.mcp.builtInServerCannotBeRemoved'),
+      variant: 'destructive'
+    })
     return
   }
   
@@ -738,6 +777,7 @@ const handleEditServer = async (serverName: string, serverConfig: Partial<MCPSer
     isEditServerDialogOpen.value = false
     selectedServer.value = ''
     selectedServerConfig.value = null
+    prefilledEditJsonConfig.value = ''
     // 重新同步服务器状态
     syncServerStatuses()
     toast({
@@ -886,6 +926,9 @@ const toggleServer = async (server: ServerItem) => {
 // 安装对话框状态
 const isInstallDialogOpen = ref(false)
 const prefilledJsonConfig = ref('')
+
+// 编辑对话框状态
+const prefilledEditJsonConfig = ref('')
 
 // MCP设置对话框状态
 const isMcpSettingsDialogOpen = ref(false)
@@ -1479,9 +1522,9 @@ const goToMcpSettings = () => {
         </DialogDescription>
       </DialogHeader>
       <McpServerForm
-        v-if="selectedServer && selectedServerConfig && selectedServerConfig.deployJson"
+        v-if="selectedServer"
         :server-name="selectedServer"
-        :default-json-config="selectedServerConfig.deployJson"
+        :default-json-config="prefilledEditJsonConfig"
         @submit="(name, config) => handleEditServer(name, config)"
       />
     </DialogContent>
