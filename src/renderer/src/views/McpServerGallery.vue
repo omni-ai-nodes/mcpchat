@@ -537,6 +537,55 @@ const filteredServers = computed(() => {
   return filtered
 })
 
+// 计算可见的页码
+const visiblePages = computed(() => {
+  const current = currentPage.value
+  const total = totalPages.value
+  const maxVisible = 7 // 最多显示7个页码
+  
+  if (total <= maxVisible) {
+    // 如果总页数不超过最大显示数，显示所有页码
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+  
+  const pages: (number | string)[] = []
+  
+  // 始终显示第一页
+  pages.push(1)
+  
+  if (current <= 4) {
+    // 当前页在前面时
+    for (let i = 2; i <= Math.min(5, total - 1); i++) {
+      pages.push(i)
+    }
+    if (total > 5) {
+      pages.push('...')
+    }
+  } else if (current >= total - 3) {
+    // 当前页在后面时
+    if (total > 5) {
+      pages.push('...')
+    }
+    for (let i = Math.max(total - 4, 2); i <= total - 1; i++) {
+      pages.push(i)
+    }
+  } else {
+    // 当前页在中间时
+    pages.push('...')
+    for (let i = current - 1; i <= current + 1; i++) {
+      pages.push(i)
+    }
+    pages.push('...')
+  }
+  
+  // 始终显示最后一页
+  if (total > 1) {
+    pages.push(total)
+  }
+  
+  return pages
+})
+
 
 
 // 状态相关函数
@@ -1551,17 +1600,19 @@ const goToMcpSettings = () => {
       </Button>
       
       <div class="flex items-center gap-1">
-        <Button
-          v-for="page in Math.min(totalPages, 5)"
-          :key="page"
-          variant="outline"
-          size="sm"
-          :class="page === currentPage ? 'bg-primary text-primary-foreground' : ''"
-          @click="goToPage(page)"
-        >
-          {{ page }}
-        </Button>
-        <span v-if="totalPages > 5" class="text-muted-foreground px-2">...</span>
+        <!-- 动态页码 -->
+        <template v-for="(page, index) in visiblePages" :key="index">
+          <Button
+            v-if="typeof page === 'number'"
+            variant="outline"
+            size="sm"
+            :class="page === currentPage ? 'bg-primary text-primary-foreground' : ''"
+            @click="goToPage(page)"
+          >
+            {{ page }}
+          </Button>
+          <span v-else class="text-muted-foreground px-2">{{ page }}</span>
+        </template>
       </div>
       
       <Button
