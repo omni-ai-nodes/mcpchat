@@ -99,6 +99,15 @@ const router = createRouter({
           }
         },
         {
+          path: 'github-proxy',
+          name: 'settings-github-proxy',
+          component: () => import('@/components/settings/GitHubProxySettings.vue'),
+          meta: {
+            titleKey: 'routes.settings-github-proxy',
+            icon: 'lucide:github'
+          }
+        },
+        {
           path: 'prompt',
           name: 'settings-prompt',
           component: () => import('@/components/settings/PromptSetting.vue'),

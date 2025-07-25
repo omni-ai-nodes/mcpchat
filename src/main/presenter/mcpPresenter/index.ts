@@ -20,7 +20,7 @@ import { OpenAI } from 'openai'
 import { ToolListUnion, Type, FunctionDeclaration } from '@google/genai'
 import { CONFIG_EVENTS } from '@/events'
 import { presenter } from '@/presenter'
-import { gitDownloadManager } from '@/lib/gitDownloadManager'
+import { GitDownloadManager } from '@/lib/gitDownloadManager'
 
 // 定义MCP工具接口
 interface MCPTool {
@@ -84,7 +84,7 @@ export class McpPresenter implements IMCPPresenter {
   private toolManager: ToolManager
   private configPresenter: IConfigPresenter
   private isInitialized: boolean = false
-  private gitDownloadManager = gitDownloadManager
+  private gitDownloadManager: GitDownloadManager
 
   constructor(configPresenter?: IConfigPresenter) {
     console.log('Initializing MCP Presenter')
@@ -92,6 +92,7 @@ export class McpPresenter implements IMCPPresenter {
     this.configPresenter = configPresenter || presenter.configPresenter
     this.serverManager = new ServerManager(this.configPresenter)
     this.toolManager = new ToolManager(this.configPresenter, this.serverManager)
+    this.gitDownloadManager = new GitDownloadManager(this.configPresenter)
 
     // 监听自定义提示词服务器检查事件
     eventBus.on(CONFIG_EVENTS.CUSTOM_PROMPTS_SERVER_CHECK_REQUIRED, async () => {
@@ -999,6 +1000,28 @@ export class McpPresenter implements IMCPPresenter {
    */
   async isGitHubRepositoryDownloaded(githubUrl: string, targetName?: string): Promise<boolean> {
     return this.gitDownloadManager.isRepositoryDownloaded(githubUrl, targetName)
+  }
+
+  /**
+   * 下载GitHub仓库到本地
+   * @param githubUrl GitHub仓库URL
+   * @param targetName 目标名称，如果与仓库名不同则重命名
+   * @returns Promise<{ success: boolean; localPath?: string; error?: string }> 下载结果
+   */
+  async downloadGitHubRepository(githubUrl: string, targetName?: string): Promise<{ success: boolean; localPath?: string; error?: string }> {
+    try {
+      const localPath = await this.gitDownloadManager.downloadRepository(githubUrl, targetName)
+      return {
+        success: true,
+        localPath: localPath
+      }
+    } catch (error) {
+      console.error('[MCP] Failed to download GitHub repository:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    }
   }
 
   /**

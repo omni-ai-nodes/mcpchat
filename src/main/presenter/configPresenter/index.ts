@@ -43,6 +43,9 @@ interface IAppSettings {
   copyWithCotEnabled?: boolean
   loggingEnabled?: boolean // 日志记录是否启用
   default_system_prompt?: string // 默认系统提示词
+  githubProxyEnabled?: boolean // 是否启用GitHub代理
+  githubProxyUrl?: string // GitHub代理地址
+  githubProxyOptions?: string[] // GitHub代理选项列表
   [key: string]: unknown // 允许任意键，使用unknown类型替代any
 }
 
@@ -100,6 +103,9 @@ export class ConfigPresenter implements IConfigPresenter {
         copyWithCotEnabled: true,
         loggingEnabled: false,
         default_system_prompt: '',
+        githubProxyEnabled: false,
+        githubProxyUrl: 'https://ghfast.top',
+        githubProxyOptions: ['https://ghfast.top', 'https://github.moeyy.xyz', 'https://mirror.ghproxy.com'],
         appVersion: this.currentAppVersion
       }
     })
@@ -115,7 +121,7 @@ export class ConfigPresenter implements IConfigPresenter {
     })
 
     // 初始化MCP配置助手
-    this.mcpConfHelper = new McpConfHelper()
+    this.mcpConfHelper = new McpConfHelper(this)
 
     // 初始化provider models目录
     this.initProviderModelsDir()
@@ -963,6 +969,45 @@ export class ConfigPresenter implements IConfigPresenter {
   // 重置快捷键
   resetShortcutKeys() {
     this.setSetting('shortcutKey', { ...defaultShortcutKey })
+  }
+
+  // GitHub 代理相关方法
+  getGitHubProxyEnabled(): boolean {
+    return this.getSetting<boolean>('githubProxyEnabled') ?? false
+  }
+
+  setGitHubProxyEnabled(enabled: boolean): void {
+    this.setSetting('githubProxyEnabled', enabled)
+  }
+
+  getGitHubProxyUrl(): string {
+    return this.getSetting<string>('githubProxyUrl') ?? 'https://ghfast.top'
+  }
+
+  setGitHubProxyUrl(url: string): void {
+    this.setSetting('githubProxyUrl', url)
+  }
+
+  getGitHubProxyOptions(): string[] {
+    return this.getSetting<string[]>('githubProxyOptions') ?? ['https://ghfast.top', 'https://github.moeyy.xyz', 'https://mirror.ghproxy.com']
+  }
+
+  setGitHubProxyOptions(options: string[]): void {
+    this.setSetting('githubProxyOptions', options)
+  }
+
+  addGitHubProxyOption(url: string): void {
+    const options = this.getGitHubProxyOptions()
+    if (!options.includes(url)) {
+      options.push(url)
+      this.setGitHubProxyOptions(options)
+    }
+  }
+
+  removeGitHubProxyOption(url: string): void {
+    const options = this.getGitHubProxyOptions()
+    const filteredOptions = options.filter(option => option !== url)
+    this.setGitHubProxyOptions(filteredOptions)
   }
 }
 

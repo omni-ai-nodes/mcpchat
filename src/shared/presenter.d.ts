@@ -396,6 +396,15 @@ export interface IConfigPresenter {
   getShortcutKey(): ShortcutKeySetting
   setShortcutKey(customShortcutKey: ShortcutKeySetting): void
   resetShortcutKeys(): void
+  // GitHub 代理设置
+  getGitHubProxyEnabled(): boolean
+  setGitHubProxyEnabled(enabled: boolean): void
+  getGitHubProxyUrl(): string
+  setGitHubProxyUrl(url: string): void
+  getGitHubProxyOptions(): string[]
+  setGitHubProxyOptions(options: string[]): void
+  addGitHubProxyOption(url: string): void
+  removeGitHubProxyOption(url: string): void
 }
 export type RENDERER_MODEL_META = {
   id: string
@@ -968,6 +977,7 @@ export interface IMCPPresenter {
   getMcpEnabled(): Promise<boolean>
   resetToDefaultServers(): Promise<void>
   isGitHubRepositoryDownloaded(githubUrl: string, targetName?: string): Promise<boolean>
+  downloadGitHubRepository(githubUrl: string, targetName?: string): Promise<{ success: boolean; localPath?: string; error?: string }>
 }
 
 export interface IDeeplinkPresenter {

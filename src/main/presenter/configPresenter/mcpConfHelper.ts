@@ -1,9 +1,10 @@
 import { eventBus, SendTarget } from '@/eventbus'
-import { MCPServerConfig } from '@shared/presenter'
+import { MCPServerConfig, IConfigPresenter } from '@shared/presenter'
 import { MCP_EVENTS } from '@/events'
 import ElectronStore from 'electron-store'
 import { app } from 'electron'
 import { compare } from 'compare-versions'
+import { GitDownloadManager } from '@/lib/gitDownloadManager'
 
 // MCP设置的接口
 interface IMcpSettings {
@@ -216,8 +217,10 @@ export const SYSTEM_INMEM_MCP_SERVERS: Record<string, MCPServerConfig> = {
 
 export class McpConfHelper {
   private mcpStore: ElectronStore<IMcpSettings> | null = null
+  private configPresenter?: IConfigPresenter
 
-  constructor() {
+  constructor(configPresenter?: IConfigPresenter) {
+    this.configPresenter = configPresenter
     // 延迟初始化ElectronStore，避免同步阻塞
   }
 
@@ -413,8 +416,8 @@ export class McpConfHelper {
       console.log(`[McpConfHelper] 检测到GitHub仓库配置，开始下载: ${config.github}`)
       
       try {
-        // 导入gitDownloadManager
-        const { gitDownloadManager } = await import('@/lib/gitDownloadManager')
+        // 创建 GitDownloadManager 实例
+        const gitDownloadManager = new GitDownloadManager(this.configPresenter)
         
         // 下载GitHub仓库
         const downloadedPath = await gitDownloadManager.downloadRepository(

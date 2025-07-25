@@ -4,7 +4,7 @@ import { IDeeplinkPresenter, MCPServerConfig } from '@shared/presenter'
 import path from 'path'
 import { DEEPLINK_EVENTS, MCP_EVENTS, WINDOW_EVENTS } from '@/events'
 import { eventBus, SendTarget } from '@/eventbus'
-import { gitDownloadManager } from '@/lib/gitDownloadManager'
+import { GitDownloadManager } from '@/lib/gitDownloadManager'
 
 interface MCPInstallConfig {
   mcpServers: Record<
@@ -330,6 +330,7 @@ export class DeeplinkPresenter implements IDeeplinkPresenter {
             console.log(`[DeeplinkPresenter] 检测到GitHub字段，开始下载仓库: ${serverConfig.github}`)
             console.log(`[DeeplinkPresenter] 传递服务器名称作为目标名称: ${serverName}`)
             // 传递服务器名称作为目标名称以便重命名
+            const gitDownloadManager = new GitDownloadManager(presenter.configPresenter)
             const repoPath = await gitDownloadManager.downloadRepository(serverConfig.github, serverName)
             console.log(`[DeeplinkPresenter] GitHub仓库下载完成，路径: ${repoPath}`)
             

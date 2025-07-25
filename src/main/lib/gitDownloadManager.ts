@@ -2,6 +2,7 @@ import { spawn } from 'child_process'
 import path from 'path'
 import fs from 'fs/promises'
 import { app } from 'electron'
+import type { IConfigPresenter } from '../../shared/presenter'
 
 /**
  * Git下载管理器
@@ -9,10 +10,12 @@ import { app } from 'electron'
  */
 export class GitDownloadManager {
   private readonly downloadDir: string
+  private configPresenter?: IConfigPresenter
 
-  constructor() {
+  constructor(configPresenter?: IConfigPresenter) {
     // 下载目录设置为用户数据目录下的mcp-git-repos
     this.downloadDir = path.join(app.getPath('userData'), 'mcp-git-repos')
+    this.configPresenter = configPresenter
   }
 
   /**
@@ -23,6 +26,37 @@ export class GitDownloadManager {
       await fs.access(this.downloadDir)
     } catch {
       await fs.mkdir(this.downloadDir, { recursive: true })
+    }
+  }
+
+  /**
+   * 构建GitHub代理URL
+   * @param originalUrl 原始GitHub URL
+   * @returns 代理URL或原始URL
+   */
+  private buildProxyUrl(originalUrl: string): string {
+    if (!this.configPresenter) {
+      return originalUrl
+    }
+
+    try {
+      const proxyEnabled = this.configPresenter.getGitHubProxyEnabled()
+      if (!proxyEnabled) {
+        return originalUrl
+      }
+
+      const proxyUrl = this.configPresenter.getGitHubProxyUrl()
+      if (!proxyUrl) {
+        return originalUrl
+      }
+
+      // 构建代理URL: proxyUrl + '//' + originalUrl
+      const finalProxyUrl = `${proxyUrl.replace(/\/$/, '')}//${originalUrl}`
+      console.log(`[GitDownloadManager] 使用GitHub代理: ${originalUrl} -> ${finalProxyUrl}`)
+      return finalProxyUrl
+    } catch (error) {
+      console.error(`[GitDownloadManager] 构建代理URL失败:`, error)
+      return originalUrl
     }
   }
 
@@ -140,7 +174,8 @@ export class GitDownloadManager {
     console.log(`[GitDownloadManager] 解析URL结果: owner=${owner}, repo=${repo}, branch=${branch || 'default'}, subPath=${subPath || 'none'}`)
     
     const originalLocalPath = this.getLocalRepoPath(owner, repo, branch)
-    const cloneUrl = `https://github.com/${owner}/${repo}.git`
+    const originalCloneUrl = `https://github.com/${owner}/${repo}.git`
+    const cloneUrl = this.buildProxyUrl(originalCloneUrl)
     
     // 如果指定了目标名称且与原仓库名不同，使用目标名称作为本地路径
     const finalRepoName = targetName && targetName !== repo ? targetName : repo
@@ -305,5 +340,4 @@ export class GitDownloadManager {
   }
 }
 
-// 导出单例实例
-export const gitDownloadManager = new GitDownloadManager()
+// 不再导出单例实例，由使用方自行创建
