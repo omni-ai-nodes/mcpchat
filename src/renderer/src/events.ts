@@ -64,7 +64,11 @@ export const MCP_EVENTS = {
   CONFIG_CHANGED: 'mcp:config-changed',
   TOOL_CALL_RESULT: 'mcp:tool-call-result',
   SERVER_STATUS_CHANGED: 'mcp:server-status-changed',
-  CACHE_UPDATED: 'mcp:cache-updated' // 新增：本地缓存更新事件
+  CACHE_UPDATED: 'mcp:cache-updated', // 新增：本地缓存更新事件
+  GITHUB_DOWNLOAD_STARTED: 'mcp:github-download-started', // GitHub下载开始
+  GITHUB_DOWNLOAD_PROGRESS: 'mcp:github-download-progress', // GitHub下载进度
+  GITHUB_DOWNLOAD_COMPLETED: 'mcp:github-download-completed', // GitHub下载完成
+  GITHUB_DOWNLOAD_ERROR: 'mcp:github-download-error' // GitHub下载错误
 }
 // 同步相关事件
 export const SYNC_EVENTS = {

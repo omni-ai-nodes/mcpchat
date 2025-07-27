@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { usePresenter } from '@/composables/usePresenter'
 import { MCP_EVENTS } from '@/events'
 import { useI18n } from 'vue-i18n'
+import { useToast } from '@/components/ui/toast/use-toast'
 import type {
   McpClient,
   MCPConfig,
@@ -29,6 +30,7 @@ interface MCPToolCallResult {
 
 export const useMcpStore = defineStore('mcp', () => {
   const { t } = useI18n()
+  const { toast } = useToast()
   // 获取MCP相关的presenter
   const mcpPresenter = usePresenter('mcpPresenter')
 
@@ -59,6 +61,21 @@ export const useMcpStore = defineStore('mcp', () => {
   const toolResults = ref<Record<string, string | { type: string; text: string }[]>>({})
   const prompts = ref<PromptListEntry[]>([])
   const resources = ref<ResourceListEntry[]>([])
+
+  // GitHub下载状态
+  const githubDownloadStatus = ref<{
+    isDownloading: boolean
+    currentUrl: string | null
+    stage: string | null
+    message: string | null
+    error: string | null
+  }>({
+    isDownloading: false,
+    currentUrl: null,
+    stage: null,
+    message: null,
+    error: null
+  })
   // ==================== 计算属性 ====================
   // 服务器列表
   const serverList = computed(() => {
@@ -514,6 +531,83 @@ export const useMcpStore = defineStore('mcp', () => {
         }
       }
     )
+
+    // GitHub下载事件监听
+    window.electron.ipcRenderer.on(
+      MCP_EVENTS.GITHUB_DOWNLOAD_STARTED,
+      (_event, data: { url: string }) => {
+        console.log(`GitHub download started: ${data.url}`)
+        githubDownloadStatus.value = {
+          isDownloading: true,
+          currentUrl: data.url,
+          stage: 'started',
+          message: '开始下载 GitHub 仓库...',
+          error: null
+        }
+        // 显示下载开始提示
+        toast({
+          title: 'GitHub 下载',
+          description: '开始下载 GitHub 仓库...',
+          variant: 'default'
+        })
+      }
+    )
+
+    window.electron.ipcRenderer.on(
+      MCP_EVENTS.GITHUB_DOWNLOAD_PROGRESS,
+      (_event, data: { url: string; stage: string; message: string }) => {
+        console.log(`GitHub download progress: ${data.stage} - ${data.message}`)
+        githubDownloadStatus.value = {
+          isDownloading: true,
+          currentUrl: data.url,
+          stage: data.stage,
+          message: data.message,
+          error: null
+        }
+      }
+    )
+
+    window.electron.ipcRenderer.on(
+      MCP_EVENTS.GITHUB_DOWNLOAD_COMPLETED,
+      (_event, data: { url: string; localPath: string }) => {
+        console.log(`GitHub download completed: ${data.url} -> ${data.localPath}`)
+        githubDownloadStatus.value = {
+          isDownloading: false,
+          currentUrl: null,
+          stage: 'completed',
+          message: '下载完成',
+          error: null
+        }
+        // 显示下载完成提示
+        toast({
+          title: 'GitHub 下载完成',
+          description: `仓库已成功下载到本地`,
+          variant: 'default'
+        })
+        // 重新加载配置以更新服务器列表
+        loadConfig()
+      }
+    )
+
+    window.electron.ipcRenderer.on(
+      MCP_EVENTS.GITHUB_DOWNLOAD_ERROR,
+      (_event, data: { url: string; error: string }) => {
+        console.log(`GitHub download error: ${data.url} - ${data.error}`)
+        githubDownloadStatus.value = {
+          isDownloading: false,
+          currentUrl: null,
+          stage: 'error',
+          message: null,
+          error: data.error
+        }
+        // 显示下载错误提示
+        toast({
+          title: 'GitHub 下载失败',
+          description: data.error,
+          variant: 'destructive'
+        })
+      }
+    )
   }
 
   // 初始化
@@ -549,6 +643,7 @@ export const useMcpStore = defineStore('mcp', () => {
     prompts,
     resources,
     mcpEnabled,
+    githubDownloadStatus,
 
     // 计算属性
     serverList,

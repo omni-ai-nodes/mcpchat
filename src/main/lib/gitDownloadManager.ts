@@ -3,6 +3,8 @@ import path from 'path'
 import fs from 'fs/promises'
 import { app } from 'electron'
 import type { IConfigPresenter } from '../../shared/presenter'
+import { eventBus, SendTarget } from '../eventbus'
+import { MCP_EVENTS } from '../events'
 
 /**
  * Git下载管理器
@@ -254,11 +256,18 @@ export class GitDownloadManager {
    * 克隆或更新GitHub仓库
    * @param githubUrl GitHub仓库URL
    * @param targetName 目标名称，如果与仓库名不同则重命名
-   * @returns Promise<string> 本地仓库路径
+   * @param args MCP服务器配置中的args参数，用于确定入口文件
+   * @returns Promise<{localPath: string, entryFile: string}> 本地路径和入口文件
    */
-  async downloadRepository(githubUrl: string, targetName?: string): Promise<{ localPath: string; entryFile: string }> {
+  async downloadRepository(githubUrl: string, targetName?: string, args?: string[]): Promise<{ localPath: string; entryFile: string }> {
     console.log(`[GitDownloadManager] 开始下载GitHub仓库: ${githubUrl}${targetName ? ` -> ${targetName}` : ''}`)
     console.log(`[GitDownloadManager] 下载目录: ${this.downloadDir}`)
+    
+    // 发送下载开始事件
+    eventBus.sendToRenderer(MCP_EVENTS.GITHUB_DOWNLOAD_STARTED, SendTarget.ALL_WINDOWS, {
+      url: githubUrl,
+      targetName: targetName || null
+    })
     
     await this.ensureDownloadDir()
     
@@ -280,6 +289,13 @@ export class GitDownloadManager {
     console.log(`[GitDownloadManager] 克隆URL: ${cloneUrl}`)
     
     try {
+      // 发送进度事件：开始处理
+      eventBus.sendToRenderer(MCP_EVENTS.GITHUB_DOWNLOAD_PROGRESS, SendTarget.ALL_WINDOWS, {
+        url: githubUrl,
+        stage: 'preparing',
+        message: '准备下载...'
+      })
+      
       // 检查是否需要重命名现有仓库
       if (targetName && targetName !== repo) {
         const originalExists = await this.isRepoExists(originalLocalPath)
@@ -287,6 +303,11 @@ export class GitDownloadManager {
         
         if (originalExists && !targetExists) {
           console.log(`[GitDownloadManager] 重命名仓库: ${originalLocalPath} -> ${localPath}`)
+          eventBus.sendToRenderer(MCP_EVENTS.GITHUB_DOWNLOAD_PROGRESS, SendTarget.ALL_WINDOWS, {
+            url: githubUrl,
+            stage: 'renaming',
+            message: '重命名仓库...'
+          })
           await fs.rename(originalLocalPath, localPath)
           console.log(`[GitDownloadManager] 重命名完成`)
         } else {
@@ -296,6 +317,14 @@ export class GitDownloadManager {
       
       if (await this.isRepoExists(localPath)) {
         console.log(`[GitDownloadManager] 仓库已存在，更新代码: ${localPath}`)
+        
+        // 发送进度事件：更新代码
+        eventBus.sendToRenderer(MCP_EVENTS.GITHUB_DOWNLOAD_PROGRESS, SendTarget.ALL_WINDOWS, {
+          url: githubUrl,
+          stage: 'updating',
+          message: '更新代码...'
+        })
+        
         // 仓库已存在，执行pull更新
         console.log(`[GitDownloadManager] 执行 git fetch origin`)
         await this.executeGitCommand('git', ['fetch', 'origin'], localPath)
@@ -314,6 +343,14 @@ export class GitDownloadManager {
         console.log(`[GitDownloadManager] 仓库更新完成`)
       } else {
         console.log(`[GitDownloadManager] 克隆新仓库: ${cloneUrl} -> ${localPath}`)
+        
+        // 发送进度事件：克隆代码
+        eventBus.sendToRenderer(MCP_EVENTS.GITHUB_DOWNLOAD_PROGRESS, SendTarget.ALL_WINDOWS, {
+          url: githubUrl,
+          stage: 'cloning',
+          message: '克隆代码...'
+        })
+        
         // 仓库不存在，执行clone
         const cloneArgs = ['clone']
         if (branch) {
@@ -326,6 +363,13 @@ export class GitDownloadManager {
         await this.executeGitCommand('git', cloneArgs)
         console.log(`[GitDownloadManager] 克隆完成`)
       }
+      
+      // 发送进度事件：安装依赖
+      eventBus.sendToRenderer(MCP_EVENTS.GITHUB_DOWNLOAD_PROGRESS, SendTarget.ALL_WINDOWS, {
+        url: githubUrl,
+        stage: 'installing',
+        message: '安装依赖...'
+      })
       
       // 检查是否需要安装依赖
       await this.installDependenciesIfNeeded(localPath)
@@ -345,36 +389,85 @@ export class GitDownloadManager {
       
       // 尝试读取 package.json 的 main 字段作为入口文件
       let entryFile = 'index.js'; // 默认入口文件
-      try {
-        const packageJsonPath = path.join(localPath, 'package.json');
-        const packageJsonContent = await fs.readFile(packageJsonPath, 'utf-8');
-        const packageJson = JSON.parse(packageJsonContent);
-        if (packageJson.main && typeof packageJson.main === 'string') {
-          entryFile = packageJson.main;
+      
+      // 优先从 args 参数中提取入口文件
+      if (args && args.length > 0) {
+        const firstArg = args[0]
+        // 检查第一个参数是否是相对路径的文件名（不包含路径分隔符）
+        if (firstArg && !firstArg.includes('/') && !firstArg.includes('\\') && !path.isAbsolute(firstArg)) {
+          entryFile = firstArg
+          console.log(`[GitDownloadManager] 从 args 中提取入口文件: ${entryFile}`)
+        } else if (firstArg) {
+          // 如果是绝对路径或包含路径分隔符，提取文件名部分
+          entryFile = path.basename(firstArg)
+          console.log(`[GitDownloadManager] 从 args 路径中提取文件名: ${entryFile}`)
         }
-      } catch (readError) {
-        console.warn(`[GitDownloadManager] Failed to read package.json or main field: ${readError}`);
+      } else {
+        // 如果没有 args，尝试读取 package.json 的 main 字段
+        try {
+          const packageJsonPath = path.join(localPath, 'package.json');
+          const packageJsonContent = await fs.readFile(packageJsonPath, 'utf-8');
+          const packageJson = JSON.parse(packageJsonContent);
+          if (packageJson.main && typeof packageJson.main === 'string') {
+            entryFile = packageJson.main;
+            console.log(`[GitDownloadManager] 从 package.json 中提取入口文件: ${entryFile}`)
+          }
+        } catch (readError) {
+          console.warn(`[GitDownloadManager] Failed to read package.json or main field: ${readError}`);
+        }
+      }
+
+      // 检查入口文件是否存在，如果不存在则回退到常见文件名检查
+      try {
+        const entryFilePath = path.join(localPath, entryFile);
+        await fs.access(entryFilePath);
+        console.log(`[GitDownloadManager] 确认入口文件存在: ${entryFile}`);
+      } catch {
+        console.log(`[GitDownloadManager] 指定的入口文件不存在: ${entryFile}，回退到常见文件名检查`);
+        
+        // 检查常见的 MCP 入口文件名，优先级从高到低
+        const commonEntryFiles = ['claude-mcp.js', 'mcp.js', 'server.js', 'main.js', 'index.js'];
+        let foundEntry = false;
+        
+        for (const fileName of commonEntryFiles) {
+          try {
+            const filePath = path.join(localPath, fileName);
+            await fs.access(filePath);
+            entryFile = fileName;
+            foundEntry = true;
+            console.log(`[GitDownloadManager] 找到常见入口文件: ${fileName}`);
+            break;
+          } catch {
+            // 文件不存在，继续检查下一个
+          }
+        }
+        
+        if (!foundEntry) {
+          console.warn(`[GitDownloadManager] 未找到任何常见入口文件，使用默认: ${entryFile}`);
+        }
       }
       
-      // 检查常见的 MCP 入口文件名，优先级从高到低
-      const commonEntryFiles = ['claude-mcp.js', 'mcp.js', 'server.js', 'main.js', entryFile];
-      for (const fileName of commonEntryFiles) {
-        try {
-          const filePath = path.join(localPath, fileName);
-          await fs.access(filePath);
-          entryFile = fileName;
-          console.log(`[GitDownloadManager] Found entry file: ${fileName}`);
-          break;
-        } catch {
-          // 文件不存在，继续检查下一个
-        }
-      }
+      // 发送下载完成事件
+      eventBus.sendToRenderer(MCP_EVENTS.GITHUB_DOWNLOAD_COMPLETED, SendTarget.ALL_WINDOWS, {
+        url: githubUrl,
+        targetName: targetName || null,
+        localPath: subPath ? path.join(localPath, subPath) : localPath,
+        entryFile
+      })
       
       return { localPath: subPath ? path.join(localPath, subPath) : localPath, entryFile };
     } catch (error) {
       console.error(`[GitDownloadManager] 下载GitHub仓库失败:`, error)
       console.error(`[GitDownloadManager] 失败的URL: ${githubUrl}`)
       console.error(`[GitDownloadManager] 目标名称: ${targetName || 'none'}`)
+      
+      // 发送下载错误事件
+      eventBus.sendToRenderer(MCP_EVENTS.GITHUB_DOWNLOAD_ERROR, SendTarget.ALL_WINDOWS, {
+        url: githubUrl,
+        targetName: targetName || null,
+        error: error instanceof Error ? error.message : String(error)
+      })
+      
       throw error
     }
   }

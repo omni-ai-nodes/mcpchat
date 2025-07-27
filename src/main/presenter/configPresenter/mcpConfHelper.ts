@@ -426,7 +426,8 @@ export class McpConfHelper {
         // 下载GitHub仓库
         const downloadResult = await gitDownloadManager.downloadRepository(
           githubUrl,
-          name // 使用服务器名称作为目标名称
+          name, // 使用服务器名称作为目标名称
+          config.args // 传递 args 参数用于确定入口文件
         )
         
         console.log(`[McpConfHelper] GitHub仓库下载完成: ${downloadResult.localPath}`)
