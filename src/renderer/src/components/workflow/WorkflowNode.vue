@@ -302,7 +302,7 @@ const handleFileUpload = async (event: Event) => {
     // 发送文件保存请求到主进程
     let savedPath = ''
     if (window.electron?.ipcRenderer) {
-      savedPath = await window.electron.ipcRenderer.invoke('save-uploaded-file', {
+      savedPath = await window.electron?.ipcRenderer?.invoke('save-uploaded-file', {
         fileName,
         fileData: Array.from(new Uint8Array(arrayBuffer)),
         originalName: file.name

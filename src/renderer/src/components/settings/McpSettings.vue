@@ -126,7 +126,7 @@ const formatSize = (bytes: number): string => {
 // 更新缓存统计信息
 const updateCacheStats = async () => {
   try {
-    const stats = await window.electron.ipcRenderer.invoke('presenter:call', 'mcpPresenter', 'getLocalPackageCacheStats')
+    const stats = await window.electron?.ipcRenderer?.invoke('presenter:call', 'mcpPresenter', 'getLocalPackageCacheStats')
     cacheStats.value = stats
   } catch (error) {
     console.error('Failed to get cache stats:', error)
@@ -136,7 +136,7 @@ const updateCacheStats = async () => {
 // 检查网络状态
 const checkNetworkStatus = async () => {
   try {
-    const status = await window.electron.ipcRenderer.invoke('presenter:call', 'mcpPresenter', 'checkNetworkConnection')
+    const status = await window.electron?.ipcRenderer?.invoke('presenter:call', 'mcpPresenter', 'checkNetworkConnection')
     networkStatus.value = status
   } catch (error) {
     console.error('Failed to check network status:', error)
@@ -148,7 +148,7 @@ const checkNetworkStatus = async () => {
 const clearLocalCache = async () => {
   try {
     cacheClearing.value = true
-    await window.electron.ipcRenderer.invoke('presenter:call', 'mcpPresenter', 'clearLocalPackageCache')
+    await window.electron?.ipcRenderer?.invoke('presenter:call', 'mcpPresenter', 'clearLocalPackageCache')
     await updateCacheStats()
     toast({
       title: t('settings.mcp.localCache.clearSuccess'),
@@ -196,7 +196,7 @@ onMounted(async () => {
   networkCheckInterval = setInterval(checkNetworkStatus, 30000) // 每30秒检查一次
   
   // 监听MCP缓存更新事件
-  window.electron.ipcRenderer.on(MCP_EVENTS.CACHE_UPDATED, handleCacheUpdateEvent)
+  window.electron?.ipcRenderer?.on(MCP_EVENTS.CACHE_UPDATED, handleCacheUpdateEvent)
 })
 
 onUnmounted(() => {
@@ -205,6 +205,6 @@ onUnmounted(() => {
   }
   
   // 移除事件监听器
-  window.electron.ipcRenderer.removeListener(MCP_EVENTS.CACHE_UPDATED, handleCacheUpdateEvent)
+  window.electron?.ipcRenderer?.removeListener(MCP_EVENTS.CACHE_UPDATED, handleCacheUpdateEvent)
 })
 </script>

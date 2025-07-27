@@ -63,13 +63,13 @@ export const useTabStore = defineStore('tab', () => {
   const init = async () => {
     const windowId = window.api.getWindowId()
     const tabsData = await tabPresenter.getWindowTabsData(windowId ?? 1)
-    window.electron.ipcRenderer.on('update-window-tabs', (_, windowId, tabsData: TabData[]) => {
+    window.electron?.ipcRenderer?.on('update-window-tabs', (_, windowId, tabsData: TabData[]) => {
       // console.log('update-window-tabs', windowId, tabsData)
       updateWindowTabs(windowId, tabsData)
     })
 
     // 监听标题更新事件
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       TAB_EVENTS.TITLE_UPDATED,
       (_, data: { tabId: number; title: string; windowId: number }) => {
         const tab = tabs.value.find((t) => t.id === data.tabId)

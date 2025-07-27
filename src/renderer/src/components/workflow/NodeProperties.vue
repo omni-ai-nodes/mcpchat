@@ -329,7 +329,7 @@ const apiTestResult = ref<{ success: boolean; message: string } | null>(null)
 const loadProviders = async () => {
   try {
     if (window.electron?.ipcRenderer) {
-      const providers = await window.electron.ipcRenderer.invoke('get-llm-providers')
+      const providers = await window.electron?.ipcRenderer?.invoke('get-llm-providers')
       availableProviders.value = providers || []
     }
   } catch (error) {
@@ -341,7 +341,7 @@ const loadProviders = async () => {
 const loadModels = async (providerId: string) => {
   try {
     if (window.electron?.ipcRenderer && providerId) {
-      const models = await window.electron.ipcRenderer.invoke('get-provider-models', providerId)
+      const models = await window.electron?.ipcRenderer?.invoke('get-provider-models', providerId)
       availableModels.value = models || []
     }
   } catch (error) {

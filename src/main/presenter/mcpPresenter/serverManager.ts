@@ -187,7 +187,7 @@ export class ServerManager {
       // 预安装npx包（如果需要）- 完全异步执行，不阻塞启动
       // 使用 setImmediate 确保完全异步
       setImmediate(() => {
-        this.preInstallPackageIfNeeded(serverConfig, npmRegistry)
+        this.preInstallPackageIfNeeded(serverConfig as unknown as Record<string, unknown>, npmRegistry)
       })
       
       // 创建并保存客户端实例，传入npm registry
@@ -222,12 +222,13 @@ export class ServerManager {
    */
   private preInstallPackageIfNeeded(serverConfig: Record<string, unknown>, npmRegistry?: string | null): void {
     const command = serverConfig.command as string
+    const args = serverConfig.args as string[] | undefined
     let packageName: string | undefined
   
     if (command === 'npx') {
       // 对于 command === 'npx'，从 args 中提取包名（假设 args[0] 是 -y，args[1] 是包名）
-      if (serverConfig.args && serverConfig.args.length >= 2 && serverConfig.args[0] === '-y') {
-        packageName = serverConfig.args[1]
+      if (args && args.length >= 2 && args[0] === '-y') {
+        packageName = args[1]
       }
     } else if (command.startsWith('npx ')) {
       packageName = command.split(' ')[1]

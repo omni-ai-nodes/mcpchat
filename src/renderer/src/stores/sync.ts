@@ -29,29 +29,29 @@ export const useSyncStore = defineStore('sync', () => {
     isBackingUp.value = status.isBackingUp
 
     // 监听备份状态变化事件
-    window.electron.ipcRenderer.on(SYNC_EVENTS.BACKUP_STARTED, () => {
+    window.electron?.ipcRenderer?.on(SYNC_EVENTS.BACKUP_STARTED, () => {
       isBackingUp.value = true
     })
 
-    window.electron.ipcRenderer.on(SYNC_EVENTS.BACKUP_COMPLETED, (_event, time) => {
+    window.electron?.ipcRenderer?.on(SYNC_EVENTS.BACKUP_COMPLETED, (_event, time) => {
       isBackingUp.value = false
       lastSyncTime.value = time
     })
 
-    window.electron.ipcRenderer.on(SYNC_EVENTS.BACKUP_ERROR, () => {
+    window.electron?.ipcRenderer?.on(SYNC_EVENTS.BACKUP_ERROR, () => {
       isBackingUp.value = false
     })
 
     // 导入事件
-    window.electron.ipcRenderer.on(SYNC_EVENTS.IMPORT_STARTED, () => {
+    window.electron?.ipcRenderer?.on(SYNC_EVENTS.IMPORT_STARTED, () => {
       isImporting.value = true
     })
 
-    window.electron.ipcRenderer.on(SYNC_EVENTS.IMPORT_COMPLETED, () => {
+    window.electron?.ipcRenderer?.on(SYNC_EVENTS.IMPORT_COMPLETED, () => {
       isImporting.value = false
     })
 
-    window.electron.ipcRenderer.on(SYNC_EVENTS.IMPORT_ERROR, () => {
+    window.electron?.ipcRenderer?.on(SYNC_EVENTS.IMPORT_ERROR, () => {
       isImporting.value = false
     })
   }

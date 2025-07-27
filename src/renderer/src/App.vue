@@ -174,24 +174,24 @@ onMounted(async () => {
   document.body.classList.add(settingsStore.fontSizeClass)
 
   // 监听全局错误通知事件
-  window.electron.ipcRenderer.on(NOTIFICATION_EVENTS.SHOW_ERROR, (_event, error) => {
+  window.electron?.ipcRenderer?.on(NOTIFICATION_EVENTS.SHOW_ERROR, (_event, error) => {
     showErrorToast(error)
   })
 
   // 监听快捷键事件
-  window.electron.ipcRenderer.on(SHORTCUT_EVENTS.ZOOM_IN, () => {
+  window.electron?.ipcRenderer?.on(SHORTCUT_EVENTS.ZOOM_IN, () => {
     handleZoomIn()
   })
 
-  window.electron.ipcRenderer.on(SHORTCUT_EVENTS.ZOOM_OUT, () => {
+  window.electron?.ipcRenderer?.on(SHORTCUT_EVENTS.ZOOM_OUT, () => {
     handleZoomOut()
   })
 
-  window.electron.ipcRenderer.on(SHORTCUT_EVENTS.ZOOM_RESUME, () => {
+  window.electron?.ipcRenderer?.on(SHORTCUT_EVENTS.ZOOM_RESUME, () => {
     handleZoomResume()
   })
 
-  window.electron.ipcRenderer.on(SHORTCUT_EVENTS.CREATE_NEW_CONVERSATION, () => {
+  window.electron?.ipcRenderer?.on(SHORTCUT_EVENTS.CREATE_NEW_CONVERSATION, () => {
     // 检查当前路由是否为聊天页面
     const currentRoute = router.currentRoute.value
     if (currentRoute.name !== 'chat') {
@@ -200,11 +200,11 @@ onMounted(async () => {
     handleCreateNewConversation()
   })
 
-  window.electron.ipcRenderer.on(SHORTCUT_EVENTS.GO_SETTINGS, () => {
+  window.electron?.ipcRenderer?.on(SHORTCUT_EVENTS.GO_SETTINGS, () => {
     handleGoSettings()
   })
 
-  window.electron.ipcRenderer.on(NOTIFICATION_EVENTS.SYS_NOTIFY_CLICKED, (_, msg) => {
+  window.electron?.ipcRenderer?.on(NOTIFICATION_EVENTS.SYS_NOTIFY_CLICKED, (_, msg) => {
     let threadId: string | null = null
 
     // 检查msg是否为字符串且是否以chat/开头
@@ -276,12 +276,12 @@ onBeforeUnmount(() => {
   }
 
   // 移除快捷键事件监听
-  window.electron.ipcRenderer.removeAllListeners(SHORTCUT_EVENTS.ZOOM_IN)
-  window.electron.ipcRenderer.removeAllListeners(SHORTCUT_EVENTS.ZOOM_OUT)
-  window.electron.ipcRenderer.removeAllListeners(SHORTCUT_EVENTS.ZOOM_RESUME)
-  window.electron.ipcRenderer.removeAllListeners(SHORTCUT_EVENTS.CREATE_NEW_CONVERSATION)
-  window.electron.ipcRenderer.removeAllListeners(SHORTCUT_EVENTS.GO_SETTINGS)
-  window.electron.ipcRenderer.removeAllListeners(NOTIFICATION_EVENTS.SYS_NOTIFY_CLICKED)
+  window.electron?.ipcRenderer?.removeAllListeners(SHORTCUT_EVENTS.ZOOM_IN)
+  window.electron?.ipcRenderer?.removeAllListeners(SHORTCUT_EVENTS.ZOOM_OUT)
+  window.electron?.ipcRenderer?.removeAllListeners(SHORTCUT_EVENTS.ZOOM_RESUME)
+  window.electron?.ipcRenderer?.removeAllListeners(SHORTCUT_EVENTS.CREATE_NEW_CONVERSATION)
+  window.electron?.ipcRenderer?.removeAllListeners(SHORTCUT_EVENTS.GO_SETTINGS)
+  window.electron?.ipcRenderer?.removeAllListeners(NOTIFICATION_EVENTS.SYS_NOTIFY_CLICKED)
 })
 </script>
 

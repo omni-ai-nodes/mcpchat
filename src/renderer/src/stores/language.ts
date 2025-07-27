@@ -18,7 +18,7 @@ export const useLanguageStore = defineStore('language', () => {
       // 设置语言
       locale.value = await configPresenter.getLanguage()
       // 监听语言变更事件
-      window.electron.ipcRenderer.on(
+      window.electron?.ipcRenderer?.on(
         CONFIG_EVENTS.LANGUAGE_CHANGED,
         async (_event, newLanguage: string) => {
           language.value = newLanguage

@@ -39,12 +39,12 @@ export const useThemeStore = defineStore('theme', () => {
 
   // 注册和清理主题变化监听器
   onMounted(() => {
-    window.electron.ipcRenderer.on('system-theme-updated', handleSystemThemeChange)
+    window.electron?.ipcRenderer?.on('system-theme-updated', handleSystemThemeChange)
   })
 
   onUnmounted(() => {
-    window.electron.ipcRenderer.removeListener('system-theme-updated', handleSystemThemeChange)
-  })
+      window.electron?.ipcRenderer?.removeListener('system-theme-updated', handleSystemThemeChange)
+    })
 
   // 监听深色模式变化
   // watch(isDark, (value) => {

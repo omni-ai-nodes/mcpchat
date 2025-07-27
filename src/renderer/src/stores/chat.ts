@@ -934,7 +934,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  window.electron.ipcRenderer.on(CONVERSATION_EVENTS.ACTIVATED, (_, msg) => {
+  window.electron?.ipcRenderer?.on(CONVERSATION_EVENTS.ACTIVATED, (_, msg) => {
     // 如果不是当前tab
     if (msg.tabId !== getTabId()) {
       // 检查新激活的会话是否在当前窗口的会话列表中
@@ -1046,11 +1046,11 @@ export const useChatStore = defineStore('chat', () => {
 
   /////////////////////////////////////////////////////////////////////////////////////////////////////////
   // 注册消息编辑事件处理
-  window.electron.ipcRenderer.on(CONVERSATION_EVENTS.MESSAGE_EDITED, (_, msgId: string) => {
+  window.electron?.ipcRenderer?.on(CONVERSATION_EVENTS.MESSAGE_EDITED, (_, msgId: string) => {
     handleMessageEdited(msgId)
   })
 
-  window.electron.ipcRenderer.on(DEEPLINK_EVENTS.START, async (_, data) => {
+  window.electron?.ipcRenderer?.on(DEEPLINK_EVENTS.START, async (_, data) => {
     console.log('DEEPLINK_EVENTS.START', data)
     // 检查当前路由，如果不在新会话页面，则跳转
     const currentRoute = router.currentRoute.value

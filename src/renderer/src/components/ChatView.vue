@@ -63,16 +63,16 @@ const handleFileUpload = () => {
 
 // 监听流式响应
 onMounted(async () => {
-  window.electron.ipcRenderer.on(STREAM_EVENTS.RESPONSE, (_, msg) => {
+  window.electron?.ipcRenderer?.on(STREAM_EVENTS.RESPONSE, (_, msg) => {
     // console.log('stream-response', msg)
     chatStore.handleStreamResponse(msg)
   })
 
-  window.electron.ipcRenderer.on(STREAM_EVENTS.END, (_, msg) => {
+  window.electron?.ipcRenderer?.on(STREAM_EVENTS.END, (_, msg) => {
     chatStore.handleStreamEnd(msg)
   })
 
-  window.electron.ipcRenderer.on(STREAM_EVENTS.ERROR, (_, msg) => {
+  window.electron?.ipcRenderer?.on(STREAM_EVENTS.ERROR, (_, msg) => {
     chatStore.handleStreamError(msg)
   })
 
@@ -103,8 +103,8 @@ watch(
 
 // 清理事件监听
 onUnmounted(async () => {
-  window.electron.ipcRenderer.removeAllListeners(STREAM_EVENTS.RESPONSE)
-  window.electron.ipcRenderer.removeAllListeners(STREAM_EVENTS.END)
-  window.electron.ipcRenderer.removeAllListeners(STREAM_EVENTS.ERROR)
+  window.electron?.ipcRenderer?.removeAllListeners(STREAM_EVENTS.RESPONSE)
+  window.electron?.ipcRenderer?.removeAllListeners(STREAM_EVENTS.END)
+  window.electron?.ipcRenderer?.removeAllListeners(STREAM_EVENTS.ERROR)
 })
 </script>

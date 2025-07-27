@@ -21,19 +21,19 @@ const handleAskAI = (text: string) => {
 }
 
 onMounted(() => {
-  window.electron.ipcRenderer.on(
+  window.electron?.ipcRenderer?.on(
     'context-menu-translate',
     (_: unknown, text: string, x?: number, y?: number) => {
       handleTranslate(text, x, y)
     }
   )
-  window.electron.ipcRenderer.on('context-menu-ask-ai', (_: unknown, text: string) => {
+  window.electron?.ipcRenderer?.on('context-menu-ask-ai', (_: unknown, text: string) => {
     handleAskAI(text)
   })
 })
 
 onUnmounted(() => {
-  window.electron.ipcRenderer.removeAllListeners('context-menu-translate')
-  window.electron.ipcRenderer.removeAllListeners('context-menu-ask-ai')
+  window.electron?.ipcRenderer?.removeAllListeners('context-menu-translate')
+  window.electron?.ipcRenderer?.removeAllListeners('context-menu-ask-ai')
 })
 </script>

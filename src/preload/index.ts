@@ -125,7 +125,33 @@ const api = {
     }
   }
 }
+
+// 暴露 Electron API
 exposeElectronAPI()
+
+// 手动暴露 ipcRenderer 到 window.electron
+const electronAPI = {
+  ipcRenderer: {
+    on: (channel: string, listener: (...args: unknown[]) => void) => {
+      ipcRenderer.on(channel, listener)
+    },
+    removeListener: (channel: string, listener: (...args: unknown[]) => void) => {
+      ipcRenderer.removeListener(channel, listener)
+    },
+    removeAllListeners: (channel: string) => {
+      ipcRenderer.removeAllListeners(channel)
+    },
+    send: (channel: string, ...args: unknown[]) => {
+      ipcRenderer.send(channel, ...args)
+    },
+    invoke: (channel: string, ...args: unknown[]) => {
+      return ipcRenderer.invoke(channel, ...args)
+    },
+    sendSync: (channel: string, ...args: unknown[]) => {
+      return ipcRenderer.sendSync(channel, ...args)
+    }
+  }
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
@@ -133,12 +159,15 @@ exposeElectronAPI()
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('api', api)
+    contextBridge.exposeInMainWorld('electron', electronAPI)
   } catch (error) {
     console.error(error)
   }
 } else {
   // @ts-ignore (define in dts)
   window.api = api
+  // @ts-ignore (define in dts)
+  window.electron = electronAPI
 }
 window.addEventListener('DOMContentLoaded', () => {
   webFrame.setVisualZoomLevelLimits(1, 1) // 禁用 trackpad 缩放

@@ -498,7 +498,7 @@ export class McpConfHelper {
         
         // 使用更新后的配置
         const mcpServers = await this.getMcpServers()
-        mcpServers[name] = updatedConfig
+        mcpServers[name] = updatedConfig as MCPServerConfig
         await this.setMcpServers(mcpServers)
         
         console.log(`[McpConfHelper] MCP服务器添加完成: ${name}`)
@@ -508,7 +508,7 @@ export class McpConfHelper {
         console.error(`[McpConfHelper] GitHub仓库下载失败:`, downloadError)
         // 下载失败时仍然保存原始配置
         const mcpServers = await this.getMcpServers()
-        mcpServers[name] = config
+        mcpServers[name] = config as MCPServerConfig
         await this.setMcpServers(mcpServers)
         return true
       }
@@ -516,7 +516,7 @@ export class McpConfHelper {
       console.log(`[McpConfHelper] 普通MCP服务器配置，直接保存`)
       // 普通配置，直接保存
       const mcpServers = await this.getMcpServers()
-      mcpServers[name] = config
+      mcpServers[name] = config as MCPServerConfig
       await this.setMcpServers(mcpServers)
       return true
     }

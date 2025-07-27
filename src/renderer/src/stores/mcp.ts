@@ -499,22 +499,22 @@ export const useMcpStore = defineStore('mcp', () => {
   // ==================== 事件监听 ====================
   // 初始化事件监听
   const initEvents = () => {
-    window.electron.ipcRenderer.on(MCP_EVENTS.SERVER_STARTED, (_event, serverName: string) => {
+    window.electron?.ipcRenderer?.on(MCP_EVENTS.SERVER_STARTED, (_event, serverName: string) => {
       console.log(`MCP server started: ${serverName}`)
       updateServerStatus(serverName)
     })
 
-    window.electron.ipcRenderer.on(MCP_EVENTS.SERVER_STOPPED, (_event, serverName: string) => {
+    window.electron?.ipcRenderer?.on(MCP_EVENTS.SERVER_STOPPED, (_event, serverName: string) => {
       console.log(`MCP server stopped: ${serverName}`)
       updateServerStatus(serverName)
     })
 
-    window.electron.ipcRenderer.on(MCP_EVENTS.CONFIG_CHANGED, () => {
+    window.electron?.ipcRenderer?.on(MCP_EVENTS.CONFIG_CHANGED, () => {
       console.log('MCP config changed')
       loadConfig()
     })
 
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       MCP_EVENTS.SERVER_STATUS_CHANGED,
       (_event, serverName: string, isRunning: boolean) => {
         console.log(`MCP server ${serverName} status changed: ${isRunning}`)
@@ -522,7 +522,7 @@ export const useMcpStore = defineStore('mcp', () => {
       }
     )
 
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       MCP_EVENTS.TOOL_CALL_RESULT,
       (_event, result: MCPToolCallResult) => {
         console.log(`MCP tool call result:`, result.function_name)
@@ -533,7 +533,7 @@ export const useMcpStore = defineStore('mcp', () => {
     )
 
     // GitHub下载事件监听
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       MCP_EVENTS.GITHUB_DOWNLOAD_STARTED,
       (_event, data: { url: string }) => {
         console.log(`GitHub download started: ${data.url}`)
@@ -553,7 +553,7 @@ export const useMcpStore = defineStore('mcp', () => {
       }
     )
 
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       MCP_EVENTS.GITHUB_DOWNLOAD_PROGRESS,
       (_event, data: { url: string; stage: string; message: string }) => {
         console.log(`GitHub download progress: ${data.stage} - ${data.message}`)
@@ -567,7 +567,7 @@ export const useMcpStore = defineStore('mcp', () => {
       }
     )
 
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       MCP_EVENTS.GITHUB_DOWNLOAD_COMPLETED,
       (_event, data: { url: string; localPath: string }) => {
         console.log(`GitHub download completed: ${data.url} -> ${data.localPath}`)
@@ -589,7 +589,7 @@ export const useMcpStore = defineStore('mcp', () => {
       }
     )
 
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       MCP_EVENTS.GITHUB_DOWNLOAD_ERROR,
       (_event, data: { url: string; error: string }) => {
         console.log(`GitHub download error: ${data.url} - ${data.error}`)
@@ -610,7 +610,7 @@ export const useMcpStore = defineStore('mcp', () => {
     )
 
     // npm install 事件监听
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_STARTED,
       (_event, data: { installer: string; serverName: string; packagePath?: string }) => {
         console.log(`npm install started: ${data.installer} for ${data.serverName}`)
@@ -623,7 +623,7 @@ export const useMcpStore = defineStore('mcp', () => {
       }
     )
 
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS,
       (_event, data: { installer: string; serverName: string; message?: string; output?: string }) => {
         const message = data.message || data.output || ''
@@ -632,7 +632,7 @@ export const useMcpStore = defineStore('mcp', () => {
       }
     )
 
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_COMPLETED,
       (_event, data: { installer: string; serverName: string; success?: boolean }) => {
         console.log(`npm install completed: ${data.installer} for ${data.serverName}`)
@@ -645,7 +645,7 @@ export const useMcpStore = defineStore('mcp', () => {
       }
     )
 
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR,
       (_event, data: { installer: string; serverName: string; error: string }) => {
         console.log(`npm install error: ${data.installer} - ${data.error}`)

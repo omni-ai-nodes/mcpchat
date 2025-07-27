@@ -34,7 +34,7 @@ export const useSoundStore = defineStore('sound', () => {
   // 设置音效开关监听器
   const setupSoundEnabledListener = () => {
     // 监听音效开关变更事件
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       CONFIG_EVENTS.SOUND_ENABLED_CHANGED,
       (_event, enabled: boolean) => {
         soundEnabled.value = enabled

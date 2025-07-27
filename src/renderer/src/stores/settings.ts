@@ -178,7 +178,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   // 监听 deeplink 事件
-  window.electron.ipcRenderer.on(DEEPLINK_EVENTS.MCP_INSTALL, async (_, data) => {
+  window.electron?.ipcRenderer?.on(DEEPLINK_EVENTS.MCP_INSTALL, async (_, data) => {
     const { mcpConfig } = data
     if (!mcpConfig) {
       return
@@ -591,13 +591,13 @@ export const useSettingsStore = defineStore('settings', () => {
   // 监听 provider 设置变化
   const setupProviderListener = () => {
     // 监听配置变更事件
-    window.electron.ipcRenderer.on(CONFIG_EVENTS.PROVIDER_CHANGED, async () => {
+    window.electron?.ipcRenderer?.on(CONFIG_EVENTS.PROVIDER_CHANGED, async () => {
       providers.value = await configP.getProviders()
       await refreshAllModels()
     })
 
     // 监听模型列表更新事件
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       CONFIG_EVENTS.MODEL_LIST_CHANGED,
       async (_event, providerId: string) => {
         // 只刷新指定的provider模型，而不是所有模型
@@ -610,7 +610,7 @@ export const useSettingsStore = defineStore('settings', () => {
       }
     )
     // 监听配置中的模型列表变更事件
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       CONFIG_EVENTS.MODEL_LIST_CHANGED,
       async (_event, providerId: string) => {
         // 只刷新指定的provider模型，而不是所有模型
@@ -624,7 +624,7 @@ export const useSettingsStore = defineStore('settings', () => {
     )
 
     // 处理模型启用状态变更事件
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       CONFIG_EVENTS.MODEL_STATUS_CHANGED,
       async (_event, msg: { providerId: string; modelId: string; enabled: boolean }) => {
         // 只更新模型启用状态，而不是刷新所有模型
@@ -1203,7 +1203,7 @@ export const useSettingsStore = defineStore('settings', () => {
   // 添加监听搜索引擎更新的事件
   const setupSearchEnginesListener = () => {
     // 使用IPC监听事件
-    window.electron.ipcRenderer.on(CONFIG_EVENTS.SEARCH_ENGINES_UPDATED, async () => {
+    window.electron?.ipcRenderer?.on(CONFIG_EVENTS.SEARCH_ENGINES_UPDATED, async () => {
       try {
         const customEngines = await configP.getCustomSearchEngines()
         if (customEngines && customEngines.length > 0) {
@@ -1233,7 +1233,7 @@ export const useSettingsStore = defineStore('settings', () => {
   // 设置投屏保护监听器
   const setupContentProtectionListener = () => {
     // 监听投屏保护变更事件
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       CONFIG_EVENTS.CONTENT_PROTECTION_CHANGED,
       (_event, enabled: boolean) => {
         contentProtectionEnabled.value = enabled
@@ -1262,7 +1262,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   const setupCopyWithCotEnabledListener = () => {
-    window.electron.ipcRenderer.on(
+    window.electron?.ipcRenderer?.on(
       CONFIG_EVENTS.COPY_WITH_COT_CHANGED,
       (_event, enabled: boolean) => {
         copyWithCotEnabled.value = enabled

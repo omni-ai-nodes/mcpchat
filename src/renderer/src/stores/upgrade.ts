@@ -71,7 +71,7 @@ export const useUpgradeStore = defineStore('upgrade', () => {
   const setupUpdateListener = () => {
     console.log('setupUpdateListener')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    window.electron.ipcRenderer.on(UPDATE_EVENTS.STATUS_CHANGED, (_, event: any) => {
+    window.electron?.ipcRenderer?.on(UPDATE_EVENTS.STATUS_CHANGED, (_, event: any) => {
       const { status, info, error } = event
       console.log(UPDATE_EVENTS.STATUS_CHANGED, status, info, error)
       // 根据不同状态更新UI
@@ -146,7 +146,7 @@ export const useUpgradeStore = defineStore('upgrade', () => {
 
     // 监听更新进度
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    window.electron.ipcRenderer.on(UPDATE_EVENTS.PROGRESS, (_, progressData: any) => {
+    window.electron?.ipcRenderer?.on(UPDATE_EVENTS.PROGRESS, (_, progressData: any) => {
       console.log(UPDATE_EVENTS.PROGRESS, progressData)
       if (progressData) {
         updateProgress.value = {
@@ -159,14 +159,14 @@ export const useUpgradeStore = defineStore('upgrade', () => {
     })
 
     // 监听即将重启事件
-    window.electron.ipcRenderer.on(UPDATE_EVENTS.WILL_RESTART, () => {
+    window.electron?.ipcRenderer?.on(UPDATE_EVENTS.WILL_RESTART, () => {
       console.log(UPDATE_EVENTS.WILL_RESTART)
       isRestarting.value = true
     })
 
     // 监听更新错误
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    window.electron.ipcRenderer.on(UPDATE_EVENTS.ERROR, (_, errorData: any) => {
+    window.electron?.ipcRenderer?.on(UPDATE_EVENTS.ERROR, (_, errorData: any) => {
       console.error(UPDATE_EVENTS.ERROR, errorData.error)
       hasUpdate.value = false
       updateInfo.value = null

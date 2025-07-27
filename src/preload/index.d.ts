@@ -1,4 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
+import { IpcRenderer } from 'electron'
 
 // 工作流相关类型定义
 interface WorkflowNode {
@@ -60,8 +61,13 @@ interface DatabaseConfig {
 interface DatabaseResult {
   success: boolean
   message: string
-  data?: any
+  data?: unknown
   error?: string
+}
+
+// 扩展 ElectronAPI 以包含 ipcRenderer
+interface ExtendedElectronAPI extends ElectronAPI {
+  ipcRenderer: IpcRenderer
 }
 
 interface IpcAPI {
@@ -101,7 +107,7 @@ interface IpcAPI {
 
 declare global {
   interface Window {
-    electron: ElectronAPI
+    electron: ExtendedElectronAPI
     api: IpcAPI
   }
 }

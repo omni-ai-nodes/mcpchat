@@ -306,12 +306,12 @@ onMounted(async () => {
   })
 
   // 监听清除聊天历史的快捷键事件
-  window.electron.ipcRenderer.on(SHORTCUT_EVENTS.CLEAN_CHAT_HISTORY, () => {
+  window.electron?.ipcRenderer?.on(SHORTCUT_EVENTS.CLEAN_CHAT_HISTORY, () => {
     handleCleanChatHistory()
   })
 
   // 监听删除会话的快捷键事件
-  window.electron.ipcRenderer.on(SHORTCUT_EVENTS.DELETE_CONVERSATION, () => {
+  window.electron?.ipcRenderer?.on(SHORTCUT_EVENTS.DELETE_CONVERSATION, () => {
     if (chatStore.activeThread) {
       showDeleteDialog(chatStore.activeThread)
     }
@@ -321,7 +321,7 @@ onMounted(async () => {
 // 在组件卸载前移除事件监听
 onBeforeUnmount(() => {
   // 移除清除聊天历史的事件监听
-  window.electron.ipcRenderer.removeAllListeners(SHORTCUT_EVENTS.CLEAN_CHAT_HISTORY)
+  window.electron?.ipcRenderer?.removeAllListeners(SHORTCUT_EVENTS.CLEAN_CHAT_HISTORY)
 })
 </script>
 
