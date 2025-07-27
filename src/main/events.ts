@@ -100,6 +100,14 @@ export const MCP_EVENTS = {
   GITHUB_DOWNLOAD_ERROR: 'mcp:github-download-error' // GitHub下载错误
 }
 
+// GitHub 下载相关事件
+export const GITHUB_DOWNLOAD_EVENTS = {
+  NPM_INSTALL_STARTED: 'mcp:npm-install-started', // npm install 开始
+  NPM_INSTALL_PROGRESS: 'mcp:npm-install-progress', // npm install 进度
+  NPM_INSTALL_COMPLETED: 'mcp:npm-install-completed', // npm install 完成
+  NPM_INSTALL_ERROR: 'mcp:npm-install-error' // npm install 错误
+}
+
 // 同步相关事件
 export const SYNC_EVENTS = {
   BACKUP_STARTED: 'sync:backup-started',

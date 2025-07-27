@@ -1,7 +1,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { defineStore } from 'pinia'
 import { usePresenter } from '@/composables/usePresenter'
-import { MCP_EVENTS } from '@/events'
+import { MCP_EVENTS, GITHUB_DOWNLOAD_EVENTS } from '@/events'
 import { useI18n } from 'vue-i18n'
 import { useToast } from '@/components/ui/toast/use-toast'
 import type {
@@ -604,6 +604,55 @@ export const useMcpStore = defineStore('mcp', () => {
         toast({
           title: 'GitHub 下载失败',
           description: data.error,
+          variant: 'destructive'
+        })
+      }
+    )
+
+    // npm install 事件监听
+    window.electron.ipcRenderer.on(
+      GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_STARTED,
+      (_event, data: { installer: string; serverName: string; packagePath?: string }) => {
+        console.log(`npm install started: ${data.installer} for ${data.serverName}`)
+        // 显示安装开始提示
+        toast({
+          title: '依赖安装',
+          description: `开始使用 ${data.installer} 安装依赖...`,
+          variant: 'default'
+        })
+      }
+    )
+
+    window.electron.ipcRenderer.on(
+      GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS,
+      (_event, data: { installer: string; serverName: string; message?: string; output?: string }) => {
+        const message = data.message || data.output || ''
+        console.log(`npm install progress: ${data.installer} - ${message}`)
+        // 可以在这里显示安装进度，但为了避免过多的 toast，暂时只记录日志
+      }
+    )
+
+    window.electron.ipcRenderer.on(
+      GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_COMPLETED,
+      (_event, data: { installer: string; serverName: string; success?: boolean }) => {
+        console.log(`npm install completed: ${data.installer} for ${data.serverName}`)
+        // 显示安装完成提示
+        toast({
+          title: '依赖安装完成',
+          description: `${data.installer} 安装依赖成功`,
+          variant: 'default'
+        })
+      }
+    )
+
+    window.electron.ipcRenderer.on(
+      GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR,
+      (_event, data: { installer: string; serverName: string; error: string }) => {
+        console.log(`npm install error: ${data.installer} - ${data.error}`)
+        // 显示安装错误提示
+        toast({
+          title: '依赖安装失败',
+          description: `${data.installer} 安装失败: ${data.error}`,
           variant: 'destructive'
         })
       }

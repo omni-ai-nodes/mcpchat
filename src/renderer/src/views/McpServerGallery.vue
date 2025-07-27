@@ -1090,6 +1090,18 @@ const installServer = async (server: ServerItem) => {
 const handleInstallSubmit = async (name: string, config: MCPServerConfig) => {
   console.log('安装服务器配置:', name, config)
   
+  // 立即关闭弹窗
+  isInstallDialogOpen.value = false
+  // 清空预填充配置
+  prefilledJsonConfig.value = ''
+  
+  // 显示开始安装的提示
+  toast({
+    title: '开始安装',
+    description: `正在安装服务器 "${name}"...`,
+    variant: 'default'
+  })
+  
   try {
     // 调用 McpServers 组件的 handleAddServer 方法
     if (mcpServersRef.value) {
@@ -1156,11 +1168,6 @@ const handleInstallSubmit = async (name: string, config: MCPServerConfig) => {
       installFormRef.value.isSubmitting = false
     }
   }
-  
-  // 关闭弹窗
-  isInstallDialogOpen.value = false
-  // 清空预填充配置
-  prefilledJsonConfig.value = ''
 }
 
 // 打开MCP设置弹窗

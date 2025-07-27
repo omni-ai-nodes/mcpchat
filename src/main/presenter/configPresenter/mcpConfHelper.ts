@@ -1,6 +1,6 @@
 import { eventBus, SendTarget } from '@/eventbus'
 import { MCPServerConfig, IConfigPresenter } from '@shared/presenter'
-import { MCP_EVENTS } from '@/events'
+import { MCP_EVENTS, GITHUB_DOWNLOAD_EVENTS } from '@/events'
 import ElectronStore from 'electron-store'
 import { app } from 'electron'
 import { compare } from 'compare-versions'
@@ -486,6 +486,20 @@ export class McpConfHelper {
             
             console.log(`[McpConfHelper] 使用 ${installer} 安装依赖`)
             
+            // 发送 npm install 开始事件
+            eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_STARTED, SendTarget.ALL_WINDOWS, {
+              serverName: name,
+              installer,
+              packagePath: packageJsonPath
+            })
+            
+            // 发送安装器信息
+            eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS, SendTarget.ALL_WINDOWS, {
+              serverName: name,
+              message: `使用 ${installer} 安装依赖...`,
+              installer
+            })
+            
             await new Promise<void>((resolve, reject) => {
               const installProcess = spawn(installCmd[0], installCmd[1], {
                 cwd: downloadResult.localPath,
@@ -493,30 +507,68 @@ export class McpConfHelper {
               })
               
               installProcess.stdout?.on('data', (data) => {
-                console.log(`[McpConfHelper] ${installer} install stdout: ${data}`)
+                const message = data.toString().trim()
+                console.log(`[McpConfHelper] ${installer} install stdout: ${message}`)
+                // 发送安装进度
+                eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS, SendTarget.ALL_WINDOWS, {
+                  serverName: name,
+                  message: message,
+                  installer
+                })
               })
               
               installProcess.stderr?.on('data', (data) => {
-                console.log(`[McpConfHelper] ${installer} install stderr: ${data}`)
+                const message = data.toString().trim()
+                console.log(`[McpConfHelper] ${installer} install stderr: ${message}`)
+                // 发送安装进度（错误信息也作为进度）
+                eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS, SendTarget.ALL_WINDOWS, {
+                  serverName: name,
+                  message: message,
+                  installer
+                })
               })
               
               installProcess.on('close', (code) => {
                 if (code === 0) {
                   console.log(`[McpConfHelper] ${installer} 依赖安装成功`)
+                  // 发送安装成功事件
+                  eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_COMPLETED, SendTarget.ALL_WINDOWS, {
+                    serverName: name,
+                    installer,
+                    success: true
+                  })
                   resolve()
                 } else {
                   console.error(`[McpConfHelper] ${installer} 依赖安装失败，退出码: ${code}`)
+                  // 发送安装失败事件
+                  eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR, SendTarget.ALL_WINDOWS, {
+                    serverName: name,
+                    installer,
+                    error: `${installer} install failed with code ${code}`
+                  })
                   reject(new Error(`${installer} install failed with code ${code}`))
                 }
               })
               
               installProcess.on('error', (error) => {
                 console.error(`[McpConfHelper] ${installer} install进程错误:`, error)
+                // 发送安装错误事件
+                eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR, SendTarget.ALL_WINDOWS, {
+                  serverName: name,
+                  installer,
+                  error: error.message
+                })
                 reject(error)
               })
             })
           } catch (installError) {
             console.error(`[McpConfHelper] 依赖安装失败:`, installError)
+            // 发送安装错误事件
+            eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR, SendTarget.ALL_WINDOWS, {
+              serverName: name,
+              installer: 'unknown',
+              error: installError instanceof Error ? installError.message : String(installError)
+            })
             // 继续执行
           }
         } else {
