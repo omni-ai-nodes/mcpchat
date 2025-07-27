@@ -4,7 +4,7 @@ import fs from 'fs/promises'
 import { app } from 'electron'
 import type { IConfigPresenter } from '../../shared/presenter'
 import { eventBus, SendTarget } from '../eventbus'
-import { MCP_EVENTS } from '../events'
+import { MCP_EVENTS, GITHUB_DOWNLOAD_EVENTS } from '../events'
 
 /**
  * Git下载管理器
@@ -21,16 +21,48 @@ export class GitDownloadManager {
   }
 
   /**
+   * 检查文件是否存在
+   * @param filePath 文件路径
+   * @returns 是否存在
+   */
+  private async fileExists(filePath: string): Promise<boolean> {
+    try {
+      await fs.access(filePath)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
    * 检查并安装依赖（如果需要）
    * @param localPath 本地仓库路径
+   * @param serverName 服务器名称（用于事件通知）
    */
-  private async installDependenciesIfNeeded(localPath: string): Promise<void> {
+  private async installDependenciesIfNeeded(localPath: string, serverName?: string): Promise<void> {
     try {
       // 检查是否存在 package.json 文件
       const packageJsonPath = path.join(localPath, 'package.json')
       try {
         await fs.access(packageJsonPath)
         console.log(`[GitDownloadManager] 发现 package.json，开始安装依赖: ${packageJsonPath}`)
+        
+        // 检测包管理器
+        let installer = 'npm'
+        if (await this.fileExists(path.join(localPath, 'bun.lockb'))) {
+          installer = 'bun'
+        } else if (await this.fileExists(path.join(localPath, 'yarn.lock'))) {
+          installer = 'yarn'
+        } else if (await this.fileExists(path.join(localPath, 'pnpm-lock.yaml'))) {
+          installer = 'pnpm'
+        }
+        
+        // 发送安装开始事件
+        eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_STARTED, SendTarget.ALL_WINDOWS, {
+          serverName: serverName || 'unknown',
+          packagePath: packageJsonPath,
+          installer
+        })
         
         // 检查是否存在 node_modules 目录
         const nodeModulesPath = path.join(localPath, 'node_modules')
@@ -47,15 +79,38 @@ export class GitDownloadManager {
         }
         
         if (needInstall) {
-          console.log(`[GitDownloadManager] 执行 npm install`)
-          await this.executeNpmCommand('npm', ['install'], localPath)
+          console.log(`[GitDownloadManager] 执行 ${installer} install`)
+          
+          // 发送安装进度事件
+          eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS, SendTarget.ALL_WINDOWS, {
+            serverName: serverName || 'unknown',
+            installer,
+            message: `使用 ${installer} 安装依赖...`
+          })
+          
+          await this.executeNpmCommand(installer, ['install'], localPath, serverName)
           console.log(`[GitDownloadManager] 依赖安装完成`)
+          
+          // 发送安装完成事件
+          eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_COMPLETED, SendTarget.ALL_WINDOWS, {
+            serverName: serverName || 'unknown',
+            installer,
+            success: true
+          })
         }
       } catch {
         console.log(`[GitDownloadManager] 未发现 package.json，跳过依赖安装`)
       }
     } catch (error) {
       console.error(`[GitDownloadManager] 安装依赖失败:`, error)
+      
+      // 发送安装错误事件
+      eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR, SendTarget.ALL_WINDOWS, {
+        serverName: serverName || 'unknown',
+        installer: 'npm',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      
       // 不抛出错误，因为依赖安装失败不应该阻止仓库下载完成
     }
   }
@@ -65,8 +120,9 @@ export class GitDownloadManager {
    * @param command npm 命令
    * @param args 参数
    * @param cwd 工作目录
+   * @param serverName 服务器名称（用于事件通知）
    */
-  private async executeNpmCommand(command: string, args: string[], cwd?: string): Promise<string> {
+  private async executeNpmCommand(command: string, args: string[], cwd?: string, serverName?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       console.log(`[GitDownloadManager] 执行命令: ${command} ${args.join(' ')} (在目录: ${cwd})`)
       
@@ -86,28 +142,68 @@ export class GitDownloadManager {
       npmProcess.stdout.on('data', (data) => {
         const output = data.toString()
         stdout += output
-        console.log(`[GitDownloadManager] npm stdout: ${output.trim()}`)
+        const message = output.trim()
+        console.log(`[GitDownloadManager] ${command} stdout: ${message}`)
+        
+        // 发送安装进度事件
+        if (message && serverName) {
+          eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS, SendTarget.ALL_WINDOWS, {
+            serverName,
+            installer: command,
+            output: message
+          })
+        }
       })
 
       npmProcess.stderr.on('data', (data) => {
         const output = data.toString()
         stderr += output
-        console.log(`[GitDownloadManager] npm stderr: ${output.trim()}`)
+        const message = output.trim()
+        console.log(`[GitDownloadManager] ${command} stderr: ${message}`)
+        
+        // 发送安装进度事件（stderr 也可能包含有用信息）
+        if (message && serverName) {
+          eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS, SendTarget.ALL_WINDOWS, {
+            serverName,
+            installer: command,
+            output: message
+          })
+        }
       })
 
       npmProcess.on('close', (code) => {
         if (code === 0) {
-          console.log(`[GitDownloadManager] npm 命令执行成功`)
+          console.log(`[GitDownloadManager] ${command} 命令执行成功`)
           resolve(stdout)
         } else {
-          console.error(`[GitDownloadManager] npm 命令执行失败，退出码: ${code}`)
-          reject(new Error(`npm command failed with code ${code}: ${stderr || stdout}`))
+          console.error(`[GitDownloadManager] ${command} 命令执行失败，退出码: ${code}`)
+          
+          // 发送安装错误事件
+          if (serverName) {
+            eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR, SendTarget.ALL_WINDOWS, {
+              serverName,
+              installer: command,
+              error: `${command} install failed with code ${code}: ${stderr || stdout}`
+            })
+          }
+          
+          reject(new Error(`${command} command failed with code ${code}: ${stderr || stdout}`))
         }
       })
 
       npmProcess.on('error', (error) => {
-        console.error(`[GitDownloadManager] npm 命令执行错误:`, error)
-        reject(new Error(`Failed to execute npm command: ${error.message}`))
+        console.error(`[GitDownloadManager] ${command} 命令执行错误:`, error)
+        
+        // 发送安装错误事件
+        if (serverName) {
+          eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR, SendTarget.ALL_WINDOWS, {
+            serverName,
+            installer: command,
+            error: `Failed to execute ${command} command: ${error.message}`
+          })
+        }
+        
+        reject(new Error(`Failed to execute ${command} command: ${error.message}`))
       })
     })
   }
@@ -257,9 +353,10 @@ export class GitDownloadManager {
    * @param githubUrl GitHub仓库URL
    * @param targetName 目标名称，如果与仓库名不同则重命名
    * @param args MCP服务器配置中的args参数，用于确定入口文件
+   * @param serverName 服务器名称，用于事件通知
    * @returns Promise<{localPath: string, entryFile: string}> 本地路径和入口文件
    */
-  async downloadRepository(githubUrl: string, targetName?: string, args?: string[]): Promise<{ localPath: string; entryFile: string }> {
+  async downloadRepository(githubUrl: string, targetName?: string, args?: string[], serverName?: string): Promise<{ localPath: string; entryFile: string }> {
     console.log(`[GitDownloadManager] 开始下载GitHub仓库: ${githubUrl}${targetName ? ` -> ${targetName}` : ''}`)
     console.log(`[GitDownloadManager] 下载目录: ${this.downloadDir}`)
     
@@ -372,7 +469,7 @@ export class GitDownloadManager {
       })
       
       // 检查是否需要安装依赖
-      await this.installDependenciesIfNeeded(localPath)
+      await this.installDependenciesIfNeeded(localPath, serverName)
       
       // 如果指定了子路径，返回子路径
       const finalPath = subPath ? path.join(localPath, subPath) : localPath
@@ -555,5 +652,3 @@ export class GitDownloadManager {
     }
   }
 }
-
-// 不再导出单例实例，由使用方自行创建

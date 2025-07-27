@@ -304,7 +304,7 @@ export class DeeplinkPresenter implements IDeeplinkPresenter {
         }
 
         // 处理GitHub下载逻辑
-        let processedCommand = determinedType === 'stdio' ? determinedCommand! : defaultConfig.command!
+        const processedCommand = determinedType === 'stdio' ? determinedCommand! : defaultConfig.command!
         let processedArgs = serverConfig.args || defaultConfig.args!
         
         console.log(`[DeeplinkPresenter] 开始处理GitHub下载逻辑，服务器: ${serverName}`)
@@ -331,8 +331,8 @@ export class DeeplinkPresenter implements IDeeplinkPresenter {
             console.log(`[DeeplinkPresenter] 传递服务器名称作为目标名称: ${serverName}`)
             // 传递服务器名称作为目标名称以便重命名
             const gitDownloadManager = new GitDownloadManager(presenter.configPresenter)
-            const repoPath = await gitDownloadManager.downloadRepository(serverConfig.github, serverName)
-            console.log(`[DeeplinkPresenter] GitHub仓库下载完成，路径: ${repoPath}`)
+            const downloadResult = await gitDownloadManager.downloadRepository(serverConfig.github, serverName, undefined, serverName)
+            console.log(`[DeeplinkPresenter] GitHub仓库下载完成，路径: ${downloadResult.localPath}`)
             
             // 更新command和args以使用下载的代码
             // 假设主文件在仓库根目录，如果args中有相对路径，则转换为绝对路径
@@ -341,7 +341,7 @@ export class DeeplinkPresenter implements IDeeplinkPresenter {
               // 将第一个参数（通常是主文件）转换为绝对路径
               const mainFile = processedArgs[0]
               console.log(`[DeeplinkPresenter] 主文件: ${mainFile}`)
-              const absoluteMainFile = path.isAbsolute(mainFile) ? mainFile : path.join(repoPath, mainFile)
+              const absoluteMainFile = path.isAbsolute(mainFile) ? mainFile : path.join(downloadResult.localPath, mainFile)
               console.log(`[DeeplinkPresenter] 绝对路径主文件: ${absoluteMainFile}`)
               processedArgs = [absoluteMainFile, ...processedArgs.slice(1)]
               console.log(`[DeeplinkPresenter] 更新后的args: ${JSON.stringify(processedArgs)}`)

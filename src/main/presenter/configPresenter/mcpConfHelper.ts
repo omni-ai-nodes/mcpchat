@@ -1,6 +1,6 @@
 import { eventBus, SendTarget } from '@/eventbus'
 import { MCPServerConfig, IConfigPresenter } from '@shared/presenter'
-import { MCP_EVENTS, GITHUB_DOWNLOAD_EVENTS } from '@/events'
+import { MCP_EVENTS } from '@/events'
 import ElectronStore from 'electron-store'
 import { app } from 'electron'
 import { compare } from 'compare-versions'
@@ -427,7 +427,8 @@ export class McpConfHelper {
         const downloadResult = await gitDownloadManager.downloadRepository(
           githubUrl,
           name, // 使用服务器名称作为目标名称
-          config.args // 传递 args 参数用于确定入口文件
+          config.args, // 传递 args 参数用于确定入口文件
+          name // 传递服务器名称用于事件通知
         )
         
         console.log(`[McpConfHelper] GitHub仓库下载完成: ${downloadResult.localPath}`)
@@ -454,128 +455,9 @@ export class McpConfHelper {
           console.log(`[McpConfHelper] 更新脚本路径: ${originalScript} -> ${newScriptPath}`)
         }
         
-        // 检查是否需要安装依赖
+        // Python依赖安装（保留Python依赖安装逻辑，因为gitDownloadManager只处理Node.js依赖）
         const fs = await import('fs')
         const pathModule = await import('path')
-        const packageJsonPath = pathModule.join(downloadResult.localPath, 'package.json')
-        
-        if (fs.existsSync(packageJsonPath)) {
-          console.log(`[McpConfHelper] 发现package.json，开始安装依赖: ${packageJsonPath}`)
-          
-          // 优化依赖安装逻辑
-          try {
-            const { spawn } = await import('child_process')
-            
-            let installCmd: [string, string[]] = ['npm', ['install']]
-            let installer = ''
-            
-            // 检测包管理器
-            if (fs.existsSync(pathModule.join(downloadResult.localPath, 'bun.lockb'))) {
-              installer = 'bun'
-              installCmd = ['bun', ['install']]
-            } else if (fs.existsSync(pathModule.join(downloadResult.localPath, 'yarn.lock'))) {
-              installer = 'yarn'
-              installCmd = ['yarn', ['install']]
-            } else if (fs.existsSync(pathModule.join(downloadResult.localPath, 'pnpm-lock.yaml'))) {
-              installer = 'pnpm'
-              installCmd = ['pnpm', ['install']]
-            } else {
-              installer = 'npm'
-              installCmd = ['npm', ['install']]
-            }
-            
-            console.log(`[McpConfHelper] 使用 ${installer} 安装依赖`)
-            
-            // 发送 npm install 开始事件
-            eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_STARTED, SendTarget.ALL_WINDOWS, {
-              serverName: name,
-              installer,
-              packagePath: packageJsonPath
-            })
-            
-            // 发送安装器信息
-            eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS, SendTarget.ALL_WINDOWS, {
-              serverName: name,
-              message: `使用 ${installer} 安装依赖...`,
-              installer
-            })
-            
-            await new Promise<void>((resolve, reject) => {
-              const installProcess = spawn(installCmd[0], installCmd[1], {
-                cwd: downloadResult.localPath,
-                stdio: 'pipe'
-              })
-              
-              installProcess.stdout?.on('data', (data) => {
-                const message = data.toString().trim()
-                console.log(`[McpConfHelper] ${installer} install stdout: ${message}`)
-                // 发送安装进度
-                eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS, SendTarget.ALL_WINDOWS, {
-                  serverName: name,
-                  message: message,
-                  installer
-                })
-              })
-              
-              installProcess.stderr?.on('data', (data) => {
-                const message = data.toString().trim()
-                console.log(`[McpConfHelper] ${installer} install stderr: ${message}`)
-                // 发送安装进度（错误信息也作为进度）
-                eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS, SendTarget.ALL_WINDOWS, {
-                  serverName: name,
-                  message: message,
-                  installer
-                })
-              })
-              
-              installProcess.on('close', (code) => {
-                if (code === 0) {
-                  console.log(`[McpConfHelper] ${installer} 依赖安装成功`)
-                  // 发送安装成功事件
-                  eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_COMPLETED, SendTarget.ALL_WINDOWS, {
-                    serverName: name,
-                    installer,
-                    success: true
-                  })
-                  resolve()
-                } else {
-                  console.error(`[McpConfHelper] ${installer} 依赖安装失败，退出码: ${code}`)
-                  // 发送安装失败事件
-                  eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR, SendTarget.ALL_WINDOWS, {
-                    serverName: name,
-                    installer,
-                    error: `${installer} install failed with code ${code}`
-                  })
-                  reject(new Error(`${installer} install failed with code ${code}`))
-                }
-              })
-              
-              installProcess.on('error', (error) => {
-                console.error(`[McpConfHelper] ${installer} install进程错误:`, error)
-                // 发送安装错误事件
-                eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR, SendTarget.ALL_WINDOWS, {
-                  serverName: name,
-                  installer,
-                  error: error.message
-                })
-                reject(error)
-              })
-            })
-          } catch (installError) {
-            console.error(`[McpConfHelper] 依赖安装失败:`, installError)
-            // 发送安装错误事件
-            eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR, SendTarget.ALL_WINDOWS, {
-              serverName: name,
-              installer: 'unknown',
-              error: installError instanceof Error ? installError.message : String(installError)
-            })
-            // 继续执行
-          }
-        } else {
-          console.log(`[McpConfHelper] 未找到package.json，跳过依赖安装`)
-        }
-        
-        // Python依赖安装
         if ((config.command === 'python' || config.command === 'python3') && fs.existsSync(pathModule.join(downloadResult.localPath, 'requirements.txt'))) {
           console.log(`[McpConfHelper] 发现requirements.txt，开始安装Python依赖`)
           try {

@@ -1010,7 +1010,7 @@ export class McpPresenter implements IMCPPresenter {
    */
   async downloadGitHubRepository(githubUrl: string, targetName?: string): Promise<{ success: boolean; localPath?: string; entryFile?: string; error?: string }> {
     try {
-      const { localPath, entryFile } = await this.gitDownloadManager.downloadRepository(githubUrl, targetName)
+      const { localPath, entryFile } = await this.gitDownloadManager.downloadRepository(githubUrl, targetName, undefined, targetName)
       return {
         success: true,
         localPath,
