@@ -1037,8 +1037,6 @@ const installServer = async (server: ServerItem) => {
       
       // 自动为每个服务器配置添加 icons、type、github 等字段
       if (deployConfig.mcpServers) {
-        const downloadPromises: Promise<void>[] = []
-        
         for (const serverKey of Object.keys(deployConfig.mcpServers)) {
           const serverConfig = deployConfig.mcpServers[serverKey]
           
@@ -1057,91 +1055,13 @@ const installServer = async (server: ServerItem) => {
             serverConfig.descriptions = server.description
           }
           
-          // 添加 GitHub 字段，使用 ServerItem 的 Github
-          if (!serverConfig.Github && server.Github) {
-            serverConfig.Github = server.Github
+          // 添加 GitHub 字段，使用 ServerItem 的 Github（注意：后端期望小写的github字段）
+          if (!serverConfig.github && server.Github) {
+            serverConfig.github = server.Github
           }
           
-          // 检查是否需要下载 GitHub 代码
-          if (serverConfig.command && (serverConfig.command === 'node' || serverConfig.command === 'python') && server.Github) {
-            console.log(`检测到 ${serverConfig.command} 命令，需要下载 GitHub 代码:`, server.Github)
-            
-            // 创建下载 Promise
-            const downloadPromise = (async () => {
-              try {
-                // 显示下载提示
-                toast({
-                  title: '正在下载代码',
-                  description: `正在从 ${server.Github} 下载代码...`,
-                  variant: 'default'
-                })
-                
-                // 调用 mcpPresenter 下载 GitHub 代码
-                const downloadResult = await mcpPresenter.downloadGitHubRepository(server.Github!, serverKey)
-                
-                if (downloadResult && downloadResult.success) {
-                  console.log(`GitHub 代码下载成功:`, downloadResult)
-                  
-                  // 获取本地代码路径
-                  const localPath = downloadResult.localPath
-                  
-                  if (localPath) {
-                    // 修改命令路径指向本地代码
-                    if (serverConfig.command === 'node') {
-                      // 对于 node 命令，通常指向 index.js 或 main.js
-                      let entryFile = 'index.js' // 默认入口文件
-                      
-                      // 可以根据 package.json 的 main 字段确定入口文件
-                      // 这里先使用默认的 index.js
-                      serverConfig.command = 'node'
-                      serverConfig.args = [localPath + '/' + entryFile, ...(serverConfig.args?.slice(1) || [])]
-                    } else if (serverConfig.command === 'python') {
-                      // 对于 python 命令，通常指向 main.py 或 __main__.py
-                      let entryFile = 'main.py' // 默认入口文件
-                      
-                      serverConfig.command = 'python'
-                      serverConfig.args = [localPath + '/' + entryFile, ...(serverConfig.args?.slice(1) || [])]
-                    }
-                    
-                    console.log(`已更新服务器配置，使用本地代码路径: ${localPath}`)
-                    
-                    toast({
-                      title: '代码下载完成',
-                      description: `已下载到本地并更新配置`,
-                      variant: 'default'
-                    })
-                  } else {
-                    console.warn('下载成功但未获取到本地路径')
-                  }
-                } else {
-                  console.error('GitHub 代码下载失败:', downloadResult)
-                  toast({
-                    title: '代码下载失败',
-                    description: `无法下载 GitHub 代码: ${downloadResult?.error || '未知错误'}`,
-                    variant: 'destructive'
-                  })
-                  // 下载失败时仍然可以继续安装，使用原始配置
-                }
-              } catch (error) {
-                console.error('下载 GitHub 代码时发生错误:', error)
-                toast({
-                  title: '代码下载失败',
-                  description: `下载过程中发生错误: ${error}`,
-                  variant: 'destructive'
-                })
-                // 下载失败时仍然可以继续安装，使用原始配置
-              }
-            })()
-            
-            downloadPromises.push(downloadPromise)
-          }
-        }
-        
-        // 等待所有下载操作完成
-        if (downloadPromises.length > 0) {
-          console.log(`等待 ${downloadPromises.length} 个下载操作完成...`)
-          await Promise.all(downloadPromises)
-          console.log('所有下载操作已完成')
+          // 不在前端处理路径，让后端统一处理 GitHub 下载和路径设置
+          console.log(`服务器 ${serverKey} 配置完成，GitHub仓库: ${server.Github}`)
         }
       }
       

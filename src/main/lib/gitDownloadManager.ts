@@ -19,6 +19,98 @@ export class GitDownloadManager {
   }
 
   /**
+   * 检查并安装依赖（如果需要）
+   * @param localPath 本地仓库路径
+   */
+  private async installDependenciesIfNeeded(localPath: string): Promise<void> {
+    try {
+      // 检查是否存在 package.json 文件
+      const packageJsonPath = path.join(localPath, 'package.json')
+      try {
+        await fs.access(packageJsonPath)
+        console.log(`[GitDownloadManager] 发现 package.json，开始安装依赖: ${packageJsonPath}`)
+        
+        // 检查是否存在 node_modules 目录
+        const nodeModulesPath = path.join(localPath, 'node_modules')
+        let needInstall = false
+        
+        try {
+          await fs.access(nodeModulesPath)
+          console.log(`[GitDownloadManager] node_modules 已存在，检查是否需要更新`)
+          // node_modules 存在，但我们仍然运行 npm install 以确保依赖是最新的
+          needInstall = true
+        } catch {
+          console.log(`[GitDownloadManager] node_modules 不存在，需要安装依赖`)
+          needInstall = true
+        }
+        
+        if (needInstall) {
+          console.log(`[GitDownloadManager] 执行 npm install`)
+          await this.executeNpmCommand('npm', ['install'], localPath)
+          console.log(`[GitDownloadManager] 依赖安装完成`)
+        }
+      } catch {
+        console.log(`[GitDownloadManager] 未发现 package.json，跳过依赖安装`)
+      }
+    } catch (error) {
+      console.error(`[GitDownloadManager] 安装依赖失败:`, error)
+      // 不抛出错误，因为依赖安装失败不应该阻止仓库下载完成
+    }
+  }
+
+  /**
+   * 执行 npm 命令
+   * @param command npm 命令
+   * @param args 参数
+   * @param cwd 工作目录
+   */
+  private async executeNpmCommand(command: string, args: string[], cwd?: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      console.log(`[GitDownloadManager] 执行命令: ${command} ${args.join(' ')} (在目录: ${cwd})`)
+      
+      const npmProcess = spawn(command, args, {
+        cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          // 确保使用系统的 npm 配置
+          npm_config_registry: process.env.npm_config_registry || 'https://registry.npmjs.org/'
+        }
+      })
+
+      let stdout = ''
+      let stderr = ''
+
+      npmProcess.stdout.on('data', (data) => {
+        const output = data.toString()
+        stdout += output
+        console.log(`[GitDownloadManager] npm stdout: ${output.trim()}`)
+      })
+
+      npmProcess.stderr.on('data', (data) => {
+        const output = data.toString()
+        stderr += output
+        console.log(`[GitDownloadManager] npm stderr: ${output.trim()}`)
+      })
+
+      npmProcess.on('close', (code) => {
+        if (code === 0) {
+          console.log(`[GitDownloadManager] npm 命令执行成功`)
+          resolve(stdout)
+        } else {
+          console.error(`[GitDownloadManager] npm 命令执行失败，退出码: ${code}`)
+          reject(new Error(`npm command failed with code ${code}: ${stderr || stdout}`))
+        }
+      })
+
+      npmProcess.on('error', (error) => {
+        console.error(`[GitDownloadManager] npm 命令执行错误:`, error)
+        reject(new Error(`Failed to execute npm command: ${error.message}`))
+      })
+    })
+  }
+
+  /**
    * 确保下载目录存在
    */
   private async ensureDownloadDir(): Promise<void> {
@@ -164,7 +256,7 @@ export class GitDownloadManager {
    * @param targetName 目标名称，如果与仓库名不同则重命名
    * @returns Promise<string> 本地仓库路径
    */
-  async downloadRepository(githubUrl: string, targetName?: string): Promise<string> {
+  async downloadRepository(githubUrl: string, targetName?: string): Promise<{ localPath: string; entryFile: string }> {
     console.log(`[GitDownloadManager] 开始下载GitHub仓库: ${githubUrl}${targetName ? ` -> ${targetName}` : ''}`)
     console.log(`[GitDownloadManager] 下载目录: ${this.downloadDir}`)
     
@@ -235,6 +327,9 @@ export class GitDownloadManager {
         console.log(`[GitDownloadManager] 克隆完成`)
       }
       
+      // 检查是否需要安装依赖
+      await this.installDependenciesIfNeeded(localPath)
+      
       // 如果指定了子路径，返回子路径
       const finalPath = subPath ? path.join(localPath, subPath) : localPath
       
@@ -247,7 +342,35 @@ export class GitDownloadManager {
       
       console.log(`[GitDownloadManager] 最终返回路径: ${finalPath}`)
       console.log(`[GitDownloadManager] GitHub仓库下载完成: ${finalPath}`)
-      return finalPath
+      
+      // 尝试读取 package.json 的 main 字段作为入口文件
+      let entryFile = 'index.js'; // 默认入口文件
+      try {
+        const packageJsonPath = path.join(localPath, 'package.json');
+        const packageJsonContent = await fs.readFile(packageJsonPath, 'utf-8');
+        const packageJson = JSON.parse(packageJsonContent);
+        if (packageJson.main && typeof packageJson.main === 'string') {
+          entryFile = packageJson.main;
+        }
+      } catch (readError) {
+        console.warn(`[GitDownloadManager] Failed to read package.json or main field: ${readError}`);
+      }
+      
+      // 检查常见的 MCP 入口文件名，优先级从高到低
+      const commonEntryFiles = ['claude-mcp.js', 'mcp.js', 'server.js', 'main.js', entryFile];
+      for (const fileName of commonEntryFiles) {
+        try {
+          const filePath = path.join(localPath, fileName);
+          await fs.access(filePath);
+          entryFile = fileName;
+          console.log(`[GitDownloadManager] Found entry file: ${fileName}`);
+          break;
+        } catch {
+          // 文件不存在，继续检查下一个
+        }
+      }
+      
+      return { localPath: subPath ? path.join(localPath, subPath) : localPath, entryFile };
     } catch (error) {
       console.error(`[GitDownloadManager] 下载GitHub仓库失败:`, error)
       console.error(`[GitDownloadManager] 失败的URL: ${githubUrl}`)

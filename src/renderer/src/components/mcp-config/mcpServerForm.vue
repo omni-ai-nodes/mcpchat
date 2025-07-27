@@ -257,7 +257,7 @@ const generateJsonFromForm = (): void => {
       mcpServers: {
         [name.value || 'server']: {
           command: command.value,
-          args: args.value ? args.value.split(' ').filter(arg => arg.trim()) : [],
+          args: parseArgsString(args.value),
           type: type.value || 'stdio',
           env: JSON.parse(env.value || '{}'),
           descriptions: descriptions.value,
@@ -431,14 +431,14 @@ watch(
     if (isBuildInFileSystem.value) {
       // 对于 buildInFileSystem，args 是文件夹路径列表
       if (newArgs) {
-        foldersList.value = newArgs.split(/\s+/).filter(Boolean)
+        foldersList.value = parseArgsString(newArgs)
       } else {
         foldersList.value = []
       }
     } else {
       // 对于其他类型，使用标签式输入
       if (newArgs) {
-        argumentsList.value = newArgs.split(/\s+/).filter(Boolean)
+        argumentsList.value = parseArgsString(newArgs)
       } else {
         argumentsList.value = []
       }
@@ -452,7 +452,7 @@ watch(
   argumentsList,
   (newList) => {
     if (!isBuildInFileSystem.value) {
-      args.value = newList.join(' ')
+      args.value = formatArgsArray(newList)
     }
   },
   { deep: true }
@@ -463,7 +463,7 @@ watch(
   foldersList,
   (newList) => {
     if (isBuildInFileSystem.value) {
-      args.value = newList.join(' ')
+      args.value = formatArgsArray(newList)
     }
   },
   { deep: true }
@@ -616,8 +616,8 @@ const handleSubmit = async (): Promise<void> => {
     serverConfig = {
       ...baseConfig,
       command: command.value.trim(),
-      // args 从 argumentsList 更新，所以直接使用 split 即可，或者直接使用 argumentsList.value
-      args: args.value.split(/\s+/).filter(Boolean),
+      // 智能解析参数，支持包含空格的路径
+      args: parseArgsString(args.value),
       env: parsedEnv,
       baseUrl: baseUrl.value.trim()
     }
@@ -719,7 +719,7 @@ watch(
       // Reset fields based on initialConfig
       // name.value = props.serverName || ''; // Name is usually passed separately and kept disabled
       command.value = newConfig.command || 'npx'
-      args.value = newConfig.args?.join(' ') || ''
+      args.value = formatArgsArray(newConfig.args || [])
       env.value = JSON.stringify(newConfig.env || {}, null, 2)
       descriptions.value = newConfig.descriptions || ''
       icons.value = newConfig.icons || '📁'
@@ -760,6 +760,59 @@ const openHigressMcpMarketplace = (): void => {
 }
 
 // --- 新增辅助函数 ---
+// 智能解析参数字符串，支持包含空格的路径
+const parseArgsString = (argsStr: string): string[] => {
+  if (!argsStr || !argsStr.trim()) {
+    return []
+  }
+
+  const args: string[] = []
+  let current = ''
+  let inQuotes = false
+  let quoteChar = ''
+  
+  for (let i = 0; i < argsStr.length; i++) {
+    const char = argsStr[i]
+    
+    if (!inQuotes && (char === '"' || char === "'")) {
+      // 开始引号
+      inQuotes = true
+      quoteChar = char
+    } else if (inQuotes && char === quoteChar) {
+      // 结束引号
+      inQuotes = false
+      quoteChar = ''
+    } else if (!inQuotes && /\s/.test(char)) {
+      // 空格且不在引号内，分割参数
+      if (current.trim()) {
+        args.push(current.trim())
+        current = ''
+      }
+    } else {
+      // 普通字符
+      current += char
+    }
+  }
+  
+  // 添加最后一个参数
+  if (current.trim()) {
+    args.push(current.trim())
+  }
+  
+  return args
+}
+
+// 将参数数组转换为字符串，包含空格的参数会被引号包围
+const formatArgsArray = (argsArray: string[]): string => {
+  return argsArray.map(arg => {
+    // 如果参数包含空格，用引号包围
+    if (arg.includes(' ')) {
+      return `"${arg}"`
+    }
+    return arg
+  }).join(' ')
+}
+
 // 解析 Key=Value 格式为 JSON 对象
 const parseKeyValueHeaders = (text: string): Record<string, string> => {
   const headers: Record<string, string> = {}

@@ -1008,12 +1008,13 @@ export class McpPresenter implements IMCPPresenter {
    * @param targetName 目标名称，如果与仓库名不同则重命名
    * @returns Promise<{ success: boolean; localPath?: string; error?: string }> 下载结果
    */
-  async downloadGitHubRepository(githubUrl: string, targetName?: string): Promise<{ success: boolean; localPath?: string; error?: string }> {
+  async downloadGitHubRepository(githubUrl: string, targetName?: string): Promise<{ success: boolean; localPath?: string; entryFile?: string; error?: string }> {
     try {
-      const localPath = await this.gitDownloadManager.downloadRepository(githubUrl, targetName)
+      const { localPath, entryFile } = await this.gitDownloadManager.downloadRepository(githubUrl, targetName)
       return {
         success: true,
-        localPath: localPath
+        localPath,
+        entryFile
       }
     } catch (error) {
       console.error('[MCP] Failed to download GitHub repository:', error)

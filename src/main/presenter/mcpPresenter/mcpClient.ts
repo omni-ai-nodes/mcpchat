@@ -96,6 +96,7 @@ export class McpClient {
   private uvRuntimePath: string | null = null
   private npmRegistry: string | null = null
   private uvRegistry: string | null = null
+  private configPresenter?: IConfigPresenter
 
   // Session management
   private isRecovering: boolean = false
@@ -248,6 +249,34 @@ export class McpClient {
     return command
   }
 
+  // 检查参数是否为可执行命令（而非文件路径或其他参数）
+  private isExecutableCommand(arg: string): boolean {
+    // 如果参数包含路径分隔符，很可能是文件路径而非命令
+    if (arg.includes('/') || arg.includes('\\')) {
+      return false
+    }
+    
+    // 如果参数以 - 开头，是命令行选项
+    if (arg.startsWith('-')) {
+      return false
+    }
+    
+    // 如果参数包含 = 号，是环境变量或配置
+    if (arg.includes('=')) {
+      return false
+    }
+    
+    // 如果参数包含文件扩展名，很可能是文件
+    if (arg.includes('.') && (arg.endsWith('.js') || arg.endsWith('.py') || arg.endsWith('.ts') || arg.endsWith('.json'))) {
+      return false
+    }
+    
+    // 检查是否为已知的可执行命令
+    const knownCommands = ['node', 'npm', 'npx', 'bun', 'python', 'python3', 'pip', 'pip3', 'uv', 'uvx']
+    const basename = path.basename(arg)
+    return knownCommands.includes(basename)
+  }
+
   // 处理特殊参数替换（如 npx -> bun x）
   private processCommandWithArgs(
     command: string,
@@ -261,12 +290,12 @@ export class McpClient {
       console.log(`[McpClient] 检测到 npx 命令，平台: ${process.platform}`)
       
       if (process.platform === 'win32') {
-        // Windows 平台使用 Node.js 的 npx，保持原有参数
+        // Windows 平台使用 Node.js 的 npx，只替换命令，保持参数不变
         const replacedCommand = this.replaceWithRuntimeCommand(command)
         console.log(`[McpClient] Windows 平台 npx 处理: ${command} -> ${replacedCommand}`)
         return {
           command: replacedCommand,
-          args: args.map((arg) => this.replaceWithRuntimeCommand(arg))
+          args: args // 保持参数不变
         }
       } else {
         // 非Windows平台优先使用 Bun，需要在参数前添加 'x'
@@ -275,7 +304,7 @@ export class McpClient {
           console.log(`[McpClient] 使用 Bun 替换 npx: ${command} -> ${bunCommand} x ${args.join(' ')}`)
           return {
             command: bunCommand,
-            args: ['x', ...args]
+            args: ['x', ...args] // 保持原参数不变
           }
         } else if (this.nodeRuntimePath) {
           // 如果没有Bun，使用Node.js，保持原有参数
@@ -283,7 +312,7 @@ export class McpClient {
           console.log(`[McpClient] 使用 Node.js 替换 npx: ${command} -> ${replacedCommand}`)
           return {
             command: replacedCommand,
-            args: args.map((arg) => this.replaceWithRuntimeCommand(arg))
+            args: args // 保持参数不变
           }
         } else {
           // 如果没有运行时，回退到系统 npx
@@ -298,9 +327,22 @@ export class McpClient {
 
     const replacedCommand = this.replaceWithRuntimeCommand(command)
     console.log(`[McpClient] 常规命令处理: ${command} -> ${replacedCommand}`)
+    
+    // 只对确实是可执行命令的参数进行替换，其他参数保持不变
+    const processedArgs = args.map((arg) => {
+      if (this.isExecutableCommand(arg)) {
+        const replacedArg = this.replaceWithRuntimeCommand(arg)
+        console.log(`[McpClient] 替换参数中的命令: ${arg} -> ${replacedArg}`)
+        return replacedArg
+      } else {
+        console.log(`[McpClient] 保持参数不变: ${arg}`)
+        return arg
+      }
+    })
+    
     return {
       command: replacedCommand,
-      args: args.map((arg) => this.replaceWithRuntimeCommand(arg))
+      args: processedArgs
     }
   }
 
@@ -330,12 +372,14 @@ export class McpClient {
     serverName: string,
     serverConfig: Record<string, unknown>,
     npmRegistry: string | null = null,
-    uvRegistry: string | null = null
+    uvRegistry: string | null = null,
+    configPresenter?: IConfigPresenter
   ) {
     this.serverName = serverName
     this.serverConfig = serverConfig
     this.npmRegistry = npmRegistry
     this.uvRegistry = uvRegistry
+    this.configPresenter = configPresenter
 
     const runtimeBasePath = path
       .join(app.getAppPath(), 'runtime')
@@ -450,7 +494,8 @@ export class McpClient {
           'NPM_CONFIG_REGISTRY',
           'NPM_CONFIG_CACHE',
           'NPM_CONFIG_PREFIX',
-          'NPM_CONFIG_TMP'
+          'NPM_CONFIG_TMP',
+          'OPENAI_API_KEY'
           // 'GRPC_PROXY',
           // 'grpc_proxy'
         ]
@@ -462,6 +507,9 @@ export class McpClient {
         const processedCommand = this.processCommandWithArgs(command, args)
         command = processedCommand.command
         args = processedCommand.args
+        
+        // 规范化args，合并可能的路径片段
+        args = this.normalizeArgs(command, args)
 
         // 判断是否是 Node.js/Bun/UV 相关命令
         const isNodeCommand = ['node', 'npm', 'npx', 'bun', 'uv', 'uvx'].some(
@@ -585,6 +633,15 @@ export class McpClient {
               }
             }
           )
+        }
+
+        // 如果是Node.js相关命令，从配置中添加OPENAI_API_KEY
+        if (isNodeCommand && this.configPresenter) {
+          const openaiProvider = this.configPresenter.getProviderById('openai')
+          if (openaiProvider && openaiProvider.apiKey) {
+            env['OPENAI_API_KEY'] = openaiProvider.apiKey
+            console.log(`[McpClient] 已添加 OPENAI_API_KEY 到环境变量`)
+          }
         }
 
         if (this.npmRegistry) {
@@ -715,6 +772,41 @@ export class McpClient {
     }
   }
 
+  private normalizeArgs(command: string, args: string[]): string[] {
+    const basename = path.basename(command);
+    if (!['node', 'bun', 'python', 'python3'].includes(basename)) {
+      return args;
+    }
+    
+    // 如果args为空或只有一个参数，直接返回
+    if (args.length <= 1) {
+      return args;
+    }
+    
+    // 检查第一个参数是否是有效的文件路径
+    const firstArg = args[0];
+    if (fs.existsSync(firstArg)) {
+      console.log(`[McpClient] 第一个参数是有效路径: ${firstArg}`);
+      return args;
+    }
+    
+    // 尝试合并前几个参数来重建可能被分割的路径
+    // 但是要更智能地处理，避免错误合并
+    for (let i = 1; i < Math.min(args.length, 4); i++) { // 最多尝试合并前4个参数
+      const potentialPath = args.slice(0, i + 1).join(' ');
+      
+      if (fs.existsSync(potentialPath)) {
+        const newArgs = [potentialPath, ...args.slice(i + 1)];
+        console.log(`[McpClient] 合并路径成功: ${potentialPath}`);
+        return newArgs;
+      }
+    }
+    
+    // 如果没有找到有效文件，返回原args
+    console.warn(`[McpClient] 未找到有效脚本路径，返回原args: ${args.join(' ')}`);
+    return args;
+  }
+  
   // 清理资源
   private cleanupResources(): void {
     // 清除超时定时器

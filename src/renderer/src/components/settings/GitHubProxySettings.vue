@@ -5,7 +5,7 @@
       <div class="flex flex-row p-2 items-center gap-2 px-2">
         <span class="flex flex-row items-center gap-2 flex-grow w-full">
           <Icon icon="lucide:github" class="w-4 h-4 text-muted-foreground" />
-          <span class="text-sm font-medium">{{ t('settings.provider.githubProxy.enabled') }}</span>
+          <span class="text-sm font-medium">{{ t('settings.githubProxy.enabled') }}</span>
         </span>
         <div class="flex-shrink-0">
           <Switch
@@ -21,12 +21,12 @@
         <div class="flex flex-row items-center gap-2">
           <span class="flex flex-row items-center gap-2 flex-grow w-full">
             <Icon icon="lucide:link" class="w-4 h-4 text-muted-foreground" />
-            <span class="text-sm font-medium">{{ t('settings.provider.githubProxy.proxyUrl') }}</span>
+            <span class="text-sm font-medium">{{ t('settings.githubProxy.proxyUrl') }}</span>
           </span>
           <div class="flex-shrink-0 min-w-64 max-w-96">
             <Input
               v-model="githubProxyUrl"
-              :placeholder="t('settings.provider.githubProxy.proxyUrlPlaceholder')"
+              :placeholder="t('settings.githubProxy.proxyUrlPlaceholder')"
               :class="{ 'border-red-500': showUrlError }"
               @input="validateProxyUrl"
               @blur="validateProxyUrl"
@@ -34,7 +34,7 @@
           </div>
         </div>
         <div v-if="showUrlError" class="text-xs text-red-500 ml-6">
-          {{ t('settings.provider.githubProxy.invalidProxyUrl') }}
+          {{ t('settings.githubProxy.invalidProxyUrl') }}
         </div>
       </div>
 
@@ -43,7 +43,7 @@
         <div class="flex flex-row items-center gap-2">
           <span class="flex flex-row items-center gap-2 flex-grow w-full">
             <Icon icon="lucide:list" class="w-4 h-4 text-muted-foreground" />
-            <span class="text-sm font-medium">{{ t('settings.provider.githubProxy.presetOptions') }}</span>
+            <span class="text-sm font-medium">{{ t('settings.githubProxy.presetOptions') }}</span>
           </span>
           <div class="flex-shrink-0">
             <Button
@@ -52,7 +52,7 @@
               @click="openAddProxyOptionDialog"
             >
               <Icon icon="lucide:plus" class="w-4 h-4 mr-1" />
-              {{ t('settings.provider.githubProxy.addOption') }}
+              {{ t('settings.githubProxy.addOption') }}
             </Button>
           </div>
         </div>
@@ -73,7 +73,7 @@
                 size="sm"
                 @click="useProxyOption(option)"
               >
-                {{ t('settings.provider.githubProxy.use') }}
+                {{ t('settings.githubProxy.use') }}
               </Button>
               <Button
                 variant="ghost"
@@ -86,7 +86,7 @@
           </div>
         </div>
         <div v-else class="text-xs text-muted-foreground ml-6">
-          {{ t('settings.provider.githubProxy.noOptions') }}
+          {{ t('settings.githubProxy.noOptions') }}
         </div>
       </div>
 
@@ -95,11 +95,11 @@
         <div class="flex flex-row items-start gap-2">
           <Icon icon="lucide:info" class="w-4 h-4 text-muted-foreground mt-0.5" />
           <div class="flex flex-col gap-1">
-            <span class="text-sm font-medium">{{ t('settings.provider.githubProxy.usage') }}</span>
+            <span class="text-sm font-medium">{{ t('settings.githubProxy.usage') }}</span>
             <div class="text-xs text-muted-foreground space-y-1">
-              <p>{{ t('settings.provider.githubProxy.usageDesc1') }}</p>
-              <p>{{ t('settings.provider.githubProxy.usageDesc2') }}</p>
-              <p>{{ t('settings.provider.githubProxy.usageDesc3') }}</p>
+              <p>{{ t('settings.githubProxy.usageDesc1') }}</p>
+              <p>{{ t('settings.githubProxy.usageDesc2') }}</p>
+              <p>{{ t('settings.githubProxy.usageDesc3') }}</p>
             </div>
           </div>
         </div>
@@ -111,26 +111,26 @@
   <Dialog v-model:open="isAddProxyOptionDialogOpen">
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>{{ t('settings.provider.githubProxy.addProxyOption') }}</DialogTitle>
+        <DialogTitle>{{ t('settings.githubProxy.addProxyOption') }}</DialogTitle>
         <DialogDescription>
-          {{ t('settings.provider.githubProxy.addProxyOptionDesc') }}
+          {{ t('settings.githubProxy.addProxyOptionDesc') }}
         </DialogDescription>
       </DialogHeader>
 
       <div class="grid gap-4 py-4">
         <div class="grid grid-cols-4 items-center gap-4">
           <Label for="proxy-option-url" class="text-right">
-            {{ t('settings.provider.githubProxy.optionUrl') }}
+            {{ t('settings.githubProxy.optionUrl') }}
           </Label>
           <div class="col-span-3">
             <Input
               id="proxy-option-url"
               v-model="newProxyUrl"
-              :placeholder="t('settings.provider.githubProxy.optionUrlPlaceholder')"
+              :placeholder="t('settings.githubProxy.optionUrlPlaceholder')"
               :class="{ 'border-red-500': showNewOptionUrlError }"
             />
             <div v-if="showNewOptionUrlError" class="text-xs text-red-500 mt-1">
-              {{ t('settings.provider.githubProxy.invalidProxyUrl') }}
+              {{ t('settings.githubProxy.invalidProxyUrl') }}
             </div>
           </div>
         </div>
@@ -207,14 +207,14 @@ const handleGitHubProxyEnabledChange = async (enabled: boolean) => {
     await configPresenter.setGitHubProxyEnabled(enabled)
     githubProxyEnabled.value = enabled
     toast({
-      title: t('settings.provider.githubProxy.enabled'),
-      description: enabled ? t('settings.provider.githubProxy.enabledSuccess') : t('settings.provider.githubProxy.disabledSuccess')
+      title: t('settings.githubProxy.enabled'),
+      description: enabled ? t('settings.githubProxy.enabledSuccess') : t('settings.githubProxy.disabledSuccess')
     })
   } catch (error) {
     console.error('Failed to update GitHub proxy enabled:', error)
     toast({
       title: t('common.error'),
-      description: t('settings.provider.githubProxy.updateError'),
+      description: t('settings.githubProxy.updateError'),
       variant: 'destructive'
     })
   }
@@ -227,14 +227,14 @@ const handleGitHubProxyUrlChange = async () => {
   try {
     await configPresenter.setGitHubProxyUrl(githubProxyUrl.value)
     toast({
-      title: t('settings.provider.githubProxy.proxyUrl'),
-      description: t('settings.provider.githubProxy.urlUpdateSuccess')
+      title: t('settings.githubProxy.proxyUrl'),
+      description: t('settings.githubProxy.urlUpdateSuccess')
     })
   } catch (error) {
     console.error('Failed to update GitHub proxy URL:', error)
     toast({
       title: t('common.error'),
-      description: t('settings.provider.githubProxy.updateError'),
+      description: t('settings.githubProxy.updateError'),
       variant: 'destructive'
     })
   }
@@ -263,14 +263,14 @@ const addProxyOption = async () => {
     await loadGitHubProxyOptions()
     closeAddProxyOptionDialog()
     toast({
-      title: t('settings.provider.githubProxy.addOption'),
-      description: t('settings.provider.githubProxy.addOptionSuccess')
+      title: t('settings.githubProxy.addOption'),
+      description: t('settings.githubProxy.addOptionSuccess')
     })
   } catch (error) {
     console.error('Failed to add GitHub proxy option:', error)
     toast({
       title: t('common.error'),
-      description: t('settings.provider.githubProxy.updateError'),
+      description: t('settings.githubProxy.updateError'),
       variant: 'destructive'
     })
   }
@@ -289,14 +289,14 @@ const removeProxyOption = async (index: number) => {
     await configPresenter.removeGitHubProxyOption(option)
     await loadGitHubProxyOptions()
     toast({
-      title: t('settings.provider.githubProxy.removeOption'),
-      description: t('settings.provider.githubProxy.removeOptionSuccess')
+      title: t('settings.githubProxy.removeOption'),
+      description: t('settings.githubProxy.removeOptionSuccess')
     })
   } catch (error) {
     console.error('Failed to remove GitHub proxy option:', error)
     toast({
       title: t('common.error'),
-      description: t('settings.provider.githubProxy.updateError'),
+      description: t('settings.githubProxy.updateError'),
       variant: 'destructive'
     })
   }

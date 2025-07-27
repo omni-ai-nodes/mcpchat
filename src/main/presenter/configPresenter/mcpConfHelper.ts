@@ -5,6 +5,7 @@ import ElectronStore from 'electron-store'
 import { app } from 'electron'
 import { compare } from 'compare-versions'
 import { GitDownloadManager } from '@/lib/gitDownloadManager'
+import path from 'path'
 
 // MCP设置的接口
 interface IMcpSettings {
@@ -412,78 +413,152 @@ export class McpConfHelper {
     console.log(`[McpConfHelper] 开始添加MCP服务器: ${name}`, config)
     
     // 检查是否包含GitHub信息且为node类型，如果是则需要下载
-    if (config.github && config.command === 'node' && config.args && config.args.length > 0) {
-      console.log(`[McpConfHelper] 检测到GitHub仓库配置，开始下载: ${config.github}`)
+    // 支持 github 和 Github 两种字段名
+    const configWithGithub = config as MCPServerConfig & { github?: string; Github?: string }
+    const githubUrl = configWithGithub.github || configWithGithub.Github
+    if (githubUrl && (config.command === 'node' || config.command === 'bun' || config.command === 'python' || config.command === 'python3') && config.args && config.args.length > 0) {
+      console.log(`[McpConfHelper] 检测到GitHub仓库配置，开始下载: ${githubUrl}`)
       
       try {
         // 创建 GitDownloadManager 实例
         const gitDownloadManager = new GitDownloadManager(this.configPresenter)
         
         // 下载GitHub仓库
-        const downloadedPath = await gitDownloadManager.downloadRepository(
-          config.github,
+        const downloadResult = await gitDownloadManager.downloadRepository(
+          githubUrl,
           name // 使用服务器名称作为目标名称
         )
         
-        console.log(`[McpConfHelper] GitHub仓库下载完成: ${downloadedPath}`)
+        console.log(`[McpConfHelper] GitHub仓库下载完成: ${downloadResult.localPath}`)
         
         // 更新配置中的路径
         const updatedConfig = { ...config }
         if (updatedConfig.args && updatedConfig.args.length > 0) {
-          // 将第一个参数更新为下载后的路径
           const originalScript = updatedConfig.args[0]
-          const newScriptPath = `${downloadedPath}/${originalScript}`
+          let scriptToUse: string
+          
+          // 检查原始脚本是否是相对路径（不包含路径分隔符的文件名）
+          if (originalScript && !originalScript.includes('/') && !originalScript.includes('\\')) {
+            // 如果是相对文件名（如"claude-mcp.js"），优先使用它
+            scriptToUse = originalScript
+            console.log(`[McpConfHelper] 使用deployJson中指定的入口文件: ${scriptToUse}`)
+          } else {
+            // 否则使用检测到的入口文件
+            scriptToUse = downloadResult.entryFile || 'index.js'
+            console.log(`[McpConfHelper] 使用检测到的入口文件: ${scriptToUse}`)
+          }
+          
+          const newScriptPath = path.join(downloadResult.localPath, scriptToUse)
           updatedConfig.args[0] = newScriptPath
           console.log(`[McpConfHelper] 更新脚本路径: ${originalScript} -> ${newScriptPath}`)
         }
         
         // 检查是否需要安装依赖
         const fs = await import('fs')
-        const path = await import('path')
-        const packageJsonPath = path.join(downloadedPath, 'package.json')
+        const pathModule = await import('path')
+        const packageJsonPath = pathModule.join(downloadResult.localPath, 'package.json')
         
         if (fs.existsSync(packageJsonPath)) {
           console.log(`[McpConfHelper] 发现package.json，开始安装依赖: ${packageJsonPath}`)
           
+          // 优化依赖安装逻辑
           try {
             const { spawn } = await import('child_process')
             
-            // 安装依赖
+            let installCmd: [string, string[]] = ['npm', ['install']]
+            let installer = ''
+            
+            // 检测包管理器
+            if (fs.existsSync(pathModule.join(downloadResult.localPath, 'bun.lockb'))) {
+              installer = 'bun'
+              installCmd = ['bun', ['install']]
+            } else if (fs.existsSync(pathModule.join(downloadResult.localPath, 'yarn.lock'))) {
+              installer = 'yarn'
+              installCmd = ['yarn', ['install']]
+            } else if (fs.existsSync(pathModule.join(downloadResult.localPath, 'pnpm-lock.yaml'))) {
+              installer = 'pnpm'
+              installCmd = ['pnpm', ['install']]
+            } else {
+              installer = 'npm'
+              installCmd = ['npm', ['install']]
+            }
+            
+            console.log(`[McpConfHelper] 使用 ${installer} 安装依赖`)
+            
             await new Promise<void>((resolve, reject) => {
-              const npmProcess = spawn('npm', ['install'], {
-                cwd: downloadedPath,
+              const installProcess = spawn(installCmd[0], installCmd[1], {
+                cwd: downloadResult.localPath,
                 stdio: 'pipe'
               })
               
-              npmProcess.stdout?.on('data', (data) => {
-                console.log(`[McpConfHelper] npm install stdout: ${data}`)
+              installProcess.stdout?.on('data', (data) => {
+                console.log(`[McpConfHelper] ${installer} install stdout: ${data}`)
               })
               
-              npmProcess.stderr?.on('data', (data) => {
-                console.log(`[McpConfHelper] npm install stderr: ${data}`)
+              installProcess.stderr?.on('data', (data) => {
+                console.log(`[McpConfHelper] ${installer} install stderr: ${data}`)
               })
               
-              npmProcess.on('close', (code) => {
+              installProcess.on('close', (code) => {
                 if (code === 0) {
-                  console.log(`[McpConfHelper] 依赖安装成功`)
+                  console.log(`[McpConfHelper] ${installer} 依赖安装成功`)
                   resolve()
                 } else {
-                  console.error(`[McpConfHelper] 依赖安装失败，退出码: ${code}`)
-                  reject(new Error(`npm install failed with code ${code}`))
+                  console.error(`[McpConfHelper] ${installer} 依赖安装失败，退出码: ${code}`)
+                  reject(new Error(`${installer} install failed with code ${code}`))
                 }
               })
               
-              npmProcess.on('error', (error) => {
-                console.error(`[McpConfHelper] npm install进程错误:`, error)
+              installProcess.on('error', (error) => {
+                console.error(`[McpConfHelper] ${installer} install进程错误:`, error)
                 reject(error)
               })
             })
           } catch (installError) {
             console.error(`[McpConfHelper] 依赖安装失败:`, installError)
-            // 继续执行，不因为依赖安装失败而中断服务器添加
+            // 继续执行
           }
         } else {
           console.log(`[McpConfHelper] 未找到package.json，跳过依赖安装`)
+        }
+        
+        // Python依赖安装
+        if ((config.command === 'python' || config.command === 'python3') && fs.existsSync(pathModule.join(downloadResult.localPath, 'requirements.txt'))) {
+          console.log(`[McpConfHelper] 发现requirements.txt，开始安装Python依赖`)
+          try {
+            const { spawn } = await import('child_process')
+            await new Promise<void>((resolve, reject) => {
+              const pipProcess = spawn(config.command, ['-m', 'pip', 'install', '-r', 'requirements.txt'], {
+                cwd: downloadResult.localPath,
+                stdio: 'pipe'
+              })
+              
+              pipProcess.stdout?.on('data', (data) => {
+                console.log(`[McpConfHelper] pip install stdout: ${data}`)
+              })
+              
+              pipProcess.stderr?.on('data', (data) => {
+                console.log(`[McpConfHelper] pip install stderr: ${data}`)
+              })
+              
+              pipProcess.on('close', (code) => {
+                if (code === 0) {
+                  console.log(`[McpConfHelper] Python依赖安装成功`)
+                  resolve()
+                } else {
+                  console.error(`[McpConfHelper] Python依赖安装失败，退出码: ${code}`)
+                  reject(new Error(`pip install failed with code ${code}`))
+                }
+              })
+              
+              pipProcess.on('error', (error) => {
+                console.error(`[McpConfHelper] pip install进程错误:`, error)
+                reject(error)
+              })
+            })
+          } catch (pyError) {
+            console.error(`[McpConfHelper] Python依赖安装失败:`, pyError)
+          }
         }
         
         // 使用更新后的配置

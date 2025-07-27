@@ -194,7 +194,9 @@ export class ServerManager {
       const client = new McpClient(
         name,
         serverConfig as unknown as Record<string, unknown>,
-        npmRegistry
+        npmRegistry,
+        null,
+        this.configPresenter
       )
       this.clients.set(name, client)
 
@@ -218,7 +220,7 @@ export class ServerManager {
   /**
    * 预安装npx包（如果需要）- 异步执行，不阻塞服务器启动
    */
-  private preInstallPackageIfNeeded(serverConfig: any, npmRegistry?: string | null): void {
+  private preInstallPackageIfNeeded(serverConfig: Record<string, unknown>, npmRegistry?: string | null): void {
     const command = serverConfig.command as string
     let packageName: string | undefined
   
