@@ -71,6 +71,7 @@ interface ApiResponse {
   data: {
     infos: ApiServerItem[]
     total_pages: number
+    total_count: number
   }
 }
 
@@ -100,7 +101,7 @@ interface ServerItem {
 const loading = ref(false)
 const currentPage = ref(1)
 const totalPages = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(30) // 调整为与API默认值一致
 const searchQuery = ref('')
 const filterStatus = ref('all')
 const viewMode = ref<'grid' | 'list'>('grid')
@@ -151,8 +152,19 @@ const isServerInstalled = (server: ServerItem): boolean => {
 
 // 同步服务状态的函数
 const syncServerStatuses = async () => {
-  console.log('同步服务状态，当前本地服务列表:', mcpStore.serverList.map(s => ({ name: s.name, type: s.type, isRunning: s.isRunning, command: s.command })))
-  console.log('当前Gallery服务列表:', allApiServers.value.map(s => ({ name: s.name, status: s.status })))
+  console.log('=== 开始同步服务状态 ===')
+  console.log('当前本地服务列表:', mcpStore.serverList.map(s => ({ 
+    name: s.name, 
+    type: s.type, 
+    isRunning: s.isRunning, 
+    isLoading: s.isLoading,
+    command: s.command 
+  })))
+  console.log('当前Gallery服务列表:', allApiServers.value.map(s => ({ 
+    name: s.name, 
+    status: s.status, 
+    isRunning: s.isRunning 
+  })))
   
   for (const server of allApiServers.value) {
     console.log(`\n正在处理服务器: ${server.name}`)
@@ -191,7 +203,8 @@ const syncServerStatuses = async () => {
     })
     
     if (localServer) {
-      console.log(`✓ 找到匹配的本地服务: Gallery服务"${server.name}" -> 本地服务"${localServer.name}", 运行状态: ${localServer.isRunning}, 命令: ${localServer.command}`)
+      console.log(`✓ 找到匹配的本地服务: Gallery服务"${server.name}" -> 本地服务"${localServer.name}"`)
+      console.log(`  本地服务状态: 运行=${localServer.isRunning}, 加载中=${localServer.isLoading}, 命令=${localServer.command}`)
       
       // 检查是否为GitHub类型的服务器且需要检查代码下载状态
       let isCodeDownloaded = true
@@ -209,41 +222,92 @@ const syncServerStatuses = async () => {
         console.log(`  npx服务器 ${server.name} 跳过GitHub目录检查，命令: ${localServer.command}`)
       }
       
-      // 计算新状态
+      // 关键修复：使用 mcpStore.serverStatuses 而不是 localServer.isRunning
+      // 这样可以确保获取到最新的服务器运行状态
+      // 但是要确保 serverStatuses 中确实有这个服务器的状态记录
+      const actualIsRunning = Object.prototype.hasOwnProperty.call(mcpStore.serverStatuses, localServer.name)
+        ? mcpStore.serverStatuses[localServer.name] 
+        : localServer.isRunning || false
+      console.log(`  实际运行状态检查: serverStatuses[${localServer.name}] = ${actualIsRunning}, localServer.isRunning = ${localServer.isRunning}`)
+      
+      // 计算新状态 - 优先考虑 loading 状态
       let newStatus: 'running' | 'stopped' | 'error' | 'loading' | 'not_installed'
-      if (localServer.isRunning) {
-        newStatus = 'running'
-      } else if (localServer.isLoading) {
+      let newIsRunning = actualIsRunning
+      let newIsDefault = localServer.isDefault
+      
+      if (localServer.isLoading) {
         newStatus = 'loading'
+        console.log(`  服务器 ${server.name} 正在加载中`)
+      } else if (actualIsRunning) {
+        newStatus = 'running'
+        console.log(`  服务器 ${server.name} 正在运行`)
       } else if (isCodeDownloaded) {
         newStatus = 'stopped'
+        console.log(`  服务器 ${server.name} 已停止但代码已下载`)
       } else {
         newStatus = 'not_installed'
+        console.log(`  服务器 ${server.name} 代码未下载，视为未安装`)
       }
       
       // 只在状态真正发生变化时才更新，避免触发不必要的响应式更新
-      if (server.status !== newStatus || server.isRunning !== localServer.isRunning || server.isDefault !== localServer.isDefault) {
-        console.log(`  服务器 ${server.name} 状态更新: ${server.status} -> ${newStatus}`)
+      let hasChanges = false
+      if (server.status !== newStatus) {
+        console.log(`  状态变化: ${server.status} -> ${newStatus}`)
         server.status = newStatus
-        server.isRunning = localServer.isRunning
-        server.isDefault = localServer.isDefault
+        hasChanges = true
+      }
+      if (server.isRunning !== newIsRunning) {
+        console.log(`  运行状态变化: ${server.isRunning} -> ${newIsRunning}`)
+        server.isRunning = newIsRunning
+        hasChanges = true
+      }
+      if (server.isDefault !== newIsDefault) {
+        console.log(`  默认状态变化: ${server.isDefault} -> ${newIsDefault}`)
+        server.isDefault = newIsDefault
+        hasChanges = true
+      }
+      
+      if (hasChanges) {
+        console.log(`  ✓ 服务器 ${server.name} 状态已更新`)
+      } else {
+        console.log(`  - 服务器 ${server.name} 状态无变化`)
       }
       
       if (localServer.mcp_type === 'mcp_gallery' && !server.isGallery) {
         server.isGallery = true
+        console.log(`  ✓ 标记为Gallery服务器: ${server.name}`)
       }
     } else {
       // 只在状态真正发生变化时才更新
-      if (server.status !== 'not_installed' || server.isRunning !== false || server.isDefault !== false) {
-        console.log(`✗ 未找到匹配的本地服务: ${server.name}, 设置为未安装状态`)
+      let hasChanges = false
+      if (server.status !== 'not_installed') {
+        console.log(`✗ 未找到匹配的本地服务: ${server.name}, 状态: ${server.status} -> not_installed`)
         server.status = 'not_installed'
+        hasChanges = true
+      }
+      if (server.isRunning !== false) {
+        console.log(`  运行状态: ${server.isRunning} -> false`)
         server.isRunning = false
+        hasChanges = true
+      }
+      if (server.isDefault !== false) {
+        console.log(`  默认状态: ${server.isDefault} -> false`)
         server.isDefault = false
+        hasChanges = true
+      }
+      
+      if (hasChanges) {
+        console.log(`  ✓ 服务器 ${server.name} 状态已重置为未安装`)
       }
     }
   }
   
-  console.log('\n同步完成，最终状态:', allApiServers.value.map(s => ({ name: s.name, status: s.status })))
+  console.log('\n=== 同步完成 ===')
+  console.log('最终状态:', allApiServers.value.map(s => ({ 
+    name: s.name, 
+    status: s.status, 
+    isRunning: s.isRunning 
+  })))
 }
 
 // 防抖的同步函数，避免频繁调用
@@ -253,19 +317,40 @@ const debouncedSyncServerStatuses = debounce(() => {
   if (!loading.value && !isRequestInProgress && !isSyncingFromFetch) {
     syncServerStatuses()
   }
-}, 100)
+}, 50) // 减少防抖时间到50ms，提高响应速度
 
 // 监听mcpStore的服务状态变化 - 合并为一个监听器
-watch(() => [mcpStore.serverStatuses, mcpStore.serverList, mcpStore.config], () => {
+watch(() => [mcpStore.serverStatuses, mcpStore.serverList, mcpStore.config], (newValues, oldValues) => {
+  console.log('=== MCP Store 状态变化监听 ===')
+  console.log('新的 serverStatuses:', newValues[0])
+  console.log('新的 serverList 长度:', Array.isArray(newValues[1]) ? newValues[1].length : 'N/A')
+  console.log('配置变化:', newValues[2] !== oldValues?.[2])
+  
   // 在 loading 状态下不执行同步，避免无限循环
   // 同时检查是否正在从 fetchServers 中同步，避免重复触发
   if (!loading.value && !isRequestInProgress && !isSyncingFromFetch) {
-    debouncedSyncServerStatuses()
+    console.log('触发快速状态同步...')
+    // 对于状态变化，使用更短的防抖时间以提高响应速度
+    const quickSyncDebounced = debounce(() => {
+      console.log('执行快速状态同步')
+      syncServerStatuses()
+    }, 10) // 10ms 的快速同步
+    quickSyncDebounced()
+  } else {
+    console.log('跳过状态同步，原因:', { 
+      loading: loading.value, 
+      isRequestInProgress, 
+      isSyncingFromFetch 
+    })
   }
-}, { deep: true })
+}, { deep: true, immediate: false })
 
 // 所有API服务器数据
 let allApiServers = ref<ServerItem[]>([])
+
+// 服务器端分页信息
+const serverTotalPages = ref(1)
+const serverTotalCount = ref(0)
 
 // 添加请求缓存，避免重复请求
 let lastSearchQuery = ''
@@ -273,7 +358,7 @@ let isRequestInProgress = false
 let isSyncingFromFetch = false // 新增：标记是否正在从 fetchServers 中同步状态
 let hasInitialFetch = false // 新增：标记是否已经完成初始获取
 
-// API调用函数 - 修改为获取所有数据
+// API调用函数 - 修改为支持服务器端分页
 const fetchServers = async (searchName: string = '') => {
   // 如果正在请求中，则跳过
   if (isRequestInProgress || loading.value) {
@@ -284,13 +369,14 @@ const fetchServers = async (searchName: string = '') => {
     return
   }
   
-  console.log('开始API请求，搜索查询:', searchName)
+  console.log('开始API请求，搜索查询:', searchName, '当前页:', currentPage.value)
   isRequestInProgress = true
   loading.value = true
   
   // 只有在搜索查询改变时才清空数据
   if (searchName !== lastSearchQuery) {
     allApiServers.value = []
+    currentPage.value = 1 // 搜索时重置到第一页
   }
   
   lastSearchQuery = searchName
@@ -298,78 +384,75 @@ const fetchServers = async (searchName: string = '') => {
   try {
     const apiUrl = import.meta.env.VITE_MCP_SERVER_API_URL || 'https://api.omni-ainode.com'
     
-    // 获取所有数据，不进行服务器端分页
-    let allServers: ApiServerItem[] = []
-    let currentApiPage = 1
-    let totalApiPages = 1
-    
-    // 循环获取所有页面的数据
-    do {
-      interface RequestBody { page_size: number; current_page: number; name?: string; }
-      const requestBody: RequestBody = {
-        page_size: 100, // 增大每页数据量以减少请求次数
-        current_page: currentApiPage
-      }
-      
-      if (searchName.trim()) {
-        requestBody.name = searchName.trim()
-      }
-      
-      const response = await fetch(`${apiUrl}/api/get_mcp_server_list`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      })
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      
-      const data: ApiResponse = await response.json()
-      
-      if (data.code === 200) {
-        allServers = allServers.concat(data.data.infos)
-        totalApiPages = data.data.total_pages
-        currentApiPage++
-      } else {
-        throw new Error(data.msg || 'API返回错误')
-      }
-    } while (currentApiPage <= totalApiPages)
-    
-    // 映射所有服务器数据
-    const mappedServers = allServers.map(item => reactive({
-      id: item.id.toString(),
-      name: item.name,
-      icon: getServerIcon(item.logo),
-      description: item.introduction,
-      type: item.by,
-      status: 'not_installed' as const,
-      isRunning: false,
-      isDefault: false,
-      isGallery: false,
-      toolsCount: 0,
-      promptsCount: 0,
-      resourcesCount: 0,
-      Github: item.github,
-      deployJson: item.deploy_json
-    }))
-    
-    // 替换所有数据
-    allApiServers.value = mappedServers
-    
-    // 同步状态
-    isSyncingFromFetch = true
-    await syncServerStatuses()
-    isSyncingFromFetch = false
-    
-    // 标记已完成初始获取
-    if (searchName === '') {
-      hasInitialFetch = true
+    // 使用当前页码进行服务器端分页
+    interface RequestBody { page_size: number; current_page: number; name?: string; status?: string; }
+    const requestBody: RequestBody = {
+      page_size: pageSize.value, // 使用当前设置的页面大小
+      current_page: currentPage.value  // API使用1基索引，与UI保持一致
     }
     
-    console.log(`获取完成，共 ${allServers.length} 个服务器`)
+    if (searchName.trim()) {
+      requestBody.name = searchName.trim()
+    }
+    
+    // 添加状态筛选参数
+    if (filterStatus.value !== 'all') {
+      requestBody.status = filterStatus.value
+    }
+    
+    const response = await fetch(`${apiUrl}/api/get_mcp_server_list`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data: ApiResponse = await response.json()
+    
+    if (data.code === 200) {
+       // 映射服务器数据
+       const mappedServers = data.data.infos.map(item => reactive({
+         id: item.id.toString(),
+         name: item.name,
+         icon: getServerIcon(item.logo),
+         description: item.introduction,
+         type: item.by,
+         status: 'not_installed' as const,
+         isRunning: false,
+         isDefault: false,
+         isGallery: false,
+         toolsCount: 0,
+         promptsCount: 0,
+         resourcesCount: 0,
+         Github: item.github,
+         deployJson: item.deploy_json
+       }))
+       
+       // 更新服务器数据和分页信息
+       allApiServers.value = mappedServers
+       serverTotalPages.value = data.data.total_pages
+       serverTotalCount.value = data.data.total_count
+       totalPages.value = data.data.total_pages // 更新UI显示的总页数
+       
+       // 同步状态
+       isSyncingFromFetch = true
+       await syncServerStatuses()
+       isSyncingFromFetch = false
+       
+       // 标记已完成初始获取
+       if (searchName === '') {
+         hasInitialFetch = true
+       }
+       
+       console.log(`获取完成，当前页: ${currentPage.value}，共 ${data.data.infos.length} 个服务器，总计 ${data.data.total_count} 个，共 ${data.data.total_pages} 页`)
+     } else {
+       throw new Error(data.msg || 'API返回错误')
+     }
   } catch (error) {
     console.error('获取服务器列表失败:', error)
     hasFetchError.value = true
@@ -479,10 +562,12 @@ watch(searchQuery, (newQuery, oldQuery) => {
 
 
 
-// 更新翻页函数
-const goToPage = (page: number) => {
+// 更新翻页函数 - 支持服务端分页
+const goToPage = async (page: number) => {
   if (page >= 1 && page <= totalPages.value && page !== currentPage.value) {
     currentPage.value = page
+    // 重新获取数据，使用当前的搜索查询
+    await fetchServers(searchQuery.value)
   }
 }
 
@@ -530,52 +615,15 @@ const hidePageInput = () => {
   pageInput.value = ''
 }
 
-// 计算属性：显示当前页的服务器列表
-const allServers = computed(() => {
-  // 直接返回 API 数据，不添加本地服务器
-  // 这样 "All Server" 页面只显示来自 API 的服务器，不会显示已安装的本地服务器
+// 当前页显示的服务器（服务端分页，直接返回所有数据）
+const filteredServers = computed(() => {
+  // 对于服务端分页，当前页的数据就是 allApiServers
   return allApiServers.value
 })
 
-// 筛选后的所有服务器（不分页）
-const allFilteredServers = computed(() => {
-  let filtered = allServers.value
-  
-  // 应用状态筛选
-  if (filterStatus.value !== 'all') {
-    filtered = filtered.filter(server => {
-      switch (filterStatus.value) {
-        case 'running':
-          return server.status === 'running'
-        case 'stopped':
-          return server.status === 'stopped'
-        case 'error':
-          return server.status === 'error'
-        case 'not_installed':
-          return server.status === 'not_installed'
-        default:
-          return true
-      }
-    })
-  }
-  
-  return filtered
-})
-
-// 计算总页数
+// 计算总页数 - 使用服务端返回的总页数
 const computedTotalPages = computed(() => {
-  return Math.ceil(allFilteredServers.value.length / pageSize.value) || 1
-})
-
-// 当前页显示的服务器（应用分页）
-const filteredServers = computed(() => {
-  const filtered = allFilteredServers.value
-  
-  // 应用分页
-  const startIndex = (currentPage.value - 1) * pageSize.value
-  const endIndex = startIndex + pageSize.value
-  
-  return filtered.slice(startIndex, endIndex)
+  return serverTotalPages.value || 1
 })
 
 // 监听筛选结果变化，更新总页数
@@ -586,6 +634,18 @@ watch(computedTotalPages, (newTotalPages) => {
     currentPage.value = 1
   }
 }, { immediate: true })
+
+// 监听筛选状态变化，重新获取数据
+watch(filterStatus, async () => {
+  currentPage.value = 1 // 重置到第一页
+  await fetchServers(searchQuery.value)
+})
+
+// 监听搜索查询变化，重新获取数据
+watch(searchQuery, async () => {
+  currentPage.value = 1 // 重置到第一页
+  await fetchServers(searchQuery.value)
+})
 
 // 计算可见的页码
 const visiblePages = computed(() => {
@@ -1005,22 +1065,73 @@ const toggleServer = async (server: ServerItem) => {
     })
     
     if (localServer) {
-      // 如果已安装，使用mcpStore的toggleServer方法
+      // 立即更新UI状态为loading
+      const originalStatus = server.status
+      const originalIsRunning = server.isRunning
       server.status = 'loading'
-      const success = await mcpStore.toggleServer(localServer.name) // 使用本地服务的名称
-      if (success) {
-        // 状态会通过watch自动同步，这里不需要手动更新
-        console.log(`服务器 ${localServer.name} 状态切换成功`)
-        await syncServerStatuses() // 立即同步状态以确保UI更新
-      } else {
-        // 如果切换失败，恢复原状态
-        server.status = server.isRunning ? 'running' : 'stopped'
-        console.error(`服务器 ${localServer.name} 状态切换失败`)
+      
+      // 获取当前真实的运行状态
+      const currentIsRunning = mcpStore.serverStatuses[localServer.name] || false
+      console.log(`开始切换服务器 ${localServer.name} 状态，当前运行状态: ${currentIsRunning}`)
+      
+      try {
+        // 使用mcpStore的toggleServer方法
+        const success = await mcpStore.toggleServer(localServer.name)
+        
+        if (success) {
+          console.log(`服务器 ${localServer.name} 状态切换成功`)
+          
+          // 等待一小段时间确保后端状态更新完成
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
+          // 强制刷新所有服务器状态，而不仅仅是当前服务器
+          await mcpStore.updateAllServerStatuses()
+          
+          // 再等待一小段时间确保状态传播完成
+          await new Promise(resolve => setTimeout(resolve, 300))
+          
+          // 立即同步状态以确保UI更新
+          await syncServerStatuses()
+          
+          // 显示成功提示
+          const actionText = !currentIsRunning ? '启动' : '停止'
+          toast({
+            title: `服务器${actionText}成功`,
+            description: `服务器 "${server.name}" 已${actionText}`,
+            variant: 'default'
+          })
+        } else {
+          // 如果切换失败，恢复原状态
+          server.status = originalStatus
+          server.isRunning = originalIsRunning
+          console.error(`服务器 ${localServer.name} 状态切换失败`)
+          
+          toast({
+            title: '操作失败',
+            description: `服务器 "${server.name}" 状态切换失败`,
+            variant: 'destructive'
+          })
+        }
+      } catch (toggleError) {
+        // 如果切换过程中出错，恢复原状态
+        server.status = originalStatus
+        server.isRunning = originalIsRunning
+        console.error(`服务器 ${localServer.name} 状态切换过程中出错:`, toggleError)
+        
+        toast({
+          title: '操作失败',
+          description: `服务器 "${server.name}" 状态切换时发生错误`,
+          variant: 'destructive'
+        })
       }
     } else {
       // 如果未安装，提示用户先安装
       console.log('当前已安装的服务列表:', mcpStore.serverList.map(s => s.name))
-      alert(`请先安装服务器 "${server.name}" 后再启动`)
+      toast({
+        title: '服务器未安装',
+        description: `请先安装服务器 "${server.name}" 后再启动`,
+        variant: 'destructive'
+      })
     }
   } catch (error) {
     console.error(`切换服务器 ${server.name} 状态时发生错误:`, error)
@@ -1030,6 +1141,12 @@ const toggleServer = async (server: ServerItem) => {
     } else {
       server.status = 'not_installed'
     }
+    
+    toast({
+      title: '操作失败',
+      description: `服务器 "${server.name}" 操作时发生未知错误`,
+      variant: 'destructive'
+    })
   }
 }
 
