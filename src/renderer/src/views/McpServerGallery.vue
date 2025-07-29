@@ -273,7 +273,7 @@ let isRequestInProgress = false
 let isSyncingFromFetch = false // 新增：标记是否正在从 fetchServers 中同步状态
 let hasInitialFetch = false // 新增：标记是否已经完成初始获取
 
-// API调用函数 - 修改为获取所有页面数据
+// API调用函数 - 修改为获取所有数据
 const fetchServers = async (searchName: string = '') => {
   // 如果正在请求中，则跳过
   if (isRequestInProgress || loading.value) {
@@ -284,7 +284,7 @@ const fetchServers = async (searchName: string = '') => {
     return
   }
   
-  console.log('开始API请求，搜索查询:', searchName, '当前页:', currentPage.value)
+  console.log('开始API请求，搜索查询:', searchName)
   isRequestInProgress = true
   loading.value = true
   
@@ -298,68 +298,78 @@ const fetchServers = async (searchName: string = '') => {
   try {
     const apiUrl = import.meta.env.VITE_MCP_SERVER_API_URL || 'https://api.omni-ainode.com'
     
-    interface RequestBody { page_size: number; current_page: number; name?: string; }
-    const requestBody: RequestBody = {
-      page_size: 30, // 固定每页30条数据
-      current_page: currentPage.value // 使用当前页面
-    }
+    // 获取所有数据，不进行服务器端分页
+    let allServers: ApiServerItem[] = []
+    let currentApiPage = 1
+    let totalApiPages = 1
     
-    if (searchName.trim()) {
-      requestBody.name = searchName.trim()
-    }
-    
-    const response = await fetch(`${apiUrl}/api/get_mcp_server_list`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    })
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    
-    const data: ApiResponse = await response.json()
-    
-    if (data.code === 200) {
-      // 映射服务器数据
-      const pageServers = data.data.infos.map(item => reactive({
-        id: item.id.toString(),
-        name: item.name,
-        icon: getServerIcon(item.logo),
-        description: item.introduction,
-        type: item.by,
-        status: 'not_installed' as const,
-        isRunning: false,
-        isDefault: false,
-        isGallery: false,
-        toolsCount: 0,
-        promptsCount: 0,
-        resourcesCount: 0,
-        Github: item.github,
-        deployJson: item.deploy_json
-      }))
-      
-      // 直接替换而不是累加
-      allApiServers.value = pageServers
-      
-      // 同步状态
-      isSyncingFromFetch = true
-      await syncServerStatuses()
-      isSyncingFromFetch = false
-      
-      // 设置总页数基于API返回的总页数
-       totalPages.value = data.data.total_pages
-      
-      // 标记已完成初始获取
-      if (searchName === '') {
-        hasInitialFetch = true
+    // 循环获取所有页面的数据
+    do {
+      interface RequestBody { page_size: number; current_page: number; name?: string; }
+      const requestBody: RequestBody = {
+        page_size: 100, // 增大每页数据量以减少请求次数
+        current_page: currentApiPage
       }
-    } else {
-      console.error('API返回错误:', data.msg)
-      allApiServers.value = []
+      
+      if (searchName.trim()) {
+        requestBody.name = searchName.trim()
+      }
+      
+      const response = await fetch(`${apiUrl}/api/get_mcp_server_list`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data: ApiResponse = await response.json()
+      
+      if (data.code === 200) {
+        allServers = allServers.concat(data.data.infos)
+        totalApiPages = data.data.total_pages
+        currentApiPage++
+      } else {
+        throw new Error(data.msg || 'API返回错误')
+      }
+    } while (currentApiPage <= totalApiPages)
+    
+    // 映射所有服务器数据
+    const mappedServers = allServers.map(item => reactive({
+      id: item.id.toString(),
+      name: item.name,
+      icon: getServerIcon(item.logo),
+      description: item.introduction,
+      type: item.by,
+      status: 'not_installed' as const,
+      isRunning: false,
+      isDefault: false,
+      isGallery: false,
+      toolsCount: 0,
+      promptsCount: 0,
+      resourcesCount: 0,
+      Github: item.github,
+      deployJson: item.deploy_json
+    }))
+    
+    // 替换所有数据
+    allApiServers.value = mappedServers
+    
+    // 同步状态
+    isSyncingFromFetch = true
+    await syncServerStatuses()
+    isSyncingFromFetch = false
+    
+    // 标记已完成初始获取
+    if (searchName === '') {
+      hasInitialFetch = true
     }
+    
+    console.log(`获取完成，共 ${allServers.length} 个服务器`)
   } catch (error) {
     console.error('获取服务器列表失败:', error)
     hasFetchError.value = true
@@ -430,17 +440,10 @@ watch(pageSize, () => {
   currentPage.value = 1
 })
 
-// 监听当前页变化，重新获取数据
-watch(currentPage, async (newPage, oldPage) => {
+// 监听当前页变化，确保页码在有效范围内
+watch(currentPage, (newPage) => {
   if (newPage > totalPages.value && totalPages.value > 0) {
     currentPage.value = totalPages.value || 1
-    return
-  }
-  
-  // 当页面真正发生变化时，重新获取数据
-  if (oldPage !== undefined && newPage !== oldPage) {
-    console.log(`页面变化: ${oldPage} -> ${newPage}，重新获取数据`)
-    await fetchServers(searchQuery.value)
   }
 })
 
@@ -534,10 +537,11 @@ const allServers = computed(() => {
   return allApiServers.value
 })
 
-// 应用状态过滤
-const filteredServers = computed(() => {
+// 筛选后的所有服务器（不分页）
+const allFilteredServers = computed(() => {
   let filtered = allServers.value
   
+  // 应用状态筛选
   if (filterStatus.value !== 'all') {
     filtered = filtered.filter(server => {
       switch (filterStatus.value) {
@@ -557,6 +561,31 @@ const filteredServers = computed(() => {
   
   return filtered
 })
+
+// 计算总页数
+const computedTotalPages = computed(() => {
+  return Math.ceil(allFilteredServers.value.length / pageSize.value) || 1
+})
+
+// 当前页显示的服务器（应用分页）
+const filteredServers = computed(() => {
+  const filtered = allFilteredServers.value
+  
+  // 应用分页
+  const startIndex = (currentPage.value - 1) * pageSize.value
+  const endIndex = startIndex + pageSize.value
+  
+  return filtered.slice(startIndex, endIndex)
+})
+
+// 监听筛选结果变化，更新总页数
+watch(computedTotalPages, (newTotalPages) => {
+  totalPages.value = newTotalPages
+  // 如果当前页超出了新的总页数，重置到第一页
+  if (currentPage.value > newTotalPages) {
+    currentPage.value = 1
+  }
+}, { immediate: true })
 
 // 计算可见的页码
 const visiblePages = computed(() => {
