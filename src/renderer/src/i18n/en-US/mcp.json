@@ -275,7 +275,10 @@
       "description": "Configure and install a new MCP server to your system"
     },
     "installSuccess": "Server installed successfully",
-    "installFailed": "Server installation failed"
+    "installFailed": "Server installation failed",
+    "cannotEdit": "Cannot Edit",
+    "cannotDelete": "Cannot Delete",
+    "serverNotInstalled": "Server is not installed. Please install the server first before performing this operation"
   },
   "serverDetail": {
     "introduction": "Introduction",

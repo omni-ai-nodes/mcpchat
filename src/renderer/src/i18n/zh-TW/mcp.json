@@ -264,6 +264,11 @@
     "installDialog": {
       "title": "安裝MCP伺服器",
       "description": "配置並安裝新的MCP伺服器到您的系統中"
-    }
+    },
+    "installSuccess": "伺服器安裝成功",
+    "installFailed": "伺服器安裝失敗",
+    "cannotEdit": "無法編輯",
+    "cannotDelete": "無法刪除",
+    "serverNotInstalled": "伺服器尚未安裝，請先安裝伺服器後再進行操作"
   }
 }

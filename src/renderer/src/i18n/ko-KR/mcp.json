@@ -264,6 +264,11 @@
     "installDialog": {
       "title": "MCP 서버 설치",
       "description": "새로운 MCP 서버를 구성하고 시스템에 설치합니다"
-    }
+    },
+    "installSuccess": "서버가 성공적으로 설치되었습니다",
+    "installFailed": "서버 설치에 실패했습니다",
+    "cannotEdit": "편집할 수 없음",
+    "cannotDelete": "삭제할 수 없음",
+    "serverNotInstalled": "서버가 설치되지 않았습니다. 이 작업을 수행하기 전에 먼저 서버를 설치해 주세요"
   }
 }

@@ -265,6 +265,11 @@
     "installDialog": {
       "title": "MCPサーバーをインストール",
       "description": "新しいMCPサーバーを設定してシステムにインストールします"
-    }
+    },
+    "installSuccess": "サーバーのインストールが成功しました",
+    "installFailed": "サーバーのインストールに失敗しました",
+    "cannotEdit": "編集できません",
+    "cannotDelete": "削除できません",
+    "serverNotInstalled": "サーバーがインストールされていません。この操作を実行する前に、まずサーバーをインストールしてください"
   }
 }

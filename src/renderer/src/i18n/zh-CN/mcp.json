@@ -275,7 +275,10 @@
       "description": "配置并安装新的MCP服务器到您的系统中"
     },
     "installSuccess": "服务器安装成功",
-    "installFailed": "服务器安装失败"
+    "installFailed": "服务器安装失败",
+    "cannotEdit": "无法编辑",
+    "cannotDelete": "无法删除",
+    "serverNotInstalled": "服务器尚未安装，请先安装服务器后再进行操作"
   },
   "workflow": {
     "title": "Mcp工作流",

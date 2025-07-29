@@ -265,6 +265,11 @@
     "installDialog": {
       "title": "Installer le serveur MCP",
       "description": "Configurer et installer un nouveau serveur MCP sur votre système"
-    }
+    },
+    "installSuccess": "Serveur installé avec succès",
+    "installFailed": "Échec de l'installation du serveur",
+    "cannotEdit": "Impossible de modifier",
+    "cannotDelete": "Impossible de supprimer",
+    "serverNotInstalled": "Le serveur n'est pas installé. Veuillez d'abord installer le serveur avant d'effectuer cette opération"
   }
 }
