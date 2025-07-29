@@ -1369,7 +1369,7 @@ const goToMcpSettings = () => {
           class="pl-10"
         />
       </div>
-      <Select v-model="filterStatus">
+      <!-- <Select v-model="filterStatus">
         <SelectTrigger class="w-48">
           <SelectValue :placeholder="t('mcp.mcpGallery.filterByStatus')" />
         </SelectTrigger>
@@ -1380,7 +1380,7 @@ const goToMcpSettings = () => {
           <SelectItem value="not_installed">{{ t('mcp.mcpGallery.notInstalledServers') }}</SelectItem>
           <SelectItem value="error">{{ t('mcp.mcpGallery.errorServers') }}</SelectItem>
         </SelectContent>
-      </Select>
+      </Select> -->
     </div>
 
     <!-- 服务器展示区域 -->
