@@ -1788,7 +1788,7 @@ const goToMcpSettings = () => {
 
   <!-- MCP设置弹窗 -->
   <Dialog v-model:open="isMcpSettingsDialogOpen">
-    <DialogContent class="w-[95vw] max-w-[800px] h-[85vh] max-h-[600px] flex flex-col">
+    <DialogContent class="w-[98vw] max-w-[1200px] h-[90vh] max-h-[800px] flex flex-col">
       <DialogHeader class="flex-shrink-0 pb-4">
         <DialogTitle class="text-lg">
           MCP设置
