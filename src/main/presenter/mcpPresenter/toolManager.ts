@@ -43,7 +43,7 @@ export class ToolManager {
       return this.cachedToolDefinitions
     }
 
-    console.info('Fetching/refreshing tool definitions and target map...')
+    // console.info('Fetching/refreshing tool definitions and target map...')
     const clients = await this.serverManager.getRunningClients()
     const results: MCPToolDefinition[] = []
     // Initialize/clear the map before processing
@@ -54,7 +54,7 @@ export class ToolManager {
     }
 
     if (!clients || clients.length === 0) {
-      console.warn('No running MCP clients found.')
+      // console.warn('No running MCP clients found.')
       this.cachedToolDefinitions = []
       // Map is already cleared or initialized as empty
       return this.cachedToolDefinitions
