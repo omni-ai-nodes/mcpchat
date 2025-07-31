@@ -37,6 +37,12 @@ function createProxy(presenterName: string) {
   return new Proxy({} as any, {
     get(_, functionName) {
       return (...payloads: []) => {
+        // 检查是否在 Electron 环境中
+        if (!window.electron?.ipcRenderer) {
+          console.warn(`Presenter ${presenterName}.${String(functionName)} called in browser environment, returning null`)
+          return Promise.resolve(null)
+        }
+
         try {
           // 先使用 toRaw 获取原始对象，然后安全序列化
           const rawPayloads = payloads.map((e) => safeSerialize(toRaw(e)))

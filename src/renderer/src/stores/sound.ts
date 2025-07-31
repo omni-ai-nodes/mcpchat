@@ -10,10 +10,19 @@ export const useSoundStore = defineStore('sound', () => {
   // 初始化设置
   const initSound = async () => {
     try {
+      // 检查是否在 Electron 环境中
+      if (!window.electron?.ipcRenderer) {
+        console.warn('Sound store initialized in browser environment, using default values')
+        soundEnabled.value = false
+        return
+      }
+
       soundEnabled.value = await configPresenter.getSoundEnabled()
       setupSoundEnabledListener()
     } catch (error) {
       console.error('初始化音效失败:', error)
+      // 在出错时设置默认值
+      soundEnabled.value = false
     }
   }
 
@@ -33,8 +42,14 @@ export const useSoundStore = defineStore('sound', () => {
 
   // 设置音效开关监听器
   const setupSoundEnabledListener = () => {
+    // 检查是否在 Electron 环境中
+    if (!window.electron?.ipcRenderer) {
+      console.warn('Sound event listener not set up in browser environment')
+      return
+    }
+
     // 监听音效开关变更事件
-    window.electron?.ipcRenderer?.on(
+    window.electron.ipcRenderer.on(
       CONFIG_EVENTS.SOUND_ENABLED_CHANGED,
       (_event, enabled: boolean) => {
         soundEnabled.value = enabled

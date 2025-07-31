@@ -240,6 +240,22 @@ export const useSettingsStore = defineStore('settings', () => {
   // 初始化设置
   const initSettings = async () => {
     try {
+      // 检查是否在 Electron 环境中
+      if (!window.electron?.ipcRenderer) {
+        console.warn('Settings store initialized in browser environment, using default values')
+        // 设置默认值
+        loggingEnabled.value = false
+        copyWithCotEnabled.value = true
+        fontSizeLevel.value = DEFAULT_FONT_SIZE_LEVEL
+        searchPreviewEnabled.value = true
+        contentProtectionEnabled.value = false
+        notificationsEnabled.value = true
+        providers.value = []
+        defaultProviders.value = []
+        searchEngines.value = []
+        return
+      }
+
       loggingEnabled.value = await configP.getLoggingEnabled()
       copyWithCotEnabled.value = await configP.getCopyWithCotEnabled()
 
