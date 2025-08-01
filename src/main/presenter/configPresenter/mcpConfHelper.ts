@@ -437,25 +437,16 @@ export class McpConfHelper {
     // 智能处理入口文件路径
     if (updatedConfig.args && updatedConfig.args.length > 0) {
       const originalScript = updatedConfig.args[0]
-      let scriptToUse: string
-      
-      // 检查原始脚本是否是相对路径（不包含路径分隔符的文件名）
-      if (originalScript && !originalScript.includes('/') && !originalScript.includes('\\') && !path.isAbsolute(originalScript)) {
-        // 如果是相对文件名（如"claude-mcp.js"），优先使用它
-        scriptToUse = originalScript
-        console.log(`[McpConfHelper] 使用配置中指定的入口文件: ${scriptToUse}`)
-      } else {
-        // 否则使用GitDownloadManager检测到的入口文件
-        scriptToUse = downloadResult.entryFile || 'index.js'
-        console.log(`[McpConfHelper] 使用检测到的入口文件: ${scriptToUse}`)
-      }
+      // 始终优先使用配置中指定的路径
+      const scriptToUse = originalScript
+      console.log(`[McpConfHelper] 使用配置中指定的入口文件: ${scriptToUse}`)
       
       const newScriptPath = path.join(downloadResult.localPath, scriptToUse)
       updatedConfig.args[0] = newScriptPath
       console.log(`[McpConfHelper] 更新脚本路径: ${originalScript} -> ${newScriptPath}`)
     } else {
-      // 如果没有args，创建一个包含入口文件的args数组
-      const scriptPath = path.join(downloadResult.localPath, downloadResult.entryFile)
+      // 如果没有args，使用GitDownloadManager检测到的入口文件
+      const scriptPath = path.join(downloadResult.localPath, downloadResult.entryFile || 'index.js')
       updatedConfig.args = [scriptPath]
       console.log(`[McpConfHelper] 创建新的args数组: [${scriptPath}]`)
     }

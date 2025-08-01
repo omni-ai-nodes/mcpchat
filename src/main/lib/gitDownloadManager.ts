@@ -47,14 +47,43 @@ export class GitDownloadManager {
         await fs.access(packageJsonPath)
         console.log(`[GitDownloadManager] 发现 package.json，开始安装依赖: ${packageJsonPath}`)
         
-        // 检测包管理器
-        let installer = 'npm'
+        // 检测包管理器 - 优先使用 bun 以避免 yarn 版本冲突
+        let installer = 'bun'
+        
+        // 如果存在 bun.lockb，优先使用 bun
         if (await this.fileExists(path.join(localPath, 'bun.lockb'))) {
           installer = 'bun'
-        } else if (await this.fileExists(path.join(localPath, 'yarn.lock'))) {
-          installer = 'yarn'
-        } else if (await this.fileExists(path.join(localPath, 'pnpm-lock.yaml'))) {
+        } 
+        // 检查是否存在 package-lock.json，使用 npm
+        else if (await this.fileExists(path.join(localPath, 'package-lock.json'))) {
+          installer = 'npm'
+        }
+        // 检查是否存在 yarn.lock，但避免使用 yarn 以避免版本冲突
+        else if (await this.fileExists(path.join(localPath, 'yarn.lock'))) {
+          // 检查 package.json 中是否指定了 yarn 版本，如果是则降级到使用 bun
+          try {
+            const packageJsonPath = path.join(localPath, 'package.json')
+            const packageJsonContent = await fs.readFile(packageJsonPath, 'utf-8')
+            const packageJson = JSON.parse(packageJsonContent)
+            
+            // 如果 package.json 中指定了 packageManager 为 yarn，优先使用 bun
+            if (packageJson.packageManager && packageJson.packageManager.startsWith('yarn@')) {
+              console.log(`[GitDownloadManager] 检测到 yarn packageManager 指定，为避免版本冲突，使用 bun 替代 yarn`)
+              installer = 'bun'
+            } else {
+              installer = 'yarn'
+            }
+          } catch {
+            installer = 'yarn'
+          }
+        }
+        // 检查是否存在 pnpm-lock.yaml
+        else if (await this.fileExists(path.join(localPath, 'pnpm-lock.yaml'))) {
           installer = 'pnpm'
+        }
+        // 默认使用 bun 而不是 npm
+        else {
+          installer = 'bun'
         }
         
         // 发送安装开始事件
@@ -116,6 +145,27 @@ export class GitDownloadManager {
   }
 
   /**
+   * 检查命令是否可用
+   * @param command 命令名称
+   * @returns Promise<boolean> 是否可用
+   */
+  private async isCommandAvailable(command: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const checkProcess = spawn(command, ['--version'], {
+        stdio: ['pipe', 'pipe', 'pipe']
+      })
+      
+      checkProcess.on('close', (code) => {
+        resolve(code === 0)
+      })
+      
+      checkProcess.on('error', () => {
+        resolve(false)
+      })
+    })
+  }
+
+  /**
    * 执行 npm 命令
    * @param command npm 命令
    * @param args 参数
@@ -123,17 +173,45 @@ export class GitDownloadManager {
    * @param serverName 服务器名称（用于事件通知）
    */
   private async executeNpmCommand(command: string, args: string[], cwd?: string, serverName?: string): Promise<string> {
+    // 处理命令选择逻辑
+    let finalCommand = command
+    let finalArgs = [...args]
+    
+    // 如果是 yarn 命令，直接替换为 bun 或 npm
+    if (command === 'yarn') {
+      console.log(`[GitDownloadManager] 检测到 yarn，为避免版本冲突，将使用 bun 替代`)
+      finalCommand = 'bun'
+      // 将 yarn install 转换为 bun install
+      if (args[0] === 'install') {
+        finalArgs = ['install']
+      }
+    }
+    
+    // 如果是 bun 命令，检查是否可用
+    if (finalCommand === 'bun') {
+      const bunAvailable = await this.isCommandAvailable('bun')
+      if (!bunAvailable) {
+        console.log(`[GitDownloadManager] bun 不可用，回退到 npm`)
+        finalCommand = 'npm'
+      } else {
+        console.log(`[GitDownloadManager] 使用 bun 安装依赖`)
+      }
+    }
+    
     return new Promise((resolve, reject) => {
-      console.log(`[GitDownloadManager] 执行命令: ${command} ${args.join(' ')} (在目录: ${cwd})`)
+      console.log(`[GitDownloadManager] 执行命令: ${finalCommand} ${finalArgs.join(' ')} (在目录: ${cwd})`)
       
-      const npmProcess = spawn(command, args, {
+      // 为不同的包管理器设置环境变量
+      const env = {
+        ...process.env,
+        // 确保使用系统的 npm 配置
+        npm_config_registry: process.env.npm_config_registry || 'https://registry.npmjs.org/'
+      }
+      
+      const npmProcess = spawn(finalCommand, finalArgs, {
         cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          // 确保使用系统的 npm 配置
-          npm_config_registry: process.env.npm_config_registry || 'https://registry.npmjs.org/'
-        }
+        env
       })
 
       let stdout = ''
@@ -143,13 +221,13 @@ export class GitDownloadManager {
         const output = data.toString()
         stdout += output
         const message = output.trim()
-        console.log(`[GitDownloadManager] ${command} stdout: ${message}`)
+        console.log(`[GitDownloadManager] ${finalCommand} stdout: ${message}`)
         
         // 发送安装进度事件
         if (message && serverName) {
           eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS, SendTarget.ALL_WINDOWS, {
             serverName,
-            installer: command,
+            installer: finalCommand,
             output: message
           })
         }
@@ -159,13 +237,13 @@ export class GitDownloadManager {
         const output = data.toString()
         stderr += output
         const message = output.trim()
-        console.log(`[GitDownloadManager] ${command} stderr: ${message}`)
+        console.log(`[GitDownloadManager] ${finalCommand} stderr: ${message}`)
         
         // 发送安装进度事件（stderr 也可能包含有用信息）
         if (message && serverName) {
           eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_PROGRESS, SendTarget.ALL_WINDOWS, {
             serverName,
-            installer: command,
+            installer: finalCommand,
             output: message
           })
         }
@@ -173,37 +251,37 @@ export class GitDownloadManager {
 
       npmProcess.on('close', (code) => {
         if (code === 0) {
-          console.log(`[GitDownloadManager] ${command} 命令执行成功`)
+          console.log(`[GitDownloadManager] ${finalCommand} 命令执行成功`)
           resolve(stdout)
         } else {
-          console.error(`[GitDownloadManager] ${command} 命令执行失败，退出码: ${code}`)
+          console.error(`[GitDownloadManager] ${finalCommand} 命令执行失败，退出码: ${code}`)
           
           // 发送安装错误事件
           if (serverName) {
             eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR, SendTarget.ALL_WINDOWS, {
               serverName,
-              installer: command,
-              error: `${command} install failed with code ${code}: ${stderr || stdout}`
+              installer: finalCommand,
+              error: `${finalCommand} install failed with code ${code}: ${stderr || stdout}`
             })
           }
           
-          reject(new Error(`${command} command failed with code ${code}: ${stderr || stdout}`))
+          reject(new Error(`${finalCommand} command failed with code ${code}: ${stderr || stdout}`))
         }
       })
 
       npmProcess.on('error', (error) => {
-        console.error(`[GitDownloadManager] ${command} 命令执行错误:`, error)
+        console.error(`[GitDownloadManager] ${finalCommand} 命令执行错误:`, error)
         
         // 发送安装错误事件
         if (serverName) {
           eventBus.send(GITHUB_DOWNLOAD_EVENTS.NPM_INSTALL_ERROR, SendTarget.ALL_WINDOWS, {
             serverName,
-            installer: command,
-            error: `Failed to execute ${command} command: ${error.message}`
+            installer: finalCommand,
+            error: `Failed to execute ${finalCommand} command: ${error.message}`
           })
         }
         
-        reject(new Error(`Failed to execute ${command} command: ${error.message}`))
+        reject(new Error(`Failed to execute ${finalCommand} command: ${error.message}`))
       })
     })
   }
