@@ -1315,6 +1315,84 @@ const handleInstallSubmit = async (name: string, config: MCPServerConfig) => {
 const goToMcpSettings = () => {
   isMcpSettingsDialogOpen.value = true
 }
+
+// 打开终端
+const openTerminal = async (server: ServerItem) => {
+  try {
+    console.log('打开终端:', server.name)
+    
+    // 找到对应的本地服务器，使用与syncServerStatuses相同的匹配逻辑
+    const localServer = mcpStore.serverList.find(local => {
+      // 优先通过deploy_json中的mcpServers键名进行精确匹配
+      if (server.deployJson) {
+        try {
+          const deployConfig = JSON.parse(server.deployJson)
+          if (deployConfig.mcpServers) {
+            const deployServerNames = Object.keys(deployConfig.mcpServers)
+            if (deployServerNames.includes(local.name)) {
+              return true
+            }
+          }
+        } catch (error) {
+          console.warn('解析deployJson失败:', error)
+        }
+      }
+      
+      // 其次尝试精确名称匹配
+      if (local.name === server.name) {
+        return true
+      }
+      
+      // GitHub匹配
+      if (server.Github && local.Github && server.Github === local.Github) {
+        return true
+      }
+      
+      return false
+    })
+
+    if (!localServer) {
+      toast({
+        title: '服务器未安装',
+        description: `请先安装服务器 "${server.name}" 后再打开终端`,
+        variant: 'destructive'
+      })
+      return
+    }
+    
+    // 使用实际安装的本地服务器名称
+    const actualServerName = localServer.name
+    console.log('实际服务器名称:', actualServerName)
+    
+    // 获取服务器路径
+    const serverPath = await (window as any).api.getMcpServerPath(actualServerName)
+    console.log('服务器路径:', serverPath)
+    
+    // 打开终端
+    const result = await (window as any).api.openTerminal(serverPath)
+    
+    if (result.success) {
+      toast({
+        title: '终端已打开',
+        description: `已在 ${actualServerName} 目录打开终端`,
+        variant: 'default'
+      })
+    } else {
+      toast({
+        title: '打开终端失败',
+        description: result.error || '无法打开终端',
+        variant: 'destructive'
+      })
+    }
+  } catch (error) {
+    console.error('打开终端失败:', error)
+    toast({
+      title: '打开终端失败',
+      description: `错误: ${error}`,
+      variant: 'destructive'
+    })
+  }
+}
 </script>
 
 <template>
@@ -1524,28 +1602,39 @@ const goToMcpSettings = () => {
                   </span>
                 </div>
                 <!-- 根据服务器状态显示不同控件 -->
-                <!-- 未安装时显示安装按钮 -->
-                <Button
-                  v-if="server.status === 'not_installed'"
-                  variant="default"
-                  size="sm"
-                  class="px-3 py-1 text-xs"
-                  @click="installServer(server)"
-                >
-                  <Icon icon="lucide:download" class="h-3 w-3 mr-1" />
-                  {{ t('mcp.mcpGallery.install') }}
-                </Button>
-                <!-- 已安装时显示启动按钮 -->
-                <Button
-                  v-if="server.status !== 'not_installed'"
-                  variant="default"
-                  size="sm"
-                  class="px-3 py-1 text-xs"
-                  @click="toggleServer(server)"
-                >
-                  <Icon :icon="server.isRunning ? 'lucide:power-off' : 'lucide:power'" class="h-3 w-3 mr-1" />
-                  {{ server.isRunning ? t('mcp.mcpGallery.stopServer') : t('mcp.mcpGallery.startServer') }}
-                </Button>
+                <div class="flex items-center space-x-1">
+                  <!-- 未安装时显示安装按钮 -->
+                  <Button
+                    v-if="server.status === 'not_installed'"
+                    variant="default"
+                    size="sm"
+                    class="px-3 py-1 text-xs"
+                    @click="installServer(server)"
+                  >
+                    <Icon icon="lucide:download" class="h-3 w-3 mr-1" />
+                    {{ t('mcp.mcpGallery.install') }}
+                  </Button>
+                  <!-- 已安装时显示启动按钮和终端按钮 -->
+                  <Button
+                    v-if="server.status !== 'not_installed'"
+                    variant="default"
+                    size="sm"
+                    class="px-3 py-1 text-xs"
+                    @click="toggleServer(server)"
+                  >
+                    <Icon :icon="server.isRunning ? 'lucide:power-off' : 'lucide:power'" class="h-3 w-3 mr-1" />
+                    {{ server.isRunning ? t('mcp.mcpGallery.stopServer') : t('mcp.mcpGallery.startServer') }}
+                  </Button>
+                  <Button
+                    v-if="server.status !== 'not_installed'"
+                    variant="outline"
+                    size="sm"
+                    class="px-3 py-1 text-xs"
+                    @click="openTerminal(server)"
+                  >
+                    <Icon icon="lucide:terminal" class="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             </div>
             
@@ -1629,28 +1718,39 @@ const goToMcpSettings = () => {
                     </span>
                   </div>
                   <!-- 根据服务器状态显示不同按钮 -->
-                  <!-- 未安装时显示安装按钮 -->
-                  <Button
-                    v-if="server.status === 'not_installed'"
-                    variant="default"
-                    size="sm"
-                    class="px-4"
-                    @click="installServer(server)"
-                  >
-                    <Icon icon="lucide:download" class="h-4 w-4 mr-2" />
-                    {{ t('mcp.mcpGallery.install') }}
-                  </Button>
-                  <!-- 已安装时显示启动按钮 -->
-                  <Button
-                    v-if="server.status !== 'not_installed'"
-                    variant="default"
-                    size="sm"
-                    class="px-4"
-                    @click="toggleServer(server)"
-                  >
-                    <Icon :icon="server.isRunning ? 'lucide:power-off' : 'lucide:power'" class="h-4 w-4 mr-2" />
-                    {{ server.isRunning ? t('mcp.mcpGallery.stopServer') : t('mcp.mcpGallery.startServer') }}
-                  </Button>
+                  <div class="flex items-center space-x-2">
+                    <!-- 未安装时显示安装按钮 -->
+                    <Button
+                      v-if="server.status === 'not_installed'"
+                      variant="default"
+                      size="sm"
+                      class="px-4"
+                      @click="installServer(server)"
+                    >
+                      <Icon icon="lucide:download" class="h-4 w-4 mr-2" />
+                      {{ t('mcp.mcpGallery.install') }}
+                    </Button>
+                    <!-- 已安装时显示启动按钮和终端按钮 -->
+                    <Button
+                      v-if="server.status !== 'not_installed'"
+                      variant="default"
+                      size="sm"
+                      class="px-4"
+                      @click="toggleServer(server)"
+                    >
+                      <Icon :icon="server.isRunning ? 'lucide:power-off' : 'lucide:power'" class="h-4 w-4 mr-2" />
+                      {{ server.isRunning ? t('mcp.mcpGallery.stopServer') : t('mcp.mcpGallery.startServer') }}
+                    </Button>
+                    <Button
+                      v-if="server.status !== 'not_installed'"
+                      variant="outline"
+                      size="sm"
+                      class="px-3"
+                      @click="openTerminal(server)"
+                    >
+                      <Icon icon="lucide:terminal" class="h-4 w-4" />
+                    </Button>
+                  </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger as-child>
                       <Button variant="ghost" size="icon" class="h-8 w-8">

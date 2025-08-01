@@ -4,7 +4,7 @@ import { presenter } from './presenter'
 import { ProxyMode, proxyConfig } from './presenter/proxyConfig'
 import path from 'path'
 import fs from 'fs'
-import { spawn } from 'child_process'
+import { spawn, spawnSync } from 'child_process'
 import { eventBus } from './eventbus'
 import { WINDOW_EVENTS, TRAY_EVENTS } from './events'
 import { setLoggingEnabled } from '@shared/logger'
@@ -301,11 +301,98 @@ app.whenReady().then(async () => {
   // 注册 IPC 处理程序用于打开终端
   ipcMain.handle('get-mcp-server-path', async (_, serverName: string) => {
     try {
+      const configPresenter = presenter.configPresenter
+      const mcpServers = await configPresenter.getMcpServers()
+      
+      // 查找匹配的服务器配置（支持模糊匹配）
+      let serverConfig = mcpServers[serverName]
+      
+      // 如果直接匹配失败，尝试通过显示名称查找
+      if (!serverConfig) {
+        const servers = Object.entries(mcpServers)
+        const found = servers.find(([key, config]) => 
+          key === serverName || 
+          (config as any).displayName === serverName ||
+          key.toLowerCase().includes(serverName.toLowerCase()) ||
+          (config as any).name === serverName
+        )
+        if (found) {
+          serverConfig = found[1]
+        }
+      }
+      
+      if (!serverConfig) {
+        // 如果没有找到配置，回退到基于名称的目录查找
+        console.warn(`服务器 ${serverName} 未在配置中找到，尝试基于名称的目录查找`)
+        
+        // 清理服务器名称，移除特殊字符
+        const cleanName = serverName.replace(/[^a-zA-Z0-9-]/g, '').toLowerCase()
+        const userDataPath = app.getPath('userData')
+        const mcpServersPath = path.join(userDataPath, 'mcp-git-repos')
+        
+        // 列出所有已下载的目录
+        if (fs.existsSync(mcpServersPath)) {
+          const dirs = fs.readdirSync(mcpServersPath, { withFileTypes: true })
+            .filter(dirent => dirent.isDirectory())
+            .map(dirent => dirent.name)
+          
+          // 查找匹配的目录
+          const matchedDir = dirs.find(dir => 
+            dir.toLowerCase().includes(cleanName) ||
+            cleanName.includes(dir.toLowerCase())
+          )
+          
+          if (matchedDir) {
+            const repoPath = path.join(mcpServersPath, matchedDir)
+            console.log(`找到匹配的目录: ${repoPath}`)
+            return repoPath
+          }
+        }
+        
+        // 最后回退到原始名称
+        const fallbackPath = path.join(mcpServersPath, cleanName)
+        if (!fs.existsSync(fallbackPath)) {
+          fs.mkdirSync(fallbackPath, { recursive: true })
+        }
+        return fallbackPath
+      }
+      
+      // 从配置中提取本地仓库路径
+      if (serverConfig.args && serverConfig.args.length > 0) {
+        const scriptPath = serverConfig.args[0]
+        if (scriptPath && typeof scriptPath === 'string') {
+          // 处理GitHub下载的仓库路径
+          if (scriptPath.includes('mcp-git-repos')) {
+            const repoDir = path.dirname(scriptPath)
+            if (fs.existsSync(repoDir)) {
+              return repoDir
+            }
+          }
+          
+          // 处理绝对路径
+          if (path.isAbsolute(scriptPath)) {
+            return path.dirname(scriptPath)
+          }
+        }
+      }
+      
+      // 处理GitHub仓库的情况
+      if (serverConfig.github) {
+        const githubUrl = serverConfig.github
+        const repoName = githubUrl.split('/').pop()?.replace('.git', '') || serverName
+        const userDataPath = app.getPath('userData')
+        const repoPath = path.join(userDataPath, 'mcp-git-repos', repoName)
+        
+        if (fs.existsSync(repoPath)) {
+          return repoPath
+        }
+      }
+      
+      // 默认回退
       const userDataPath = app.getPath('userData')
-      const mcpServersPath = path.join(userDataPath, 'mcp-servers')
+      const mcpServersPath = path.join(userDataPath, 'mcp-git-repos')
       const serverPath = path.join(mcpServersPath, serverName)
       
-      // 确保目录存在
       if (!fs.existsSync(serverPath)) {
         fs.mkdirSync(serverPath, { recursive: true })
       }
@@ -336,12 +423,12 @@ app.whenReady().then(async () => {
           terminalCommand = 'cmd'
           args = ['/c', 'start', 'cmd', '/k', `cd /d "${workDir}"`]
           break
-        case 'linux': // Linux
+        case 'linux': { // Linux
           // 尝试常见的 Linux 终端
           const terminals = ['gnome-terminal', 'konsole', 'x-terminal-emulator', 'xterm']
           terminalCommand = terminals.find(term => {
             try {
-              const result = spawn('which', [term], { stdio: 'pipe' })
+              const result = spawnSync('which', [term], { stdio: 'pipe' })
               return result.status === 0
             } catch {
               return false
@@ -349,6 +436,7 @@ app.whenReady().then(async () => {
           }) || 'xterm'
           args = ['--working-directory', workDir]
           break
+        }
         default:
           throw new Error(`不支持的平台: ${platform}`)
       }
