@@ -408,93 +408,77 @@ export class McpConfHelper {
     return Promise.resolve(mcpStore.get('mcpEnabled') ?? getDefaultMcpServers().mcpEnabled)
   }
 
+  // 提取通用的GitHub下载处理逻辑
+  private async processGitHubDownload(name: string, config: MCPServerConfig): Promise<MCPServerConfig> {
+    const githubUrl = config.github
+    
+    if (!githubUrl || !(config.command === 'node' || config.command === 'python' || config.command === 'python3' || config.command === 'bun')) {
+      return config
+    }
+    
+    console.log(`[McpConfHelper] 检测到GitHub仓库配置，command=${config.command}，开始下载: ${githubUrl}`)
+    
+    // 创建 GitDownloadManager 实例
+    const gitDownloadManager = new GitDownloadManager(this.configPresenter)
+    
+    // 直接下载GitHub仓库
+    const downloadResult = await gitDownloadManager.downloadRepository(
+      githubUrl,
+      name, // 使用服务器名称作为目标名称
+      config.args, // 传递 args 参数用于确定入口文件
+      name // 传递服务器名称用于事件通知
+    )
+    
+    console.log(`[McpConfHelper] GitHub仓库下载完成: ${downloadResult.localPath}`)
+    
+    // 更新配置中的路径
+    const updatedConfig = { ...config }
+    
+    // 智能处理入口文件路径
+    if (updatedConfig.args && updatedConfig.args.length > 0) {
+      const originalScript = updatedConfig.args[0]
+      let scriptToUse: string
+      
+      // 检查原始脚本是否是相对路径（不包含路径分隔符的文件名）
+      if (originalScript && !originalScript.includes('/') && !originalScript.includes('\\') && !path.isAbsolute(originalScript)) {
+        // 如果是相对文件名（如"claude-mcp.js"），优先使用它
+        scriptToUse = originalScript
+        console.log(`[McpConfHelper] 使用配置中指定的入口文件: ${scriptToUse}`)
+      } else {
+        // 否则使用GitDownloadManager检测到的入口文件
+        scriptToUse = downloadResult.entryFile || 'index.js'
+        console.log(`[McpConfHelper] 使用检测到的入口文件: ${scriptToUse}`)
+      }
+      
+      const newScriptPath = path.join(downloadResult.localPath, scriptToUse)
+      updatedConfig.args[0] = newScriptPath
+      console.log(`[McpConfHelper] 更新脚本路径: ${originalScript} -> ${newScriptPath}`)
+    } else {
+      // 如果没有args，创建一个包含入口文件的args数组
+      const scriptPath = path.join(downloadResult.localPath, downloadResult.entryFile)
+      updatedConfig.args = [scriptPath]
+      console.log(`[McpConfHelper] 创建新的args数组: [${scriptPath}]`)
+    }
+    
+    // Python依赖安装（GitDownloadManager已处理Node.js依赖，这里只处理Python）
+    if ((config.command === 'python' || config.command === 'python3')) {
+      await this.installPythonDependencies(downloadResult.localPath, config.command)
+    }
+    
+    return updatedConfig
+  }
+
   // 添加MCP服务器
   async addMcpServer(name: string, config: MCPServerConfig): Promise<boolean> {
     console.log(`[McpConfHelper] 开始添加MCP服务器: ${name}`, config)
     
-    // 检查是否包含GitHub信息且为node类型，如果是则需要下载
-    // 支持 github 和 Github 两种字段名
-    const configWithGithub = config as MCPServerConfig & { github?: string; Github?: string }
-    const githubUrl = configWithGithub.github || configWithGithub.Github
-    if (githubUrl && (config.command === 'node' || config.command === 'bun' || config.command === 'python' || config.command === 'python3') && config.args && config.args.length > 0) {
-      console.log(`[McpConfHelper] 检测到GitHub仓库配置，开始下载: ${githubUrl}`)
-      
+    // 检查是否包含GitHub信息且为node或python类型，如果是则直接下载
+    const githubUrl = config.github
+    
+    // 优化逻辑：当command为'node'或'python'时，直接下载GitHub仓库
+    if (githubUrl && (config.command === 'node' || config.command === 'python' || config.command === 'python3' || config.command === 'bun')) {
       try {
-        // 创建 GitDownloadManager 实例
-        const gitDownloadManager = new GitDownloadManager(this.configPresenter)
-        
-        // 下载GitHub仓库
-        const downloadResult = await gitDownloadManager.downloadRepository(
-          githubUrl,
-          name, // 使用服务器名称作为目标名称
-          config.args, // 传递 args 参数用于确定入口文件
-          name // 传递服务器名称用于事件通知
-        )
-        
-        console.log(`[McpConfHelper] GitHub仓库下载完成: ${downloadResult.localPath}`)
-        
-        // 更新配置中的路径
-        const updatedConfig = { ...config }
-        if (updatedConfig.args && updatedConfig.args.length > 0) {
-          const originalScript = updatedConfig.args[0]
-          let scriptToUse: string
-          
-          // 检查原始脚本是否是相对路径（不包含路径分隔符的文件名）
-          if (originalScript && !originalScript.includes('/') && !originalScript.includes('\\')) {
-            // 如果是相对文件名（如"claude-mcp.js"），优先使用它
-            scriptToUse = originalScript
-            console.log(`[McpConfHelper] 使用deployJson中指定的入口文件: ${scriptToUse}`)
-          } else {
-            // 否则使用检测到的入口文件
-            scriptToUse = downloadResult.entryFile || 'index.js'
-            console.log(`[McpConfHelper] 使用检测到的入口文件: ${scriptToUse}`)
-          }
-          
-          const newScriptPath = path.join(downloadResult.localPath, scriptToUse)
-          updatedConfig.args[0] = newScriptPath
-          console.log(`[McpConfHelper] 更新脚本路径: ${originalScript} -> ${newScriptPath}`)
-        }
-        
-        // Python依赖安装（保留Python依赖安装逻辑，因为gitDownloadManager只处理Node.js依赖）
-        const fs = await import('fs')
-        const pathModule = await import('path')
-        if ((config.command === 'python' || config.command === 'python3') && fs.existsSync(pathModule.join(downloadResult.localPath, 'requirements.txt'))) {
-          console.log(`[McpConfHelper] 发现requirements.txt，开始安装Python依赖`)
-          try {
-            const { spawn } = await import('child_process')
-            await new Promise<void>((resolve, reject) => {
-              const pipProcess = spawn(config.command, ['-m', 'pip', 'install', '-r', 'requirements.txt'], {
-                cwd: downloadResult.localPath,
-                stdio: 'pipe'
-              })
-              
-              pipProcess.stdout?.on('data', (data) => {
-                console.log(`[McpConfHelper] pip install stdout: ${data}`)
-              })
-              
-              pipProcess.stderr?.on('data', (data) => {
-                console.log(`[McpConfHelper] pip install stderr: ${data}`)
-              })
-              
-              pipProcess.on('close', (code) => {
-                if (code === 0) {
-                  console.log(`[McpConfHelper] Python依赖安装成功`)
-                  resolve()
-                } else {
-                  console.error(`[McpConfHelper] Python依赖安装失败，退出码: ${code}`)
-                  reject(new Error(`pip install failed with code ${code}`))
-                }
-              })
-              
-              pipProcess.on('error', (error) => {
-                console.error(`[McpConfHelper] pip install进程错误:`, error)
-                reject(error)
-              })
-            })
-          } catch (pyError) {
-            console.error(`[McpConfHelper] Python依赖安装失败:`, pyError)
-          }
-        }
+        const updatedConfig = await this.processGitHubDownload(name, config)
         
         // 使用更新后的配置
         const mcpServers = await this.getMcpServers()
@@ -522,6 +506,55 @@ export class McpConfHelper {
     }
   }
 
+  // 提取Python依赖安装逻辑为独立方法
+  private async installPythonDependencies(localPath: string, pythonCommand: string): Promise<void> {
+    const fs = await import('fs')
+    const pathModule = await import('path')
+    
+    const requirementsPath = pathModule.join(localPath, 'requirements.txt')
+    if (!fs.existsSync(requirementsPath)) {
+      console.log(`[McpConfHelper] 未发现requirements.txt，跳过Python依赖安装`)
+      return
+    }
+    
+    console.log(`[McpConfHelper] 发现requirements.txt，开始安装Python依赖`)
+    try {
+      const { spawn } = await import('child_process')
+      await new Promise<void>((resolve, reject) => {
+        const pipProcess = spawn(pythonCommand, ['-m', 'pip', 'install', '-r', 'requirements.txt'], {
+          cwd: localPath,
+          stdio: 'pipe'
+        })
+        
+        pipProcess.stdout?.on('data', (data) => {
+          console.log(`[McpConfHelper] pip install stdout: ${data}`)
+        })
+        
+        pipProcess.stderr?.on('data', (data) => {
+          console.log(`[McpConfHelper] pip install stderr: ${data}`)
+        })
+        
+        pipProcess.on('close', (code) => {
+          if (code === 0) {
+            console.log(`[McpConfHelper] Python依赖安装成功`)
+            resolve()
+          } else {
+            console.error(`[McpConfHelper] Python依赖安装失败，退出码: ${code}`)
+            reject(new Error(`pip install failed with code ${code}`))
+          }
+        })
+        
+        pipProcess.on('error', (error) => {
+          console.error(`[McpConfHelper] pip install进程错误:`, error)
+          reject(error)
+        })
+      })
+    } catch (pyError) {
+      console.error(`[McpConfHelper] Python依赖安装失败:`, pyError)
+      throw pyError
+    }
+  }
+
   // 移除MCP服务器
   async removeMcpServer(name: string): Promise<void> {
     const mcpServers = await this.getMcpServers()
@@ -541,11 +574,45 @@ export class McpConfHelper {
     if (!mcpServers[name]) {
       throw new Error(`MCP server ${name} not found`)
     }
-    mcpServers[name] = {
+    
+    // 合并配置
+    const mergedConfig = {
       ...mcpServers[name],
       ...config
+    } as MCPServerConfig
+    
+    console.log(`[McpConfHelper] 开始更新MCP服务器: ${name}`, config)
+    
+    // 检查是否需要触发GitHub下载逻辑
+    const githubUrl = mergedConfig.github
+    
+    // 检查是否有相对路径的args且存在GitHub配置
+    const hasRelativeArgs = mergedConfig.args && 
+      mergedConfig.args.length > 0 && 
+      mergedConfig.args[0] && 
+      !mergedConfig.args[0].includes('/') && 
+      !mergedConfig.args[0].includes('\\') && 
+      !path.isAbsolute(mergedConfig.args[0])
+    
+    if (githubUrl && hasRelativeArgs && (mergedConfig.command === 'node' || mergedConfig.command === 'python' || mergedConfig.command === 'python3' || mergedConfig.command === 'bun')) {
+      console.log(`[McpConfHelper] 检测到相对路径args且存在GitHub配置，触发下载逻辑`)
+      
+      try {
+        const updatedConfig = await this.processGitHubDownload(name, mergedConfig)
+        mcpServers[name] = updatedConfig
+        console.log(`[McpConfHelper] GitHub下载处理完成，更新配置`)
+      } catch (downloadError) {
+        console.error(`[McpConfHelper] GitHub仓库下载失败:`, downloadError)
+        // 下载失败时使用合并后的配置
+        mcpServers[name] = mergedConfig
+      }
+    } else {
+      console.log(`[McpConfHelper] 普通配置更新，直接保存`)
+      mcpServers[name] = mergedConfig
     }
+    
     await this.setMcpServers(mcpServers)
+    console.log(`[McpConfHelper] MCP服务器更新完成: ${name}`)
   }
 
   // 恢复默认服务器配置

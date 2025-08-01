@@ -199,6 +199,9 @@ const parseJsonConfig = (): void => {
     // 填充 github 字段
     github.value = serverConfig.github || ''
 
+    // 填充 customNpmRegistry 字段
+    npmRegistry.value = serverConfig.customNpmRegistry || ''
+
     // 权限设置
     autoApproveAll.value = serverConfig.autoApprove?.includes('all') || false
     autoApproveRead.value =
@@ -295,6 +298,11 @@ const generateJsonFromForm = (): void => {
     // 添加图标
     if (icons.value) {
       serverConfig.icons = icons.value
+    }
+
+    // 添加 github 字段（如果有值）
+    if (github.value.trim()) {
+      serverConfig.github = github.value.trim()
     }
 
     // 添加baseUrl（如果适用）
