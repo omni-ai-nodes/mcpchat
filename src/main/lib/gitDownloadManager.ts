@@ -524,18 +524,36 @@ export class GitDownloadManager {
         
         // 检查常见的 MCP 入口文件名，优先级从高到低
         const commonEntryFiles = ['claude-mcp.js', 'mcp.js', 'server.js', 'main.js', 'index.js'];
+        const distEntryFiles = ['dist/index.js', 'dist/main.js', 'dist/server.js', 'build/index.js', 'build/main.js', 'build/server.js'];
         let foundEntry = false;
         
-        for (const fileName of commonEntryFiles) {
+        // 首先检查dist/build目录中的入口文件
+        for (const fileName of distEntryFiles) {
           try {
             const filePath = path.join(localPath, fileName);
             await fs.access(filePath);
             entryFile = fileName;
             foundEntry = true;
-            console.log(`[GitDownloadManager] 找到常见入口文件: ${fileName}`);
+            console.log(`[GitDownloadManager] 找到dist/build目录入口文件: ${fileName}`);
             break;
           } catch {
             // 文件不存在，继续检查下一个
+          }
+        }
+        
+        // 如果dist目录中没有找到，再检查根目录的常见入口文件
+        if (!foundEntry) {
+          for (const fileName of commonEntryFiles) {
+            try {
+              const filePath = path.join(localPath, fileName);
+              await fs.access(filePath);
+              entryFile = fileName;
+              foundEntry = true;
+              console.log(`[GitDownloadManager] 找到根目录入口文件: ${fileName}`);
+              break;
+            } catch {
+              // 文件不存在，继续检查下一个
+            }
           }
         }
         

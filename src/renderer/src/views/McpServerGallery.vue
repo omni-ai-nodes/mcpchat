@@ -262,6 +262,27 @@ const syncServerStatuses = async () => {
         hasChanges = true
       }
       
+      // 更新Gallery服务器的deployJson，确保使用最新配置
+      try {
+        const latestConfig = {
+          mcpServers: {
+            [localServer.name]: {
+              command: localServer.command,
+              args: localServer.args,
+              env: localServer.env || {},
+              descriptions: localServer.descriptions || server.description || '',
+              icons: localServer.icons || server.icon || '🔧',
+              type: localServer.type || 'stdio',
+              autoApprove: localServer.autoApprove || []
+            }
+          }
+        }
+        server.deployJson = JSON.stringify(latestConfig, null, 2)
+        console.log(`  🔄 已更新Gallery服务器的deployJson配置`)
+      } catch (error) {
+        console.warn(`  ⚠️ 更新Gallery服务器deployJson失败:`, error)
+      }
+      
       if (hasChanges) {
         console.log(`  ✓ 服务器 ${server.name} 状态已更新`)
       } else {
@@ -808,12 +829,27 @@ const editServer = (server: ServerItem) => {
     return
   }
   
-  // 处理配置信息，从 localServer 获取 DeployJson 数据
-  const deployJsonSource = localServer.DeployJson || server.deployJson
+  // 处理配置信息，优先使用最新的本地配置
+  let deployJsonSource = ''
+  
+  // 检查是否有最新的本地配置
+  if (mcpStore.config.mcpServers[localServer.name]) {
+    const latestConfig = {
+      mcpServers: {
+        [localServer.name]: mcpStore.config.mcpServers[localServer.name]
+      }
+    }
+    deployJsonSource = JSON.stringify(latestConfig, null, 2)
+    console.log(`使用最新的本地配置: ${localServer.name}`)
+  } else {
+    // 回退到原来的逻辑
+    deployJsonSource = localServer.DeployJson || server.deployJson || ''
+    console.log(`使用原始配置: ${localServer.name}`)
+  }
   
   if (deployJsonSource) {
     try {
-      // 解析原始 JSON 配置
+      // 解析 JSON 配置
       const deployConfig = JSON.parse(deployJsonSource)
       
       // 自动为每个服务器配置添加 icons、type 和 descriptions 字段
@@ -847,11 +883,9 @@ const editServer = (server: ServerItem) => {
       prefilledEditJsonConfig.value = enhancedDeployJson
       isEditServerDialogOpen.value = true
       
-      console.log(`准备编辑服务器 "${server.name}"，已增强配置`)
-      console.log('使用的 DeployJson 来源:', localServer.DeployJson ? 'localServer.DeployJson' : 'server.deployJson')
+      console.log(`准备编辑服务器 "${server.name}"，使用最新配置`)
       console.log('selectedServer:', selectedServer.value)
       console.log('prefilledEditJsonConfig 长度:', prefilledEditJsonConfig.value.length)
-      console.log('prefilledEditJsonConfig 内容:', prefilledEditJsonConfig.value.substring(0, 200) + '...')
     } catch (error) {
       console.error('DeployJson 格式错误:', error)
       // 如果解析失败，使用原始配置
@@ -861,7 +895,6 @@ const editServer = (server: ServerItem) => {
       isEditServerDialogOpen.value = true
       
       console.log('解析失败，使用原始配置')
-      console.log('使用的 DeployJson 来源:', localServer.DeployJson ? 'localServer.DeployJson' : 'server.deployJson')
       console.log('selectedServer:', selectedServer.value)
       console.log('prefilledEditJsonConfig 长度:', prefilledEditJsonConfig.value.length)
     }
@@ -889,7 +922,6 @@ const editServer = (server: ServerItem) => {
     console.log('没有 deployJson，生成基本配置')
     console.log('selectedServer:', selectedServer.value)
     console.log('prefilledEditJsonConfig 长度:', prefilledEditJsonConfig.value.length)
-    console.log('生成的基本配置:', prefilledEditJsonConfig.value)
   }
 }
 
@@ -973,8 +1005,14 @@ const handleEditServer = async (serverName: string, serverConfig: Partial<MCPSer
     selectedServer.value = ''
     selectedServerConfig.value = null
     prefilledEditJsonConfig.value = ''
-    // 重新同步服务器状态
-    syncServerStatuses()
+    // 强制刷新Gallery服务器的状态，确保同步最新配置
+    await new Promise(resolve => setTimeout(resolve, 500))
+    await syncServerStatuses()
+    
+    // 额外延迟确保状态完全同步
+    setTimeout(() => {
+      syncServerStatuses()
+    }, 1000)
     toast({
       title: t('mcp.editServer'),
       description: t('mcp.serverUpdatedSuccessfully', { name: serverName })
@@ -1361,15 +1399,15 @@ const openTerminal = async (server: ServerItem) => {
     }
     
     // 使用实际安装的本地服务器名称
-    const actualServerName = localServer.name
+    const actualServerName = localServer.name || server.name
     console.log('实际服务器名称:', actualServerName)
     
     // 获取服务器路径
-    const serverPath = await (window as any).api.getMcpServerPath(actualServerName)
+    const serverPath = await (window as unknown as { api: { getMcpServerPath: (name: string) => Promise<string> } }).api.getMcpServerPath(actualServerName)
     console.log('服务器路径:', serverPath)
     
     // 打开终端
-    const result = await (window as any).api.openTerminal(serverPath)
+    const result = await (window as unknown as { api: { openTerminal: (path: string) => Promise<{ success: boolean; error?: string }> } }).api.openTerminal(serverPath)
     
     if (result.success) {
       toast({
