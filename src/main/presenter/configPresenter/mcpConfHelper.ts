@@ -30,8 +30,8 @@ function getDefaultInMemoryServers(): Record<string, MCPServerConfig> {
       type: 'inmemory' as MCPServerType,
       command: 'filesystem',
       env: {},
-      disable: true
-    },
+        disable: true
+      },
     Artifacts: {
       args: [],
       descriptions: 'McpChat内置 artifacts mcp服务',
@@ -412,7 +412,7 @@ export class McpConfHelper {
   private async processGitHubDownload(name: string, config: MCPServerConfig): Promise<MCPServerConfig> {
     const githubUrl = config.github
     
-    if (!githubUrl || !(config.command === 'node' || config.command === 'python' || config.command === 'python3' || config.command === 'bun')) {
+    if (!githubUrl || !(config.command === 'node' || config.command === 'python' || config.command === 'python3' || config.command === 'bun' || config.command === 'uv')) {
       return config
     }
     
@@ -465,6 +465,11 @@ export class McpConfHelper {
       await this.installPythonDependencies(downloadResult.localPath, config.command)
     }
     
+    // uv依赖安装
+    if (config.command === 'uv') {
+      await this.installUvDependencies(downloadResult.localPath)
+    }
+    
     return updatedConfig
   }
 
@@ -475,8 +480,8 @@ export class McpConfHelper {
     // 检查是否包含GitHub信息且为node或python类型，如果是则直接下载
     const githubUrl = config.github
     
-    // 优化逻辑：当command为'node'或'python'时，直接下载GitHub仓库
-    if (githubUrl && (config.command === 'node' || config.command === 'python' || config.command === 'python3' || config.command === 'bun')) {
+    // 优化逻辑：当command为支持的命令时，直接下载GitHub仓库
+    if (githubUrl && (config.command === 'node' || config.command === 'python' || config.command === 'python3' || config.command === 'bun' || config.command === 'uv')) {
       try {
         const updatedConfig = await this.processGitHubDownload(name, config)
         
@@ -555,6 +560,93 @@ export class McpConfHelper {
     }
   }
 
+  // 安装uv依赖
+  private async installUvDependencies(localPath: string): Promise<void> {
+    const fs = await import('fs')
+    const path = await import('path')
+    
+    // 检查是否存在 pyproject.toml 或 requirements.txt
+    const pyprojectPath = path.join(localPath, 'pyproject.toml')
+    const requirementsPath = path.join(localPath, 'requirements.txt')
+    
+    if (!fs.existsSync(pyprojectPath) && !fs.existsSync(requirementsPath)) {
+      console.log(`[McpConfHelper] 未发现 pyproject.toml 或 requirements.txt，跳过uv依赖安装`)
+      return
+    }
+    
+    console.log(`[McpConfHelper] 发现项目配置文件，开始使用uv安装Python环境和依赖`)
+    try {
+      const { spawn } = await import('child_process')
+      
+      // 首先安装 Python 环境
+      console.log(`[McpConfHelper] 使用uv安装Python环境`)
+      await new Promise<void>((resolve, reject) => {
+        const uvPythonProcess = spawn('uv', ['python', 'install'], {
+          cwd: localPath,
+          stdio: 'pipe'
+        })
+        
+        uvPythonProcess.stdout?.on('data', (data) => {
+          console.log(`[McpConfHelper] uv python install stdout: ${data}`)
+        })
+        
+        uvPythonProcess.stderr?.on('data', (data) => {
+          console.log(`[McpConfHelper] uv python install stderr: ${data}`)
+        })
+        
+        uvPythonProcess.on('close', (code) => {
+          if (code === 0) {
+            console.log(`[McpConfHelper] Python环境安装成功`)
+            resolve()
+          } else {
+            console.error(`[McpConfHelper] Python环境安装失败，退出码: ${code}`)
+            reject(new Error(`uv python install failed with code ${code}`))
+          }
+        })
+        
+        uvPythonProcess.on('error', (error) => {
+          console.error(`[McpConfHelper] uv python install进程错误:`, error)
+          reject(error)
+        })
+      })
+      
+      // 然后安装依赖
+      console.log(`[McpConfHelper] 使用uv安装项目依赖`)
+      await new Promise<void>((resolve, reject) => {
+        const uvSyncProcess = spawn('uv', ['sync'], {
+          cwd: localPath,
+          stdio: 'pipe'
+        })
+        
+        uvSyncProcess.stdout?.on('data', (data) => {
+          console.log(`[McpConfHelper] uv sync stdout: ${data}`)
+        })
+        
+        uvSyncProcess.stderr?.on('data', (data) => {
+          console.log(`[McpConfHelper] uv sync stderr: ${data}`)
+        })
+        
+        uvSyncProcess.on('close', (code) => {
+          if (code === 0) {
+            console.log(`[McpConfHelper] uv依赖安装成功`)
+            resolve()
+          } else {
+            console.error(`[McpConfHelper] uv依赖安装失败，退出码: ${code}`)
+            reject(new Error(`uv sync failed with code ${code}`))
+          }
+        })
+        
+        uvSyncProcess.on('error', (error) => {
+          console.error(`[McpConfHelper] uv sync进程错误:`, error)
+          reject(error)
+        })
+      })
+    } catch (uvError) {
+      console.error(`[McpConfHelper] uv依赖安装失败:`, uvError)
+      throw uvError
+    }
+  }
+
   // 移除MCP服务器
   async removeMcpServer(name: string): Promise<void> {
     const mcpServers = await this.getMcpServers()
@@ -594,7 +686,7 @@ export class McpConfHelper {
       !mergedConfig.args[0].includes('\\') && 
       !path.isAbsolute(mergedConfig.args[0])
     
-    if (githubUrl && hasRelativeArgs && (mergedConfig.command === 'node' || mergedConfig.command === 'python' || mergedConfig.command === 'python3' || mergedConfig.command === 'bun')) {
+    if (githubUrl && hasRelativeArgs && (mergedConfig.command === 'node' || mergedConfig.command === 'python' || mergedConfig.command === 'python3' || mergedConfig.command === 'bun' || mergedConfig.command === 'uv')) {
       console.log(`[McpConfHelper] 检测到相对路径args且存在GitHub配置，触发下载逻辑`)
       
       try {
