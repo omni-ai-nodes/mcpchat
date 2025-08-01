@@ -1,9 +1,10 @@
-import { app, protocol } from 'electron'
+import { app, protocol, ipcMain } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { presenter } from './presenter'
 import { ProxyMode, proxyConfig } from './presenter/proxyConfig'
 import path from 'path'
 import fs from 'fs'
+import { spawn } from 'child_process'
 import { eventBus } from './eventbus'
 import { WINDOW_EVENTS, TRAY_EVENTS } from './events'
 import { setLoggingEnabled } from '@shared/logger'
@@ -294,6 +295,75 @@ app.whenReady().then(async () => {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       })
+    }
+  })
+
+  // 注册 IPC 处理程序用于打开终端
+  ipcMain.handle('get-mcp-server-path', async (_, serverName: string) => {
+    try {
+      const userDataPath = app.getPath('userData')
+      const mcpServersPath = path.join(userDataPath, 'mcp-servers')
+      const serverPath = path.join(mcpServersPath, serverName)
+      
+      // 确保目录存在
+      if (!fs.existsSync(serverPath)) {
+        fs.mkdirSync(serverPath, { recursive: true })
+      }
+      
+      return serverPath
+    } catch (error) {
+      console.error('获取 MCP 服务器路径失败:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('open-terminal', async (_, workDir: string) => {
+    try {
+      if (!fs.existsSync(workDir)) {
+        throw new Error(`工作目录不存在: ${workDir}`)
+      }
+
+      const platform = process.platform
+      let terminalCommand: string
+      let args: string[]
+
+      switch (platform) {
+        case 'darwin': // macOS
+          terminalCommand = 'open'
+          args = ['-a', 'Terminal', workDir]
+          break
+        case 'win32': // Windows
+          terminalCommand = 'cmd'
+          args = ['/c', 'start', 'cmd', '/k', `cd /d "${workDir}"`]
+          break
+        case 'linux': // Linux
+          // 尝试常见的 Linux 终端
+          const terminals = ['gnome-terminal', 'konsole', 'x-terminal-emulator', 'xterm']
+          terminalCommand = terminals.find(term => {
+            try {
+              const result = spawn('which', [term], { stdio: 'pipe' })
+              return result.status === 0
+            } catch {
+              return false
+            }
+          }) || 'xterm'
+          args = ['--working-directory', workDir]
+          break
+        default:
+          throw new Error(`不支持的平台: ${platform}`)
+      }
+
+      const child = spawn(terminalCommand, args, {
+        detached: true,
+        stdio: 'ignore'
+      })
+
+      child.unref()
+      
+      return { success: true, terminal: terminalCommand, directory: workDir }
+    } catch (error) {
+      console.error('打开终端失败:', error)
+      throw error
     }
   })
 }) // app.whenReady().then 结束

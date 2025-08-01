@@ -90,6 +90,9 @@ interface IpcAPI {
   // 数据库相关API
   testDatabaseConnection: (config: DatabaseConfig) => Promise<DatabaseResult>
 
+  // 终端相关API
+  getMcpServerPath: (serverName: string) => Promise<string>
+  openTerminal: (workDir: string) => Promise<{ success: boolean; terminal: string; directory: string }>
   // MCP相关API
   mcpPresenter: {
     getLocalPackageCacheStats: () => Promise<{ packageCount: number; totalSize: number }>

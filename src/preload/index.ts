@@ -77,6 +77,9 @@ const api = {
     return ipcRenderer.invoke('get-uploaded-files')
   },
   readUploadedFile: (filePath: string) => ipcRenderer.invoke('read-uploaded-file', filePath),
+  // 终端相关API
+  getMcpServerPath: (serverName: string) => ipcRenderer.invoke('get-mcp-server-path', serverName),
+  openTerminal: (workDir: string) => ipcRenderer.invoke('open-terminal', workDir),
   // 工作流相关API
   saveWorkflow: (workflowData: WorkflowData) => {
     return ipcRenderer.invoke('save-workflow', workflowData)
@@ -116,7 +119,8 @@ const api = {
     },
     installPackageToCache: (packageName: string) => {
       return ipcRenderer.invoke('presenter:call', 'mcpPresenter', 'installPackageToCache', packageName)
-    }
+    },
+
   },
   // 通用 Presenter 调用接口
   presenter: {

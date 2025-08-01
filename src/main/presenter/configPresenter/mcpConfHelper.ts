@@ -578,7 +578,39 @@ export class McpConfHelper {
     try {
       const { spawn } = await import('child_process')
       
-      // 首先安装 Python 环境
+      // 首先创建并激活虚拟环境
+      console.log(`[McpConfHelper] 使用uv创建并激活虚拟环境`)
+      await new Promise<void>((resolve, reject) => {
+        const uvVenvProcess = spawn('uv', ['venv'], {
+          cwd: localPath,
+          stdio: 'pipe'
+        })
+        
+        uvVenvProcess.stdout?.on('data', (data) => {
+          console.log(`[McpConfHelper] uv venv stdout: ${data}`)
+        })
+        
+        uvVenvProcess.stderr?.on('data', (data) => {
+          console.log(`[McpConfHelper] uv venv stderr: ${data}`)
+        })
+        
+        uvVenvProcess.on('close', (code) => {
+          if (code === 0) {
+            console.log(`[McpConfHelper] 虚拟环境创建成功`)
+            resolve()
+          } else {
+            console.error(`[McpConfHelper] 虚拟环境创建失败，退出码: ${code}`)
+            reject(new Error(`uv venv failed with code ${code}`))
+          }
+        })
+        
+        uvVenvProcess.on('error', (error) => {
+          console.error(`[McpConfHelper] uv venv进程错误:`, error)
+          reject(error)
+        })
+      })
+      
+      // 然后安装 Python 环境
       console.log(`[McpConfHelper] 使用uv安装Python环境`)
       await new Promise<void>((resolve, reject) => {
         const uvPythonProcess = spawn('uv', ['python', 'install'], {
@@ -610,7 +642,7 @@ export class McpConfHelper {
         })
       })
       
-      // 然后安装依赖
+      // 最后安装依赖
       console.log(`[McpConfHelper] 使用uv安装项目依赖`)
       await new Promise<void>((resolve, reject) => {
         const uvSyncProcess = spawn('uv', ['sync'], {

@@ -82,6 +82,18 @@ const getLocalizedServerDesc = (serverName: string, fallbackDesc: string) => {
   }
 }
 
+// 打开终端并定位到服务目录
+const openTerminal = async () => {
+  try {
+    const serverName = props.server.name || 'unknown-server'
+    const serverPath = await window.api.getMcpServerPath(serverName)
+    await window.api.openTerminal(serverPath)
+  } catch (error) {
+    console.error('打开终端失败:', error)
+    alert(`打开终端失败: ${error instanceof Error ? error.message : '未知错误'}`)
+  }
+}
+
 const getServerTypeLabel = (type?: string) => {
   switch (type) {
     case 'http':
@@ -342,6 +354,17 @@ watch(watchDescription, () => {
       >
         <Icon icon="lucide:folder" class="h-3 w-3 mr-1" />
         {{ resourcesCount }}
+      </Button>
+      <Separator orientation="vertical" class="h-5" />
+      <!-- 终端按钮 -->
+      <Button
+        variant="ghost"
+        class="h-full flex-1 text-xs hover:bg-secondary rounded-none"
+        :disabled="disabled"
+        @click="openTerminal"
+      >
+        <Icon icon="lucide:terminal" class="h-3 w-3 mr-1" />
+        终端
       </Button>
     </div>
   </div>
